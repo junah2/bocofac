@@ -332,7 +332,7 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
       <div className="w-full bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-7 relative">
         <button
           type="button"
-          onClick={() => setPage('signup')}
+          onClick={() => setPage('home')}
           aria-label="Back"
           className="absolute left-5 top-5 w-9 h-9 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition cursor-pointer"
         >
