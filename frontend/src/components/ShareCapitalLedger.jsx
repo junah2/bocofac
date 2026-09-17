@@ -66,6 +66,7 @@ export default function ShareCapitalLedger({
   const [submittingSheet, setSubmittingSheet] = useState(false);
 
   const emptySheetForm = (member) => ({
+    requiredShareCapital: member.requiredShareCapital,
     address: member.address || '',
     mobileNumber: member.mobileNumber || '',
     ncfrsId: member.ncfrsId || '',
@@ -87,10 +88,16 @@ export default function ShareCapitalLedger({
 
   const handleSheetSubmit = async (e) => {
     e.preventDefault();
+    const capital = Number(sheetForm.requiredShareCapital);
+    if (!Number.isFinite(capital) || capital < MIN_SHARE_CAPITAL || capital > MAX_SHARE_CAPITAL) {
+      onToast?.(`Required share capital must be between ₱${MIN_SHARE_CAPITAL.toLocaleString()} and ₱${MAX_SHARE_CAPITAL.toLocaleString()}.`, 'error');
+      return;
+    }
     setSubmittingSheet(true);
     try {
       const updated = await onUpdateMember(viewedMember.id, {
         ...sheetForm,
+        requiredShareCapital: capital,
         membershipFee: sheetForm.membershipFee === '' ? null : Number(sheetForm.membershipFee),
         membershipFeeDatePaid: sheetForm.membershipFeeDatePaid || null,
       });
@@ -913,6 +920,20 @@ export default function ShareCapitalLedger({
                     <form onSubmit={handleSheetSubmit} className="space-y-4 border-t pt-4">
                       <h4 className="text-[10px] uppercase font-bold text-slate-400">Member's Information Sheet</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="sm:col-span-2">
+                          <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                            Required Share Capital (₱{MIN_SHARE_CAPITAL.toLocaleString()}–₱{MAX_SHARE_CAPITAL.toLocaleString()})
+                          </label>
+                          <input
+                            type="number"
+                            min={MIN_SHARE_CAPITAL}
+                            max={MAX_SHARE_CAPITAL}
+                            step={500}
+                            value={sheetForm.requiredShareCapital}
+                            onChange={(e) => setSheetForm(f => ({ ...f, requiredShareCapital: e.target.value }))}
+                            className="w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-slate-950"
+                          />
+                        </div>
                         <div className="sm:col-span-2">
                           <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Address</label>
                           <input type="text" value={sheetForm.address} onChange={(e) => setSheetForm(f => ({ ...f, address: e.target.value }))} className="w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-slate-950" />
