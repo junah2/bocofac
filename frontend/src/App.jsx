@@ -583,7 +583,7 @@ export default function App() {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ status: updates.status, reason: updates.reason }),
+          body: JSON.stringify({ status: updates.status, reason: updates.reason, requiredShareCapital: updates.requiredShareCapital }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));

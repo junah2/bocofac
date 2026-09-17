@@ -735,9 +735,15 @@ function Section({ title, children }) {
   );
 }
 
+// Mirrors backend/src/utils/shareCapital.js - every member's required share
+// capital target must fall inside this range.
+const MIN_REQUIRED_SHARE_CAPITAL = 4000;
+const MAX_REQUIRED_SHARE_CAPITAL = 25000;
+
 function ApplicantDetailModal({ applicant: a, onClose, onUpdateApplicantStatus, onToast }) {
   const docs = a.documentsUploaded || {};
   const [rejectReasonDraft, setRejectReasonDraft] = useState('');
+  const [requiredShareCapitalDraft, setRequiredShareCapitalDraft] = useState('10000');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60" onClick={onClose}>
@@ -992,17 +998,33 @@ function ApplicantDetailModal({ applicant: a, onClose, onUpdateApplicantStatus, 
         )}
 
         {a.status !== 'Rejected' && a.status !== 'Approved' && (
-          <div className="p-4 border-t border-slate-100 dark:border-slate-800">
-            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
-              Rejection Reason (required to reject)
-            </label>
-            <textarea
-              value={rejectReasonDraft}
-              onChange={(e) => setRejectReasonDraft(e.target.value)}
-              placeholder="E.g., incomplete requirements, ID does not match records, duplicate application..."
-              rows={2}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm resize-none"
-            />
+          <div className="p-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                Required Share Capital (₱{MIN_REQUIRED_SHARE_CAPITAL.toLocaleString()}–₱{MAX_REQUIRED_SHARE_CAPITAL.toLocaleString()}, required to approve)
+              </label>
+              <input
+                type="number"
+                min={MIN_REQUIRED_SHARE_CAPITAL}
+                max={MAX_REQUIRED_SHARE_CAPITAL}
+                step={500}
+                value={requiredShareCapitalDraft}
+                onChange={(e) => setRequiredShareCapitalDraft(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                Rejection Reason (required to reject)
+              </label>
+              <textarea
+                value={rejectReasonDraft}
+                onChange={(e) => setRejectReasonDraft(e.target.value)}
+                placeholder="E.g., incomplete requirements, ID does not match records, duplicate application..."
+                rows={2}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm resize-none"
+              />
+            </div>
           </div>
         )}
 
@@ -1024,7 +1046,15 @@ function ApplicantDetailModal({ applicant: a, onClose, onUpdateApplicantStatus, 
           )}
           {a.status !== 'Approved' && (
             <button
-              onClick={() => { onUpdateApplicantStatus(a.id, { status: 'Approved' }); onClose(); }}
+              onClick={() => {
+                const capital = Number(requiredShareCapitalDraft);
+                if (!Number.isFinite(capital) || capital < MIN_REQUIRED_SHARE_CAPITAL || capital > MAX_REQUIRED_SHARE_CAPITAL) {
+                  onToast?.(`Required share capital must be between ₱${MIN_REQUIRED_SHARE_CAPITAL.toLocaleString()} and ₱${MAX_REQUIRED_SHARE_CAPITAL.toLocaleString()}.`, 'error');
+                  return;
+                }
+                onUpdateApplicantStatus(a.id, { status: 'Approved', requiredShareCapital: capital });
+                onClose();
+              }}
               className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm cursor-pointer"
             >
               Approve

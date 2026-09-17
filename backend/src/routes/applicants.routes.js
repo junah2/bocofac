@@ -12,6 +12,7 @@ const { logAudit, auditFromRequest } = require('../utils/audit');
 const { validate } = require('../middleware/validate');
 const { applicantCreateSchema } = require('../validation/applicants.schema');
 const { applicantLookupLimiter, applicantDocsLimiter } = require('../middleware/rateLimit');
+const { validateRequiredShareCapital, MIN_REQUIRED_SHARE_CAPITAL, MAX_REQUIRED_SHARE_CAPITAL } = require('../utils/shareCapital');
 
 const router = express.Router();
 
@@ -332,6 +333,16 @@ router.patch('/:id/status', requireRole('board'), asyncHandler(async (req, res) 
     return res.status(400).json({ error: 'A rejection reason is required.' });
   }
 
+  let requiredShareCapital = 10000;
+  if (status === 'Approved' && req.body.requiredShareCapital !== undefined) {
+    requiredShareCapital = validateRequiredShareCapital(req.body.requiredShareCapital);
+    if (requiredShareCapital === null) {
+      return res.status(400).json({
+        error: `requiredShareCapital must be between ${MIN_REQUIRED_SHARE_CAPITAL} and ${MAX_REQUIRED_SHARE_CAPITAL}.`,
+      });
+    }
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -356,8 +367,8 @@ router.patch('/:id/status', requireRole('board'), asyncHandler(async (req, res) 
         createdMemberId = await nextMemberId(client);
         await client.query(
           `INSERT INTO members (id, name, email, required_share_capital, joined_date, status)
-           VALUES ($1,$2,$3,10000,CURRENT_DATE,'Active')`,
-          [createdMemberId, applicant.full_name, applicant.email]
+           VALUES ($1,$2,$3,$4,CURRENT_DATE,'Active')`,
+          [createdMemberId, applicant.full_name, applicant.email, requiredShareCapital]
         );
       }
       await client.query(
