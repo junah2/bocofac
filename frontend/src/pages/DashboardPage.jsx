@@ -12,6 +12,12 @@ import { displayApplicantStatus } from '../utils/applicantStatus';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
+// Mirrors backend/src/utils/shareCapital.js - the "Target Amount" tile shows
+// this fixed range rather than the member's own requiredShareCapital number,
+// per how the cooperative wants it presented on the customer-facing page.
+const MIN_REQUIRED_SHARE_CAPITAL = 4000;
+const MAX_REQUIRED_SHARE_CAPITAL = 10000;
+
 // Cancellation window matches the backend's own 24-hour cutoff (orders.routes.js).
 const CANCELLABLE_WINDOW_MS = 24 * 60 * 60 * 1000;
 function canStillCancel(order) {
@@ -1137,7 +1143,7 @@ function MembershipContributionPanel({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5" style={{ marginBottom: 18 }}>
           <StatTile label="Total Paid" value={`₱${totalContribution.toLocaleString()}`} color="var(--green)" background="var(--tile-green-bg)" />
           <StatTile label="Remaining Balance" value={`₱${remainingBalance.toLocaleString()}`} color="#d97706" background="var(--tile-amber-bg)" />
-          <StatTile label="Target Amount" value={`₱${target.toLocaleString()}`} color="#2563eb" background="var(--tile-blue-bg)" />
+          <StatTile label="Target Amount" value={`₱${MIN_REQUIRED_SHARE_CAPITAL.toLocaleString()} - ₱${MAX_REQUIRED_SHARE_CAPITAL.toLocaleString()}`} color="#2563eb" background="var(--tile-blue-bg)" />
           <StatTile label="Savings" value={`₱${savingsBalance.toLocaleString()}`} color="#0284c7" background="rgba(2, 132, 199, 0.12)" />
         </div>
 
