@@ -51,7 +51,7 @@ export default function Navbar({
   // signed in. A guest is assumed to be a new customer, so it opens
   // Create Account first (Sign In / Admin / Board of Directors are all
   // reachable from there).
-  const accountTarget = admin ? 'admin-dashboard' : bod ? 'bod-dashboard' : user ? 'dashboard' : 'signin';
+  const accountTarget = admin ? 'admin-dashboard' : bod ? 'bod-dashboard' : user ? 'dashboard' : 'signup';
   const accountLabel = admin ? 'Admin' : bod ? 'Board' : user ? 'Me' : 'Sign Up';
   const AccountIcon = admin ? ShieldCheck : bod ? Landmark : UserCircle;
 

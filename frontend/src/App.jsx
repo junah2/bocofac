@@ -785,7 +785,7 @@ export default function App() {
 
   const navigate = (target) => {
     if (target === 'dashboard' && !user) {
-      setPage('signin');
+      setPage('signup');
       return;
     }
     if (target === 'admin-dashboard' && !admin) {
@@ -851,7 +851,7 @@ export default function App() {
           onToast={addToast}
           cartPanelOpen={cartPanelOpen}
           onCloseCart={() => setCartPanelOpen(false)}
-          onRequireAccount={() => navigate('signin')}
+          onRequireAccount={() => navigate('signup')}
         />
       )}
       {page === 'about' && <PublicAbout onApplyMembership={() => navigate('membership')} />}
