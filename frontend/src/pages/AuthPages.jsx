@@ -211,19 +211,10 @@ export function SignupPage({ setPage, setUser, onToast }) {
           </div>
 
           {/* This form only ever creates a Member account - Admin and Board
-              accounts aren't self-registered. Sign-in is one shared form for
-              every role (see SigninPage below), so this is just a quiet link
-              over to it for the rare staff member landing on this page. */}
-          <p style={{ textAlign: 'right', marginBottom: 14, fontSize: 12, color: 'var(--text-muted)' }}>
-            BOCOFAC staff?{' '}
-            <button
-              type="button"
-              onClick={() => setPage('signin')}
-              style={{ color: 'var(--green)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, padding: 0 }}
-            >
-              Sign in here
-            </button>
-          </p>
+              accounts aren't self-registered. Everyone, staff included,
+              signs in through the same shared form via the "Sign In" link
+              below (see SigninPage), so no separate staff link is needed
+              here. */}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5">
             <FormInput label="Full Name" name="name" autoComplete="name" placeholder="Juan Dela Cruz" value={form.name} onChange={set('name')} onBlur={handleBlur('name')} error={errors.name} required />
