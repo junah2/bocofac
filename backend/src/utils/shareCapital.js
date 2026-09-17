@@ -3,7 +3,7 @@
 // member's verified payments into share capital vs. savings for earnings
 // purposes) so the two never drift apart.
 const MIN_REQUIRED_SHARE_CAPITAL = 4000;
-const MAX_REQUIRED_SHARE_CAPITAL = 25000;
+const MAX_REQUIRED_SHARE_CAPITAL = 10000;
 
 // Verified payments only count toward share capital (and the earnings it
 // accrues) up to this amount - anything a member pays in beyond it is

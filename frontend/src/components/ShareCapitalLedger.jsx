@@ -25,7 +25,7 @@ import { printOfficialReceipt } from '../utils/printDocument';
 // enforces the same range server-side). Verified payments only count as
 // share capital up to this cap; anything paid beyond it becomes savings.
 const MIN_SHARE_CAPITAL = 4000;
-const MAX_SHARE_CAPITAL = 25000;
+const MAX_SHARE_CAPITAL = 10000;
 const SHARE_CAPITAL_CAP = MAX_SHARE_CAPITAL;
 
 export default function ShareCapitalLedger({

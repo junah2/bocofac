@@ -738,7 +738,7 @@ function Section({ title, children }) {
 // Mirrors backend/src/utils/shareCapital.js - every member's required share
 // capital target must fall inside this range.
 const MIN_REQUIRED_SHARE_CAPITAL = 4000;
-const MAX_REQUIRED_SHARE_CAPITAL = 25000;
+const MAX_REQUIRED_SHARE_CAPITAL = 10000;
 
 function ApplicantDetailModal({ applicant: a, onClose, onUpdateApplicantStatus, onToast }) {
   const docs = a.documentsUploaded || {};
