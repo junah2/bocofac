@@ -519,6 +519,10 @@ export default function App() {
 
   // formData carries an optional image file, so these go over multipart
   // rather than JSON (see uploadProductImage in backend/src/middleware/upload.js).
+  // Both return a plain boolean (never throw) so the Add/Edit Product form
+  // can tell success from failure and only close itself on success - it
+  // used to close either way, since the toast-and-swallow catch here meant
+  // the form's own await never saw the failure.
   const handleAddProduct = async (formData) => {
     try {
       const res = await fetch(`${API_BASE}/products`, {
@@ -530,8 +534,10 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || 'Failed to add product.');
       setProducts(prev => [...prev, data]);
       addToast(`Product "${data.name}" added.`, 'success');
+      return true;
     } catch (err) {
       addToast(err.message || 'Failed to add product.', 'error');
+      return false;
     }
   };
 
@@ -546,8 +552,10 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || 'Failed to update product.');
       setProducts(prev => prev.map(p => (p.id === productId ? data : p)));
       addToast(`Product "${data.name}" updated.`, 'success');
+      return true;
     } catch (err) {
       addToast(err.message || 'Failed to update product.', 'error');
+      return false;
     }
   };
 

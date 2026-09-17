@@ -279,14 +279,19 @@ export default function AdminDashboardPage({
 
     setSavingProduct(true);
     try {
+      let ok;
       if (editingProductId) {
         formData.append('discountPercent', productForm.discountPercent || '0');
-        await onUpdateProduct(editingProductId, formData);
+        ok = await onUpdateProduct(editingProductId, formData);
       } else {
         formData.append('stock', productForm.stock || '0');
-        await onAddProduct(formData);
+        ok = await onAddProduct(formData);
       }
-      closeProductForm();
+      // onAddProduct/onUpdateProduct already toast the specific error - only
+      // close the form once the product actually saved, so a failed save
+      // (bad category, rejected image, session expired, ...) leaves the
+      // form open with what was typed instead of silently discarding it.
+      if (ok) closeProductForm();
     } finally {
       setSavingProduct(false);
     }
