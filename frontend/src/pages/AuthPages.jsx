@@ -1,6 +1,6 @@
 // src/pages/AuthPages.jsx
 import React, { useState } from 'react';
-import { Mail, Lock, UserCircle, ShieldCheck, Landmark, ArrowLeft, UserPlus, Sprout, ShoppingBag, Handshake } from 'lucide-react';
+import { Mail, Lock, UserCircle, ShieldCheck, ArrowLeft, UserPlus, Sprout, ShoppingBag, Handshake } from 'lucide-react';
 import { GreenBtn, FormInput } from '../components/UI';
 import coconutHero from '../assets/coconut-palms-hero.jpg';
 import bocofacLogo from '../assets/bocofac-logo.jpg';
@@ -61,7 +61,7 @@ function validateSignupField(key, values) {
   }
 }
 
-export function SignupPage({ setPage, setUser, setSigninRole, onToast }) {
+export function SignupPage({ setPage, setUser, onToast }) {
   const [form, setForm] = useState({ name: '', email: '', phone: '', pass: '', confirm: '' });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -206,50 +206,24 @@ export function SignupPage({ setPage, setUser, setSigninRole, onToast }) {
             </div>
             <h1 className="font-serif" style={{ color: 'var(--green)', fontSize: 22, fontWeight: 700 }}>Create Account</h1>
             <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>
-              Choose your role and fill in your details to continue.
+              Fill in your details to join as a member.
             </p>
           </div>
 
-          {/* Select Role - Member is what this form creates, so it's shown
-              active/selected; Admin and Board accounts aren't self-registered
-              (see SigninPage below), so those two jump straight to their own
-              sign-in instead of pretending to be selectable here. */}
-          <div style={{ marginBottom: 20 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-              Select Role
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {['member', 'admin', 'board'].map(key => {
-                const cfg = SIGNIN_ROLES[key];
-                const Icon = cfg.icon;
-                const active = key === 'member';
-                const Tag = active ? 'div' : 'button';
-                return (
-                  <Tag
-                    key={key}
-                    {...(!active && { onClick: () => { setSigninRole(key); setPage('signin'); } })}
-                    style={{
-                      textAlign: 'center', padding: '12px 6px', borderRadius: 14,
-                      cursor: active ? 'default' : 'pointer',
-                      border: `2px solid ${active ? cfg.accent : 'var(--border)'}`,
-                      background: active ? cfg.tileBg : 'var(--card-bg)',
-                      transition: 'border-color 0.15s, transform 0.15s',
-                    }}
-                    onMouseEnter={!active ? e => { e.currentTarget.style.borderColor = cfg.accent; e.currentTarget.style.transform = 'translateY(-2px)'; } : undefined}
-                    onMouseLeave={!active ? e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'translateY(0)'; } : undefined}
-                  >
-                    <span style={{
-                      width: 36, height: 36, borderRadius: '50%', margin: '0 auto 6px',
-                      background: cfg.accent, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <Icon className="w-4 h-4" style={{ color: '#fff' }} />
-                    </span>
-                    <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{cfg.shortLabel}</span>
-                  </Tag>
-                );
-              })}
-            </div>
-          </div>
+          {/* This form only ever creates a Member account - Admin and Board
+              accounts aren't self-registered. Sign-in is one shared form for
+              every role (see SigninPage below), so this is just a quiet link
+              over to it for the rare staff member landing on this page. */}
+          <p style={{ textAlign: 'right', marginBottom: 14, fontSize: 12, color: 'var(--text-muted)' }}>
+            BOCOFAC staff?{' '}
+            <button
+              type="button"
+              onClick={() => setPage('signin')}
+              style={{ color: 'var(--green)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, padding: 0 }}
+            >
+              Sign in here
+            </button>
+          </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5">
             <FormInput label="Full Name" name="name" autoComplete="name" placeholder="Juan Dela Cruz" value={form.name} onChange={set('name')} onBlur={handleBlur('name')} error={errors.name} required />
@@ -270,7 +244,7 @@ export function SignupPage({ setPage, setUser, setSigninRole, onToast }) {
           <p style={{ textAlign: 'center', marginTop: 14, fontSize: 13, color: 'var(--text-muted)' }}>
             Already have an account?{' '}
             <button
-              onClick={() => { setSigninRole('member'); setPage('signin'); }}
+              onClick={() => setPage('signin')}
               style={{ color: 'var(--green)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
             >
               Sign In
@@ -282,33 +256,6 @@ export function SignupPage({ setPage, setUser, setSigninRole, onToast }) {
   );
 }
 
-
-const SIGNIN_ROLES = {
-  member: {
-    label: 'Member / Customer', shortLabel: 'Member', icon: UserCircle, expected: ['customer'],
-    desc: 'General access to your cooperative account',
-    avatarBg: 'bg-[#313826]', ring: 'ring-emerald-100 dark:ring-emerald-900/40',
-    badge: 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300',
-    // Same tokens the dashboards already use (StatTile in DashboardPage.jsx),
-    // so the staff-access tiles below read as part of the site, not a
-    // bolted-on Tailwind card.
-    tileBg: 'var(--tile-green-bg)', accent: 'var(--green)',
-  },
-  admin: {
-    label: 'Admin', shortLabel: 'Admin', icon: ShieldCheck, expected: ['admin'],
-    desc: 'Manage members, products & settings',
-    avatarBg: 'bg-blue-900', ring: 'ring-blue-100 dark:ring-blue-900/40',
-    badge: 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300',
-    tileBg: 'var(--tile-blue-bg)', accent: '#2563eb',
-  },
-  board: {
-    label: 'Board of Directors', shortLabel: 'Board', icon: Landmark, expected: ['board'],
-    desc: 'View governance reports & materials',
-    avatarBg: 'bg-amber-900', ring: 'ring-amber-100 dark:ring-amber-900/40',
-    badge: 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300',
-    tileBg: 'var(--tile-amber-bg)', accent: '#d97706',
-  },
-};
 
 // sign-in validation
 function validateSigninField(key, values) {
@@ -322,8 +269,10 @@ function validateSigninField(key, values) {
   }
 }
 
-export function SigninPage({ setPage, setUser, setAdmin, setBod, setSigninRole, initialRole = 'member', onToast }) {
-  const role = SIGNIN_ROLES[initialRole] ? initialRole : 'member'; 
+// One shared sign-in form for every role (member/customer, admin, board) -
+// there's nothing to pick beforehand. The backend's response tells us the
+// account's actual role, and that alone decides which dashboard opens.
+export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
   const [form, setForm] = useState({ email: '', pass: '' });  //dito nai-store yung data sa email and pass
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -349,9 +298,6 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, setSigninRole, 
 
   const handleBlur = key => () => setErrors(prev => ({ ...prev, [key]: validateSigninField(key, form) }));
 
-  const roleConfig = SIGNIN_ROLES[role]; // validation of role
-  const RoleIcon = roleConfig.icon;
-
   const handleSubmit = async () => { // submit
     const fieldErrors = {
       email: validateSigninField('email', form),
@@ -362,7 +308,7 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, setSigninRole, 
 
     setSubmitting(true);
     try {
-      
+
       // CONNECTION OF FRONTEND TO BACKEND
       const res = await fetch(`${API_BASE}/auth/signin`, {
         method: 'POST',
@@ -372,11 +318,6 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, setSigninRole, 
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Invalid email or password.');
-
-      if (!roleConfig.expected.includes(data.role)) {
-        await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
-        throw new Error(`These credentials are not registered as ${roleConfig.label}. Please use the correct sign-in link.`);
-      }
 
       if (data.role === 'admin') {
         setAdmin(data);
@@ -400,7 +341,7 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, setSigninRole, 
       <div className="w-full bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-7 relative">
         <button
           type="button"
-          onClick={() => { setSigninRole?.('member'); setPage('signup'); }}
+          onClick={() => setPage('signup')}
           aria-label="Back"
           className="absolute left-5 top-5 w-9 h-9 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition cursor-pointer"
         >
@@ -408,8 +349,8 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, setSigninRole, 
         </button>
 
         <div className="text-center mb-5">
-          <div className={`w-16 h-16 mx-auto rounded-full ${roleConfig.avatarBg} flex items-center justify-center mb-3 shadow-sm ring-4 ${roleConfig.ring}`}>
-            <RoleIcon className="w-7 h-7 text-white" />
+          <div className="w-16 h-16 mx-auto rounded-full bg-[#313826] flex items-center justify-center mb-3 shadow-sm ring-4 ring-emerald-100 dark:ring-emerald-900/40">
+            <UserCircle className="w-7 h-7 text-white" />
           </div>
           <h1 className="font-serif text-emerald-600 dark:text-emerald-400 text-xl font-bold">Welcome Back</h1>
           <p className="text-slate-700 dark:text-slate-300 text-sm mt-1">Enter your credentials to continue</p>
@@ -421,7 +362,7 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, setSigninRole, 
             <Mail className="w-4.5 h-4.5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
             <input
               type="email"
-              name={`${role}-email-${noAutofillId}`} 
+              name={`signin-email-${noAutofillId}`}
               autoComplete="off"
               readOnly={autofillGuardOn}
               onFocus={dropAutofillGuard}
@@ -442,7 +383,7 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, setSigninRole, 
             <Lock className="w-4.5 h-4.5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
             <input
               type="password"
-              name={`${role}-password-${noAutofillId}`}
+              name={`signin-password-${noAutofillId}`}
               autoComplete="off"
               readOnly={autofillGuardOn}
               onFocus={dropAutofillGuard}
@@ -472,21 +413,18 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, setSigninRole, 
           {submitting ? 'Signing In…' : 'Sign In'}
         </button>
 
-        {role === 'member' ? (
-          <p className="text-center mt-4 text-sm text-slate-700 dark:text-slate-300">
-            Don't have an account?{' '}
-            <button
-              onClick={() => setPage('signup')}
-              className="text-blue-600 dark:text-blue-400 font-semibold cursor-pointer hover:underline"
-            >
-              Sign Up
-            </button>
-          </p>
-        ) : (
-          <p className="text-center mt-4 text-xs text-slate-500 dark:text-slate-400">
-            {roleConfig.label} accounts are created by BOCOFAC, not self-registered.
-          </p>
-        )}
+        <p className="text-center mt-4 text-sm text-slate-700 dark:text-slate-300">
+          Don't have an account?{' '}
+          <button
+            onClick={() => setPage('signup')}
+            className="text-blue-600 dark:text-blue-400 font-semibold cursor-pointer hover:underline"
+          >
+            Sign Up
+          </button>
+        </p>
+        <p className="text-center mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+          Staff (Admin/Board) accounts are created by BOCOFAC, not self-registered.
+        </p>
       </div>
     </AuthShell>
   );

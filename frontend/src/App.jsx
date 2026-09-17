@@ -783,34 +783,18 @@ export default function App() {
   // stays hidden on all of them.
   const hideNav = ['signup', 'signin', 'admin-dashboard', 'bod-dashboard'].includes(page);
 
-  // Which tab the Sign In page opens on - defaults to Member/Customer, but
-  // gets pointed at the right tab when a guest tries to reach a staff-only
-  // dashboard directly.
-  const [signinRole, setSigninRole] = useState('member');
-
   const navigate = (target) => {
     if (target === 'dashboard' && !user) {
       setPage('signup');
       return;
     }
     if (target === 'admin-dashboard' && !admin) {
-      setSigninRole('admin');
       setPage('signin');
       return;
     }
     if (target === 'bod-dashboard' && !bod) {
-      setSigninRole('board');
       setPage('signin');
       return;
-    }
-    // Every staff logout routes back here via setPage('home') (which, on
-    // those dashboards, actually is this `navigate` function). Without this,
-    // signinRole stays stuck on 'admin'/'board' from the earlier staff visit,
-    // so the next plain "Sign In" click silently reopens the Admin/Board tab
-    // instead of Member/Customer - locking the person out of their own
-    // customer account until they notice and manually pick the right tab.
-    if (target === 'home' || target === 'signup') {
-      setSigninRole('member');
     }
     // Clicking the "Products" nav link should always land on the catalog,
     // even if the cart panel was left open from an earlier visit - without
@@ -926,10 +910,10 @@ export default function App() {
         // would read the `user` state from this render's stale closure
         // (still null, since setUser() hasn't re-rendered yet) and bounce
         // the freshly-authenticated customer straight back to signup.
-        <SignupPage setPage={setPage} setUser={setUser} setSigninRole={setSigninRole} onToast={addToast} />
+        <SignupPage setPage={setPage} setUser={setUser} onToast={addToast} />
       )}
       {page === 'signin' && (
-        <SigninPage setPage={setPage} setUser={setUser} setAdmin={setAdmin} setBod={setBod} setSigninRole={setSigninRole} initialRole={signinRole} onToast={addToast} />
+        <SigninPage setPage={setPage} setUser={setUser} setAdmin={setAdmin} setBod={setBod} onToast={addToast} />
       )}
       {page === 'forgot-password' && (
         <ForgotPasswordPage setPage={setPage} onToast={addToast} />

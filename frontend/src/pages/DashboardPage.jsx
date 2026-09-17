@@ -163,7 +163,7 @@ function ApplicationStatusPanel({ applicantStatus, setPage }) {
 }
 
 export default function DashboardPage({ user, setUser, setPage, pmesSessions = [] }) {
-  const [activeTab, setActiveTab] = useState('membership');
+  const [activeTab, setActiveTab] = useState('orders');
 
   // Real orders for the signed-in customer, tied to their account via the
   // session cookie (not the localStorage-only demo orders used elsewhere).
