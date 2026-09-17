@@ -910,7 +910,7 @@ export default function App() {
         // would read the `user` state from this render's stale closure
         // (still null, since setUser() hasn't re-rendered yet) and bounce
         // the freshly-authenticated customer straight back to signup.
-        <SignupPage setPage={setPage} setUser={setUser} onToast={addToast} />
+        <SignupPage setPage={setPage} onToast={addToast} />
       )}
       {page === 'signin' && (
         <SigninPage setPage={setPage} setUser={setUser} setAdmin={setAdmin} setBod={setBod} onToast={addToast} />

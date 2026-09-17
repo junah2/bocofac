@@ -24,9 +24,9 @@ function passwordError(value) {
   return '';
 }
 
-/* Shared branded backdrop for every auth screen - matches the organic-
-   gradient + dot pattern + glow orbs treatment used on the public Home/About
-   heroes, so sign up/in doesn't feel like a plain, unbranded form. */
+/* Shared branded backdrop for the Forgot Password flow only - Sign In and
+   Create Account instead share AuthSplitLayout below, which keeps the same
+   left-side photo panel under both, swapping only the form on the right. */
 function AuthShell({ children, wide }) {
   return (
     <div className="h-full min-h-[calc(100vh-64px)] flex items-center justify-center px-5 py-6 relative overflow-hidden bg-[#1e2318]">
@@ -37,6 +37,85 @@ function AuthShell({ children, wide }) {
         <div className="flex items-center justify-center gap-2 mb-3 text-emerald-300 text-xs font-semibold uppercase tracking-wider">
           <Sprout className="w-3.5 h-3.5" /> BOCOFAC Coconut Farmers Cooperative
         </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* Left-side branded panel shared by Sign In and Create Account - decorative
+   only, so it's dropped on small screens rather than squeezed. */
+function AuthBrandPanel() {
+  return (
+    <div className="hidden lg:flex flex-col lg:w-1/2 relative overflow-hidden bg-[#1e2318] px-10 py-10">
+      <img src={coconutHero} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      <div
+        className="absolute inset-0"
+        style={{ background: 'linear-gradient(180deg, rgba(2,44,34,0.45) 0%, rgba(2,44,34,0.35) 40%, rgba(2,44,34,0.92) 100%)' }}
+      />
+
+      <div className="relative z-10 flex flex-col h-full">
+        <div className="inline-flex items-center gap-2 mb-8 text-emerald-50 text-xs font-semibold uppercase tracking-wider w-fit px-3 py-1 rounded-full bg-black/25 border border-white/20 backdrop-blur-sm">
+          <Sprout className="w-3.5 h-3.5" /> BOCOFAC Coconut Farmers Cooperative
+        </div>
+
+        <h1 className="font-serif text-white text-3xl font-extrabold leading-tight mb-3">Welcome to BOCOFAC!</h1>
+        <p className="text-emerald-100/80 text-sm leading-relaxed max-w-sm">
+          Sign in to manage your membership, track your share capital, and shop the marketplace — all in one place.
+        </p>
+
+        {/* Real coconut grove photo fills the rest of the panel - the
+            gradient scrim keeps the feature row below readable without
+            needing a separate illustration on top of it. */}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full bg-emerald-400/20 blur-2xl" />
+            <img
+              src={bocofacLogo}
+              alt="BOCOFAC"
+              className="relative w-40 h-40 sm:w-52 sm:h-52 rounded-full object-cover shadow-2xl ring-4 ring-white/20"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 pt-6 border-t border-white/20">
+          <div className="text-center">
+            <div className="w-9 h-9 mx-auto mb-2 rounded-lg bg-black/30 backdrop-blur-sm flex items-center justify-center">
+              <ShieldCheck className="w-4.5 h-4.5 text-emerald-300" />
+            </div>
+            <p className="text-white text-xs font-bold">Secure Access</p>
+            <p className="text-emerald-50/80 text-[10.5px] mt-1 leading-snug">Your account and data stay protected.</p>
+          </div>
+          <div className="text-center">
+            <div className="w-9 h-9 mx-auto mb-2 rounded-lg bg-black/30 backdrop-blur-sm flex items-center justify-center">
+              <Handshake className="w-4.5 h-4.5 text-emerald-300" />
+            </div>
+            <p className="text-white text-xs font-bold">Coop Benefits</p>
+            <p className="text-emerald-50/80 text-[10.5px] mt-1 leading-snug">Shared capital and fair trade pricing.</p>
+          </div>
+          <div className="text-center">
+            <div className="w-9 h-9 mx-auto mb-2 rounded-lg bg-black/30 backdrop-blur-sm flex items-center justify-center">
+              <ShoppingBag className="w-4.5 h-4.5 text-emerald-300" />
+            </div>
+            <p className="text-white text-xs font-bold">Marketplace</p>
+            <p className="text-emerald-50/80 text-[10.5px] mt-1 leading-snug">Buy and sell coconut products directly.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Shared outer frame for Sign In and Create Account - same left photo panel
+   under both, so switching between them only swaps the card on the right
+   instead of the whole page changing shape. */
+function AuthSplitLayout({ children }) {
+  return (
+    <div className="min-h-screen flex">
+      <AuthBrandPanel />
+      <div className="w-full lg:w-1/2 relative overflow-hidden bg-[#ede6db] flex items-center justify-center px-6 py-10 sm:px-12">
+        <div className="absolute -right-24 -top-24 w-72 h-72 bg-emerald-300/30 rounded-full blur-3xl" />
+        <div className="absolute -left-24 -bottom-24 w-80 h-80 bg-amber-200/30 rounded-full blur-3xl" />
         {children}
       </div>
     </div>
@@ -61,7 +140,7 @@ function validateSignupField(key, values) {
   }
 }
 
-export function SignupPage({ setPage, setUser, onToast }) {
+export function SignupPage({ setPage, onToast }) {
   const [form, setForm] = useState({ name: '', email: '', phone: '', pass: '', confirm: '' });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -102,8 +181,12 @@ export function SignupPage({ setPage, setUser, onToast }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not create your account.');
-      setUser(data);
-      setPage('dashboard');
+      // Land back on Sign In (not straight into the dashboard) so the new
+      // member's very first action is actually signing in with the
+      // credentials they just set - one consistent login path for every
+      // account, freshly created or not.
+      onToast('Account created! Please sign in to continue.', 'success');
+      setPage('signin');
     } catch (err) {
       onToast(err.message || 'Could not create your account.', 'error');
     } finally {
@@ -112,138 +195,70 @@ export function SignupPage({ setPage, setUser, onToast }) {
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left - branded panel. Decorative only, so it's dropped on small
-          screens rather than squeezed - the form is what matters there. */}
-      <div className="hidden lg:flex flex-col lg:w-1/2 relative overflow-hidden bg-[#1e2318] px-10 py-10">
-        <img src={coconutHero} alt="" className="absolute inset-0 w-full h-full object-cover" />
-        <div
-          className="absolute inset-0"
-          style={{ background: 'linear-gradient(180deg, rgba(2,44,34,0.45) 0%, rgba(2,44,34,0.35) 40%, rgba(2,44,34,0.92) 100%)' }}
-        />
-
-        <div className="relative z-10 flex flex-col h-full">
-          <div className="inline-flex items-center gap-2 mb-8 text-emerald-50 text-xs font-semibold uppercase tracking-wider w-fit px-3 py-1 rounded-full bg-black/25 border border-white/20 backdrop-blur-sm">
-            <Sprout className="w-3.5 h-3.5" /> BOCOFAC Coconut Farmers Cooperative
+    <AuthSplitLayout>
+      <div
+        className="auth-dark-panel relative w-full max-w-md"
+        style={{
+          '--card-bg': '#ffffff',
+          '--text': '#2b2b2b',
+          '--text-muted': '#726b5c',
+          '--border': '#d9dcc7',
+          '--green': '#6b7c52',
+          '--green-dark': '#566343',
+          '--green-light': 'rgba(107, 124, 82, 0.12)',
+          '--tile-green-bg': '#ebebe0',
+          '--tile-blue-bg': '#dbeafe',
+          '--tile-amber-bg': '#fef3c7',
+        }}
+      >
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: '50%',
+            background: 'var(--green)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 10px',
+          }}>
+            <UserPlus className="w-6 h-6 text-white" />
           </div>
-
-          <h1 className="font-serif text-white text-3xl font-extrabold leading-tight mb-3">Welcome to BOCOFAC!</h1>
-          <p className="text-emerald-100/80 text-sm leading-relaxed max-w-sm">
-            Create your account to manage your membership, track your share capital, and shop the marketplace — all in one place.
-          </p>
-
-          {/* Real coconut grove photo fills the rest of the panel - the
-              gradient scrim keeps the feature row below readable without
-              needing a separate illustration on top of it. */}
-          <div className="flex-1 flex items-center justify-center">
-            <div className="relative">
-              <div className="absolute inset-0 rounded-full bg-emerald-400/20 blur-2xl" />
-              <img
-                src={bocofacLogo}
-                alt="BOCOFAC"
-                className="relative w-40 h-40 sm:w-52 sm:h-52 rounded-full object-cover shadow-2xl ring-4 ring-white/20"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 pt-6 border-t border-white/20">
-            <div className="text-center">
-              <div className="w-9 h-9 mx-auto mb-2 rounded-lg bg-black/30 backdrop-blur-sm flex items-center justify-center">
-                <ShieldCheck className="w-4.5 h-4.5 text-emerald-300" />
-              </div>
-              <p className="text-white text-xs font-bold">Secure Access</p>
-              <p className="text-emerald-50/80 text-[10.5px] mt-1 leading-snug">Your account and data stay protected.</p>
-            </div>
-            <div className="text-center">
-              <div className="w-9 h-9 mx-auto mb-2 rounded-lg bg-black/30 backdrop-blur-sm flex items-center justify-center">
-                <Handshake className="w-4.5 h-4.5 text-emerald-300" />
-              </div>
-              <p className="text-white text-xs font-bold">Coop Benefits</p>
-              <p className="text-emerald-50/80 text-[10.5px] mt-1 leading-snug">Shared capital and fair trade pricing.</p>
-            </div>
-            <div className="text-center">
-              <div className="w-9 h-9 mx-auto mb-2 rounded-lg bg-black/30 backdrop-blur-sm flex items-center justify-center">
-                <ShoppingBag className="w-4.5 h-4.5 text-emerald-300" />
-              </div>
-              <p className="text-white text-xs font-bold">Marketplace</p>
-              <p className="text-emerald-50/80 text-[10.5px] mt-1 leading-snug">Buy and sell coconut products directly.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Right - the form itself. Warm beige, paired with the brand forest
-          green (see logo) instead of the earlier blue-sky wash. The shared
-          FormInput/GreenBtn pick up their colors from CSS vars, so
-          overriding those locally is enough to reskin them for this
-          surface without touching the components. */}
-      <div className="w-full lg:w-1/2 relative overflow-hidden bg-[#ede6db] flex items-center justify-center px-6 py-10 sm:px-12">
-        <div className="absolute -right-24 -top-24 w-72 h-72 bg-emerald-300/30 rounded-full blur-3xl" />
-        <div className="absolute -left-24 -bottom-24 w-80 h-80 bg-amber-200/30 rounded-full blur-3xl" />
-        <div
-          className="auth-dark-panel relative w-full max-w-md"
-          style={{
-            '--card-bg': '#ffffff',
-            '--text': '#2b2b2b',
-            '--text-muted': '#726b5c',
-            '--border': '#d9dcc7',
-            '--green': '#6b7c52',
-            '--green-dark': '#566343',
-            '--green-light': 'rgba(107, 124, 82, 0.12)',
-            '--tile-green-bg': '#ebebe0',
-            '--tile-blue-bg': '#dbeafe',
-            '--tile-amber-bg': '#fef3c7',
-          }}
-        >
-          <div style={{ textAlign: 'center', marginBottom: 20 }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: '50%',
-              background: 'var(--green)', display: 'flex',
-              alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 10px',
-            }}>
-              <UserPlus className="w-6 h-6 text-white" />
-            </div>
-            <h1 className="font-serif" style={{ color: 'var(--green)', fontSize: 22, fontWeight: 700 }}>Create Account</h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>
-              Fill in your details to join as a member.
-            </p>
-          </div>
-
-          {/* This form only ever creates a Member account - Admin and Board
-              accounts aren't self-registered. Everyone, staff included,
-              signs in through the same shared form via the "Sign In" link
-              below (see SigninPage), so no separate staff link is needed
-              here. */}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5">
-            <FormInput label="Full Name" name="name" autoComplete="name" placeholder="Juan Dela Cruz" value={form.name} onChange={set('name')} onBlur={handleBlur('name')} error={errors.name} required />
-            <FormInput label="Email Address" name="email" type="email" autoComplete="email" placeholder="youremail@example.com" value={form.email} onChange={set('email')} onBlur={handleBlur('email')} error={errors.email} required />
-          </div>
-          <div style={{ maxWidth: 220 }}>
-            <FormInput label="Contact Number" name="phone" type="tel" inputMode="numeric" maxLength={11} autoComplete="tel" placeholder="09171234567" value={form.phone} onChange={set('phone')} onBlur={handleBlur('phone')} error={errors.phone} />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5">
-            <FormInput label="Password" name="new-password" type="password" autoComplete="new-password" placeholder="8+ characters, with a letter, number & symbol" value={form.pass} onChange={set('pass')} onBlur={handleBlur('pass')} error={errors.pass} required />
-            <FormInput label="Confirm Password" name="confirm-password" type="password" autoComplete="new-password" placeholder="Re-enter your password" value={form.confirm} onChange={set('confirm')} onBlur={handleBlur('confirm')} error={errors.confirm} required />
-          </div>
-
-          <GreenBtn full onClick={handleSubmit} disabled={submitting}>
-            {submitting ? 'Creating Account…' : 'Create Account'}
-          </GreenBtn>
-
-          <p style={{ textAlign: 'center', marginTop: 14, fontSize: 13, color: 'var(--text-muted)' }}>
-            Already have an account?{' '}
-            <button
-              onClick={() => setPage('signin')}
-              style={{ color: 'var(--green)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
-            >
-              Sign In
-            </button>
+          <h1 className="font-serif" style={{ color: 'var(--green)', fontSize: 22, fontWeight: 700 }}>Create Account</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>
+            Fill in your details to join as a member.
           </p>
         </div>
+
+        {/* This form only ever creates a Member account - Admin and Board
+            accounts aren't self-registered. Everyone, staff included,
+            signs in through the same shared form via the "Sign In" link
+            below (see SigninPage), so no separate staff link is needed
+            here. */}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5">
+          <FormInput label="Full Name" name="name" autoComplete="name" placeholder="Juan Dela Cruz" value={form.name} onChange={set('name')} onBlur={handleBlur('name')} error={errors.name} required />
+          <FormInput label="Email Address" name="email" type="email" autoComplete="email" placeholder="youremail@example.com" value={form.email} onChange={set('email')} onBlur={handleBlur('email')} error={errors.email} required />
+        </div>
+        <div style={{ maxWidth: 220 }}>
+          <FormInput label="Contact Number" name="phone" type="tel" inputMode="numeric" maxLength={11} autoComplete="tel" placeholder="09171234567" value={form.phone} onChange={set('phone')} onBlur={handleBlur('phone')} error={errors.phone} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5">
+          <FormInput label="Password" name="new-password" type="password" autoComplete="new-password" placeholder="8+ characters, with a letter, number & symbol" value={form.pass} onChange={set('pass')} onBlur={handleBlur('pass')} error={errors.pass} required />
+          <FormInput label="Confirm Password" name="confirm-password" type="password" autoComplete="new-password" placeholder="Re-enter your password" value={form.confirm} onChange={set('confirm')} onBlur={handleBlur('confirm')} error={errors.confirm} required />
+        </div>
+
+        <GreenBtn full onClick={handleSubmit} disabled={submitting}>
+          {submitting ? 'Creating Account…' : 'Create Account'}
+        </GreenBtn>
+
+        <p style={{ textAlign: 'center', marginTop: 14, fontSize: 13, color: 'var(--text-muted)' }}>
+          Already have an account?{' '}
+          <button
+            onClick={() => setPage('signin')}
+            style={{ color: 'var(--green)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
+          >
+            Sign In
+          </button>
+        </p>
       </div>
-    </div>
+    </AuthSplitLayout>
   );
 }
 
@@ -328,8 +343,8 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
   };
 
   return (
-    <AuthShell>
-      <div className="w-full bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-7 relative">
+    <AuthSplitLayout>
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-7 relative">
         <button
           type="button"
           onClick={() => setPage('home')}
@@ -410,14 +425,14 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
             onClick={() => setPage('signup')}
             className="text-blue-600 dark:text-blue-400 font-semibold cursor-pointer hover:underline"
           >
-            Sign Up
+            Create Account
           </button>
         </p>
         <p className="text-center mt-1.5 text-xs text-slate-500 dark:text-slate-400">
           Staff (Admin/Board) accounts are created by BOCOFAC, not self-registered.
         </p>
       </div>
-    </AuthShell>
+    </AuthSplitLayout>
   );
 }
 
