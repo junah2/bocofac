@@ -1,0 +1,34 @@
+{
+  "name": "bocofac",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "lucide-react": "^1.23.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "^5.0.1",
+    "recharts": "^3.9.1",
+    "tesseract.js": "^5.1.1"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.5.2",
+    "postcss": "^8.5.16",
+    "tailwindcss": "^3.4.19"
+  }
+}

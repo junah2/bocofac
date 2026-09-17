@@ -1,0 +1,228 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Glassmorphism / brand utilities used by the ported Tailwind components */
+.glass-panel {
+  @apply bg-white/85 backdrop-blur-md border border-slate-200/50 shadow-sm transition-all duration-300;
+}
+.dark .glass-panel {
+  @apply bg-slate-900/85 backdrop-blur-md border border-slate-800/50 shadow-sm;
+}
+.organic-gradient {
+  background: linear-gradient(135deg, #424c34 0%, #1e2318 100%);
+}
+/* Form-on-tinted-background variant used where a form sits directly on a
+   colored surface (e.g. the sign-up split panel's beige background)
+   instead of a plain --card-bg surface. Native placeholder text ignores
+   CSS vars entirely, so it needs its own rule rather than going through
+   --text-muted like everything else here. */
+.auth-dark-panel input::placeholder {
+  color: #94a3b8;
+}
+.gold-gradient {
+  background: linear-gradient(135deg, #fbbf24 0%, #b45309 100%);
+}
+.hover-lift {
+  @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-md;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* Muted sage/botanical palette (Naturelle Botanicals reference board):
+     soft sage green accent, warm cream surfaces, charcoal text - see
+     tailwind.config.js for the matching emerald-* utility override these
+     vars are kept in step with. */
+  --green: #6b7c52;
+  --green-dark: #566343;
+  --green-mid: #8f9d6c;
+  --green-light: #ebebe0;
+  --green-lighter: #f7f7f2;
+  --text: #2b2b2b;
+  --text-muted: #726b5c;
+  --border: #d9dcc7;
+  --white: #ffffff;
+  --bg: #faf8f4;
+  --card-bg: #ffffff;
+  --track-bg: #e2e8f0;
+  --alert-amber-bg: #fff7ed;
+  --alert-amber-border: #fbbf24;
+  --alert-amber-text: #92400e;
+  --alert-rose-bg: #fee2e2;
+  --alert-rose-border: #fca5a5;
+  --alert-rose-text: #991b1b;
+  --alert-emerald-bg: #f7f7f2;
+  --tile-green-bg: #ebebe0;
+  --tile-amber-bg: #fffbeb;
+  --tile-blue-bg: #eff6ff;
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 20px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,0.14);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+
+.dark {
+  --green: #a8b587;
+  --green-dark: #8f9d6c;
+  --green-mid: #8f9d6c;
+  --green-light: rgba(168, 181, 135, 0.12);
+  --green-lighter: rgba(168, 181, 135, 0.08);
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --border: #1e293b;
+  --white: #0f172a;
+  --bg: #020617;
+  --card-bg: #0f172a;
+  --track-bg: #1e293b;
+  --alert-amber-bg: rgba(251, 191, 36, 0.1);
+  --alert-amber-border: rgba(251, 191, 36, 0.3);
+  --alert-amber-text: #fbbf24;
+  --alert-rose-bg: rgba(252, 165, 165, 0.1);
+  --alert-rose-border: rgba(252, 165, 165, 0.3);
+  --alert-rose-text: #fca5a5;
+  --alert-emerald-bg: rgba(143, 157, 108, 0.12);
+  --tile-green-bg: rgba(143, 157, 108, 0.12);
+  --tile-amber-bg: rgba(217, 119, 6, 0.12);
+  --tile-blue-bg: rgba(37, 99, 235, 0.14);
+}
+
+body {
+  overflow-x: hidden;
+}
+
+html {
+  /* Bumped up from the browser default 16px so every rem/Tailwind text-*
+     size scales larger site-wide - many members are older farmers who
+     find the default sizing too small to read comfortably. */
+  font-size: 18px;
+}
+
+body {
+  font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+input, select, textarea, button {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* Utility classes */
+.container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  border: 1.5px solid var(--green);
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+  cursor: pointer;
+}
+
+.btn:active { transform: scale(0.98); }
+
+.btn-primary {
+  background: var(--green);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--green-dark); }
+
+.btn-outline {
+  background: transparent;
+  color: var(--green);
+}
+.btn-outline:hover { background: var(--green-light); }
+
+.btn-full { width: 100%; }
+.btn-sm { padding: 8px 16px; font-size: 13px; }
+
+/* Form input */
+.input-field {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input-field:focus { border-color: var(--green); }
+.input-field::placeholder { color: #b0c0b0; }
+
+.input-with-icon { position: relative; }
+.input-with-icon .icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9eb09e;
+  font-size: 16px;
+  pointer-events: none;
+}
+.input-with-icon input { padding-left: 40px; }
+
+/* Card */
+.card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Section header (green bar) */
+.section-header {
+  background: var(--green);
+  padding: 12px 20px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.section-header h2 {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive grid */
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .hide-mobile { display: none !important; }
+  .grid-3 { grid-template-columns: 1fr; }
+}

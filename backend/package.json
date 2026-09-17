@@ -1,0 +1,32 @@
+{
+  "name": "bocofac-backend",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "migrate": "node src/db/migrate.js",
+    "seed": "node src/db/seed.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.6.1",
+    "file-type": "^22.0.1",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^2.2.0",
+    "nodemailer": "^9.0.3",
+    "pdfkit": "^0.15.2",
+    "pg": "^8.11.5",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
