@@ -318,8 +318,25 @@ router.patch('/:sessionId/registrations/:regId/send-certificate', requireRole('b
 // an arbitrary third party's slot just by guessing/enumerating an id.
 router.post('/:id/register', asyncHandler(async (req, res) => {
   const { applicantId, memberId, email } = req.body;
+  let selfName = null;
+  let selfEmail = null;
   if (!applicantId && !memberId) {
-    return res.status(400).json({ error: 'applicantId or memberId is required.' });
+    // Not everyone reserving a slot has filed an application yet - PMES
+    // attendance is required *before* applying, so a signed-in customer with
+    // no applicant/member record on file can still self-register here, using
+    // their own account's name/email (pulled server-side from the session,
+    // never trusted from the request body). Recorded the same way a walk-in
+    // check-in is (see the walk-in columns below) so it still surfaces on the
+    // session roster and still satisfies GET /attendance-check by email.
+    if (!req.user) {
+      return res.status(400).json({ error: 'applicantId or memberId is required.' });
+    }
+    const { rows: selfRows } = await pool.query('SELECT name, email FROM users WHERE id = $1', [req.user.sub]);
+    if (!selfRows[0]) {
+      return res.status(400).json({ error: 'applicantId or memberId is required.' });
+    }
+    selfName = selfRows[0].name;
+    selfEmail = selfRows[0].email;
   }
   if (applicantId && !email) {
     return res.status(400).json({ error: 'email is required to verify this applicant.' });
@@ -362,6 +379,22 @@ router.post('/:id/register', asyncHandler(async (req, res) => {
       return res.status(404).json({ error: 'Session not found.' });
     }
 
+    // The self-registration (walk_in_*) shape has no DB unique constraint
+    // the way applicant_id/member_id do (see uniq_pmes_reg_applicant/
+    // uniq_pmes_reg_member in schema.sql - a walk-in check-in can legitimately
+    // repeat a name/email across different people), so this path checks for
+    // an existing registration by this exact account email itself.
+    if (selfEmail) {
+      const dupeCheck = await client.query(
+        'SELECT 1 FROM pmes_registrations WHERE session_id = $1 AND lower(walk_in_email) = lower($2)',
+        [req.params.id, selfEmail]
+      );
+      if (dupeCheck.rows[0]) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'Already registered for this session.' });
+      }
+    }
+
     const countResult = await client.query(
       'SELECT COUNT(*) AS n FROM pmes_registrations WHERE session_id = $1',
       [req.params.id]
@@ -372,13 +405,13 @@ router.post('/:id/register', asyncHandler(async (req, res) => {
     }
 
     await client.query(
-      'INSERT INTO pmes_registrations (session_id, applicant_id, member_id) VALUES ($1,$2,$3)',
-      [req.params.id, applicantId || null, memberId || null]
+      'INSERT INTO pmes_registrations (session_id, applicant_id, member_id, walk_in_name, walk_in_email) VALUES ($1,$2,$3,$4,$5)',
+      [req.params.id, applicantId || null, memberId || null, selfName, selfEmail]
     );
     await auditFromRequest(req, 'pmes_session.register', {
-      db: client, actorEmail: email || null,
+      db: client, actorEmail: email || selfEmail || null,
       entityType: 'pmes_session', entityId: req.params.id,
-      metadata: { applicantId: applicantId || null, memberId: memberId || null },
+      metadata: { applicantId: applicantId || null, memberId: memberId || null, selfRegistered: !!selfEmail },
     });
     await client.query('COMMIT');
     broadcast('pmes-sessions');

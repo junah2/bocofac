@@ -3,6 +3,20 @@ import React, { useState } from 'react';
 import { ShoppingCart, ShieldCheck, UserCircle, Landmark, Menu, X, Sun, Moon, Bell } from 'lucide-react';
 import bocofacLogo from '../assets/bocofac-logo.jpg';
 
+// Every customer notification message is one of a fixed handful of strings
+// this app itself generates server-side (see notifyUser/notifyByMemberId/
+// notifyByEmail call sites in backend/src/routes, and messages.routes.js for
+// the "new message" one) - matching on their stable prefixes tells us where
+// the notification is actually about, the same way the admin notification
+// bell already carries an explicit tab per notification. A "new message"
+// notification isn't a Dashboard tab at all - it's about the chat widget
+// (CustomerMessageWidget, floating on every page), so it opens that instead.
+function resolveNotificationTarget(message) {
+  if (message.startsWith('You have a new message')) return { kind: 'messages' };
+  if (message.startsWith('Your order')) return { kind: 'tab', tab: 'orders' };
+  return { kind: 'tab', tab: 'membership' };
+}
+
 // "Just now" / "5m ago" / "3h ago" / "2d ago" - notifications skew recent, so
 // a relative label reads better here than a full timestamp.
 function timeAgo(dateStr) {
@@ -19,17 +33,27 @@ function timeAgo(dateStr) {
 export default function Navbar({
   page, setPage, cartCount, onOpenCart, user, admin, bod, isApprovedMember,
   notifications = [], onMarkNotificationRead, onMarkAllNotificationsRead,
-  isDarkMode, onToggleDarkMode,
+  onNotificationNavigate, onOpenMessages, isDarkMode, onToggleDarkMode,
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [viewedNotification, setViewedNotification] = useState(null);
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
+  // Jumps straight to whatever the notification is actually about - the
+  // Dashboard tab, or the message widget - same as clicking an admin
+  // notification jumps straight to its tab, via setPage's in-app page state
+  // or the widget's own open flag, never a hardcoded URL (so it works the
+  // same wherever this app is actually hosted, not just on a local dev
+  // server, and on every page since both the bell and the widget are global).
   const openNotification = (n) => {
     onMarkNotificationRead(n.id);
-    setViewedNotification(n);
     setNotifOpen(false);
+    const target = resolveNotificationTarget(n.message);
+    if (target.kind === 'messages') {
+      onOpenMessages?.();
+    } else {
+      onNotificationNavigate?.(target.tab);
+    }
   };
 
   // Already-approved members apply/track nothing new on that page anymore -
@@ -210,32 +234,6 @@ export default function Navbar({
               <AccountIcon className="w-4 h-4" /> {accountLabel}
             </button>
           )}
-        </div>
-      )}
-
-      {/* Notification detail popup - shows the full message in a clean
-          dialog instead of leaving it truncated in the dropdown, and never
-          renders anything derived from a URL/API address. */}
-      {viewedNotification && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-          onClick={() => setViewedNotification(null)}
-        >
-          <div
-            className="bg-white dark:bg-slate-900 rounded-xl shadow-xl max-w-sm w-full p-6"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <p className="text-sm font-bold text-slate-900 dark:text-white">Notification</p>
-              <button onClick={() => setViewedNotification(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
-              {viewedNotification.message}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-4">{timeAgo(viewedNotification.createdAt)}</p>
-          </div>
         </div>
       )}
     </header>

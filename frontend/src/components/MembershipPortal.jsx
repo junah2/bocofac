@@ -9,13 +9,16 @@ import {
   Info,
   Sparkles,
   Users,
-  Landmark
+  Landmark,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 
 import { downloadFile } from '../utils/downloadFile';
 import { formatDate } from '../utils/formatDate';
 import { getPmesDisplayStatus } from '../utils/pmesStatus';
 import { displayApplicantStatus } from '../utils/applicantStatus';
+import { Field, Section } from './ProfileField';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
@@ -302,6 +305,10 @@ export default function MembershipPortal({
       onToast('Payment reference number must be exactly 13 digits.', 'error');
       return;
     }
+    if (!pmesCertFile) {
+      onToast('Please attach your PMES Certificate before filing the application.', 'error');
+      return;
+    }
 
     const fullName = [firstName, middleName, lastName, suffix].filter(Boolean).join(' ');
     const address = [
@@ -356,6 +363,7 @@ export default function MembershipPortal({
       const uploads = [
         validIdFile && ['valid_id', validIdFile],
         feeReceiptFile && ['registration_fee_receipt', feeReceiptFile],
+        pmesCertFile && ['pmes_certificate', pmesCertFile],
       ].filter(Boolean);
 
       for (const [docType, file] of uploads) {
@@ -426,6 +434,27 @@ export default function MembershipPortal({
     }
   };
   const pmesConfirmed = !!(activeSearchedApplicant?.pmesAttended || pmesAttendanceConfirmed);
+  // True once a certificate is actually on file for this applicant - checked
+  // both ways since the field lands under a different name depending on
+  // which endpoint last populated activeSearchedApplicant (the by-email
+  // lookup's reduced toPublicStatusClient vs. the full toClient the upload
+  // endpoint returns).
+  const pmesCertOnFile = !!(activeSearchedApplicant?.pmesCertificateAttached || activeSearchedApplicant?.documentsUploaded?.pmesCertificate);
+
+  // Pops up once when landing on "Apply" without a confirmed PMES attendance
+  // - the inline banner below says the same thing, but a popup is harder to
+  // miss than a banner scrolled past. Stays dismissed until the applicant
+  // switches away and back to "Apply", or their attendance status changes.
+  const [pmesGateOpen, setPmesGateOpen] = useState(false);
+  const [pmesGateDismissed, setPmesGateDismissed] = useState(false);
+  useEffect(() => {
+    setPmesGateOpen(activePortalTab === 'apply' && !pmesConfirmed && !pmesGateDismissed);
+  }, [activePortalTab, pmesConfirmed, pmesGateDismissed]);
+  const goToPmesSchedule = () => {
+    setPmesGateDismissed(true);
+    setPmesGateOpen(false);
+    document.getElementById('pmes-schedule-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   // Signed-in customers land here already knowing their email - surface
   // their existing application status immediately instead of making them
@@ -438,9 +467,23 @@ export default function MembershipPortal({
     }
   }, [user?.email]);
 
+  // Reservation confirmation popup (see render below) - separate from the
+  // toast used for errors, since a successful reservation is worth a harder
+  // to miss confirmation with the actual date/venue on it.
+  const [reservedSession, setReservedSession] = useState(null);
+
   const registerForPmesSession = async (session) => {
-    if (!activeSearchedApplicant) {
-      onToast('Please submit or look up your application first (Check Application Status tab) before reserving a PMES slot.', 'error');
+    // Preferred identity: an application already on file. Otherwise, a
+    // signed-in account with no application yet can still self-register -
+    // PMES attendance has to happen *before* applying, so requiring an
+    // application first here would be circular. A fully anonymous guest has
+    // no account for the backend to attach the reservation to, so that case
+    // still needs an application on file (or a look-up) first.
+    const body = activeSearchedApplicant
+      ? { applicantId: activeSearchedApplicant.id, email: activeSearchedApplicant.email }
+      : {};
+    if (!activeSearchedApplicant && !user) {
+      onToast('Please sign in, or submit/look up your application first (Check Application Status tab), before reserving a PMES slot.', 'error');
       return;
     }
     try {
@@ -448,13 +491,13 @@ export default function MembershipPortal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ applicantId: activeSearchedApplicant.id, email: activeSearchedApplicant.email }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to reserve a slot for this session.');
       }
-      onToast(`Slot reserved! See you on ${formatDate(session.date)} at ${session.venue || 'the announced venue'}.`, 'success');
+      setReservedSession(session);
     } catch (err) {
       onToast(err.message || 'Could not reserve a slot for this session.', 'error');
     }
@@ -502,6 +545,72 @@ export default function MembershipPortal({
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
 
+      {pmesGateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60" onClick={() => setPmesGateDismissed(true)}>
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl max-w-sm w-full p-6 space-y-4 text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">You must attend a PMES seminar first</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                You need to attend a Pre-Membership Education Seminar (PMES) in person before you can apply for
+                membership. Pick a schedule below, reserve a slot, attend it, and once you're checked in as present
+                you'll be able to file your application.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setPmesGateDismissed(true)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 text-slate-700 font-semibold text-sm cursor-pointer"
+              >
+                Got it
+              </button>
+              <button
+                onClick={goToPmesSchedule}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm cursor-pointer"
+              >
+                View PMES Schedule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reservedSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60" onClick={() => setReservedSession(null)}>
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl max-w-sm w-full p-6 space-y-4 text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center">
+              <Check className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Slot Reserved!</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                You're booked for <span className="font-semibold text-slate-700 dark:text-slate-300">{reservedSession.title}</span> on{' '}
+                <span className="font-semibold text-slate-700 dark:text-slate-300">{formatDate(reservedSession.date)}</span>
+                {reservedSession.time ? ` (${reservedSession.time})` : ''} at{' '}
+                <span className="font-semibold text-slate-700 dark:text-slate-300">{reservedSession.venue || 'the announced venue'}</span>.
+                Your reservation is already on the cooperative's attendance roster for this session.
+              </p>
+            </div>
+            <div className="flex justify-end pt-1">
+              <button
+                onClick={() => setReservedSession(null)}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm cursor-pointer"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isApprovedMember ? (
         <div className="max-w-2xl mx-auto text-center bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-10 space-y-4">
           <div className="w-14 h-14 mx-auto rounded-full bg-emerald-800 flex items-center justify-center">
@@ -524,12 +633,12 @@ export default function MembershipPortal({
       ) : (
       <>
       {/* Tab Navigation header */}
-      <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-2">
         <div className="space-y-1 text-left">
           <p className="text-sm font-mono uppercase tracking-widest text-emerald-700 dark:text-emerald-400 font-bold">BOCOFAC Fellowship</p>
           <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white">Membership applicant Pipeline</h2>
         </div>
-        <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border">
+        <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border self-start">
           <button
             onClick={() => setActivePortalTab('apply')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition ${
@@ -570,17 +679,18 @@ export default function MembershipPortal({
                 <UserCheck className="w-5 h-5 text-emerald-800 dark:text-emerald-400" />
                 Cooperative Registrar Portal
               </h3>
-              <p className="text-xs text-slate-400 font-mono">STEP {wizardStep} of 6</p>
+              <p className="text-xs text-slate-400 font-mono">STEP {wizardStep} of 7</p>
             </div>
 
             {/* Step Indicators */}
-            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center text-[10px] font-bold">
+            <div className="grid grid-cols-2 sm:grid-cols-7 gap-2 text-center text-[10px] font-bold">
               <div onClick={() => setWizardStep(1)} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 1 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Personal</div>
               <div onClick={() => { if (firstName) setWizardStep(2); }} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 2 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Address</div>
               <div onClick={() => { if (firstName) setWizardStep(3); }} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 3 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Family</div>
               <div onClick={() => { if (firstName) setWizardStep(4); }} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 4 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Farm/Edu</div>
               <div onClick={() => { if (firstName) setWizardStep(5); }} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 5 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Requirements</div>
               <div onClick={() => { if (firstName) setWizardStep(6); }} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 6 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Payment</div>
+              <div onClick={() => { if (firstName) setWizardStep(7); }} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 7 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Review</div>
             </div>
 
             {wizardStep === 1 && (
@@ -1142,9 +1252,128 @@ export default function MembershipPortal({
                     Back to Requirements
                   </button>
                   <button
+                    onClick={() => setWizardStep(7)}
+                    className="px-6 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center gap-1 transition shadow-lg hover:shadow-emerald-900/10 cursor-pointer"
+                  >
+                    Review Application <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {wizardStep === 7 && (
+              <div className="space-y-6">
+                <div className="p-4 rounded-xl bg-emerald-500/5 text-emerald-800 dark:text-emerald-400 text-xs flex gap-2 border">
+                  <Info className="w-5 h-5 shrink-0" />
+                  <p>Review everything below before filing - go back to any step to fix something, or file the application if it all looks right.</p>
+                </div>
+
+                <Section title="Personal Data Sheet">
+                  <Field label="First Name" value={firstName} />
+                  <Field label="Middle Name" value={middleName} />
+                  <Field label="Family Name" value={lastName} />
+                  <Field label="Suffix" value={suffix} />
+                  <Field label="Birthday" value={birthdate ? new Date(birthdate).toLocaleDateString() : null} />
+                  <Field label="Birthplace" value={birthplace} />
+                  <Field label="Gender" value={gender} />
+                  <Field label="Civil Status" value={civilStatus} />
+                  <Field label="Email" value={email} />
+                  <Field label="Mobile / CP #" value={phone} />
+                </Section>
+
+                <Section title="Address & Background">
+                  <Field label="Address" value={[addressNumber && `#${addressNumber}`, street, zone && `Zone ${zone}`, barangay, munCity].filter(Boolean).join(', ')} />
+                  <Field label="Facebook" value={facebook} />
+                  <Field label="Occupation" value={occupation} />
+                  <Field label="Employer" value={employer} />
+                  <Field label="Annual Income" value={annualIncome !== '' ? `₱${Number(annualIncome).toLocaleString()}` : null} />
+                  <Field label="Business Owned / Connected" value={businessOwned} />
+                  <Field label="TIN" value={tin} />
+                  <Field label="Religion" value={religion} />
+                </Section>
+
+                <Section title="Family & Dependents">
+                  <Field label="Spouse / Contact Person" value={spouseContactPerson} />
+                  <Field label="CP #s" value={spouseCpNumber} />
+                  <Field label="No. of Dependents" value={dependents.filter(d => d.name).length} />
+                </Section>
+
+                <Section title="Farm & Education">
+                  <Field label="Educational Attainment" value={eduAttainment} />
+                </Section>
+
+                <Section title="Requirements & Documents">
+                  <Field label="EDUCOM Chairperson" value={educomChairperson} />
+                  <Field label="ID Type / #" value={[idType, idNumber].filter(Boolean).join(' / ')} />
+                  <Field label="Valid ID Attached" value={validIdAttached ? `Yes (${validIdName})` : 'Not yet'} />
+                </Section>
+
+                <Section title="Payment">
+                  <Field label="Membership Fee" value="₱300.00" />
+                  <Field label="Reference Number" value={refNum} />
+                  <Field label="Receipt Attached" value={feeReceiptFile ? `Yes (${feeReceiptFile.name})` : 'Not yet'} />
+                </Section>
+
+                <Section title="PMES Certificate">
+                  <div className="sm:col-span-3 space-y-2">
+                    {pmesCertFile ? (
+                      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                        <Check className="w-3.5 h-3.5" /> Attached: {pmesCertFile.name}
+                      </p>
+                    ) : (
+                      <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 text-xs text-amber-800 dark:text-amber-300 flex gap-2">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <p>
+                          <span className="font-bold">No PMES Certificate attached yet</span> - attach the copy emailed
+                          to you once the Board confirmed your seminar attendance. This is required before you can
+                          file the application.
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      {pmesCertPreview && (
+                        <img src={pmesCertPreview} alt="PMES certificate preview" className="h-16 rounded-lg shadow-md border object-contain" />
+                      )}
+                      <div className="relative overflow-hidden inline-block">
+                        <button type="button" className="px-3 py-1.5 rounded-lg border text-xs bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 cursor-pointer">
+                          {pmesCertFile ? 'Replace File' : 'Attach PMES Certificate'}
+                        </button>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            setPmesCertFile(file);
+                            setPmesCertPreview(file && file.type !== 'application/pdf' ? URL.createObjectURL(file) : '');
+                          }}
+                          className="absolute inset-0 opacity-0 w-full cursor-pointer"
+                        />
+                      </div>
+                      {pmesCertFile && (
+                        <button
+                          type="button"
+                          onClick={() => { setPmesCertFile(null); setPmesCertPreview(''); }}
+                          title="Remove attached certificate"
+                          className="p-1.5 rounded-lg border text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </Section>
+
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    onClick={() => setWizardStep(6)}
+                    className="px-4 py-2 text-xs rounded-xl border hover:bg-slate-100 dark:hover:bg-slate-950 cursor-pointer"
+                  >
+                    Back to Payment
+                  </button>
+                  <button
                     onClick={submitApplication}
-                    disabled={submitting || !pmesConfirmed}
-                    title={pmesConfirmed ? undefined : 'Attend a PMES seminar first'}
+                    disabled={submitting || !pmesCertFile}
+                    title={!pmesCertFile ? 'Attach your PMES Certificate first' : undefined}
                     className="px-6 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-xs flex items-center gap-1 transition shadow-lg hover:shadow-emerald-900/10 cursor-pointer"
                   >
                     {submitting ? 'Filing...' : 'File Membership Application'}
@@ -1191,7 +1420,7 @@ export default function MembershipPortal({
                 starting the form at all) - not everyone browsing seminar
                 dates has decided to apply yet, and this used to only appear
                 after reaching step 5 of the wizard. */}
-            <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 space-y-3">
+            <div id="pmes-schedule-panel" className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 space-y-3">
               <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-emerald-800 dark:text-emerald-400" />
                 Upcoming PMES Seminars
@@ -1214,7 +1443,9 @@ export default function MembershipPortal({
                           <span className="font-semibold text-slate-700 dark:text-slate-300">Venue:</span> {session.venue || 'BOCOFAC Cooperative Hall, Sipocot'}
                         </p>
                         <p className="text-[11px] text-slate-500">Facilitator: <span className="font-semibold text-slate-700 dark:text-slate-300">{session.speaker}</span></p>
-                        <p className="text-[11px] text-slate-500">{Math.max(session.capacity - session.registeredCount, 0)} slot(s) left</p>
+                        <p className="text-[11px] text-slate-500">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">{session.registeredCount}/{session.capacity}</span> registered · {Math.max(session.capacity - session.registeredCount, 0)} slot(s) left
+                        </p>
                       </div>
                       <div className="flex justify-end pt-1 border-t">
                         <button
@@ -1369,7 +1600,9 @@ export default function MembershipPortal({
                                   <span className="font-semibold text-slate-700 dark:text-slate-300">Venue:</span> {session.venue || 'BOCOFAC Cooperative Hall, Sipocot'}
                                 </p>
                                 <p className="text-[11px] text-slate-500">Facilitator: <span className="font-semibold text-slate-700 dark:text-slate-300">{session.speaker}</span></p>
-                                <p className="text-[11px] text-slate-500">{Math.max(session.capacity - session.registeredCount, 0)} slot(s) left</p>
+                                <p className="text-[11px] text-slate-500">
+                                  <span className="font-semibold text-slate-700 dark:text-slate-300">{session.registeredCount}/{session.capacity}</span> registered · {Math.max(session.capacity - session.registeredCount, 0)} slot(s) left
+                                </p>
                               </div>
                               <div className="flex justify-end pt-1 border-t">
                                 <button
@@ -1386,52 +1619,69 @@ export default function MembershipPortal({
                     </div>
                   )}
 
-                  <div className="p-3 rounded-xl border border-dashed bg-slate-50/50 dark:bg-slate-950/20 space-y-2">
-                    <p className="text-[11px] text-slate-500">
-                      {activeSearchedApplicant.pmesAttended
-                        ? 'Already received your PMES certificate by email? Optionally attach a copy here for your own file.'
-                        : "Already attended and received your certificate by email? Optionally attach a copy here for your own file while waiting for board confirmation."}
-                    </p>
-                    {pmesCertPreview && (
-                      <div className="text-center">
-                        <img src={pmesCertPreview} alt="PMES certificate preview" className="h-24 mx-auto rounded-lg shadow-md border object-contain" />
-                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">Attached: {pmesCertFile?.name}</p>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <div className="relative overflow-hidden inline-block">
-                        <button type="button" className="px-3 py-1.5 rounded-lg border text-xs bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 cursor-pointer">
-                          {pmesCertFile ? 'Replace File' : 'Attach PMES Certificate'}
-                        </button>
-                        <input
-                          type="file"
-                          accept="image/*,application/pdf"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            setPmesCertFile(file);
-                            setPmesCertPreview(file && file.type !== 'application/pdf' ? URL.createObjectURL(file) : '');
-                          }}
-                          className="absolute inset-0 opacity-0 w-full cursor-pointer"
-                        />
-                      </div>
-                      {pmesCertFile && (
-                        <button
-                          type="button"
-                          disabled={submittingPmesCert}
-                          onClick={async () => {
-                            setSubmittingPmesCert(true);
-                            await uploadPmesCertificateForActiveApplicant(pmesCertFile);
-                            setPmesCertFile(null);
-                            setPmesCertPreview('');
-                            setSubmittingPmesCert(false);
-                          }}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold text-xs cursor-pointer"
-                        >
-                          {submittingPmesCert ? 'Submitting…' : 'Submit'}
-                        </button>
-                      )}
+                  {pmesCertOnFile ? (
+                    <div className="p-3 rounded-xl border border-dashed border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/10 flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                      <Check className="w-4 h-4 shrink-0" /> Your PMES Certificate is on file.
                     </div>
-                  </div>
+                  ) : (
+                    <div className="p-3 rounded-xl border border-dashed bg-slate-50/50 dark:bg-slate-950/20 space-y-2">
+                      <p className="text-[11px] text-slate-500">
+                        {activeSearchedApplicant.pmesAttended
+                          ? 'Already received your PMES certificate by email? Optionally attach a copy here for your own file.'
+                          : "Already attended and received your certificate by email? Optionally attach a copy here for your own file while waiting for board confirmation."}
+                      </p>
+                      {pmesCertPreview && (
+                        <div className="text-center">
+                          <img src={pmesCertPreview} alt="PMES certificate preview" className="h-24 mx-auto rounded-lg shadow-md border object-contain" />
+                          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">Attached: {pmesCertFile?.name}</p>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <div className="relative overflow-hidden inline-block">
+                          <button type="button" className="px-3 py-1.5 rounded-lg border text-xs bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 cursor-pointer">
+                            {pmesCertFile ? 'Replace File' : 'Attach PMES Certificate'}
+                          </button>
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              setPmesCertFile(file);
+                              setPmesCertPreview(file && file.type !== 'application/pdf' ? URL.createObjectURL(file) : '');
+                            }}
+                            className="absolute inset-0 opacity-0 w-full cursor-pointer"
+                          />
+                        </div>
+                        {pmesCertFile && (
+                          <button
+                            type="button"
+                            disabled={submittingPmesCert}
+                            onClick={async () => {
+                              setSubmittingPmesCert(true);
+                              await uploadPmesCertificateForActiveApplicant(pmesCertFile);
+                              setPmesCertFile(null);
+                              setPmesCertPreview('');
+                              setSubmittingPmesCert(false);
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold text-xs cursor-pointer"
+                          >
+                            {submittingPmesCert ? 'Submitting…' : 'Submit'}
+                          </button>
+                        )}
+                        {pmesCertFile && (
+                          <button
+                            type="button"
+                            disabled={submittingPmesCert}
+                            onClick={() => { setPmesCertFile(null); setPmesCertPreview(''); }}
+                            title="Remove attached certificate"
+                            className="p-1.5 rounded-lg border text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-950/30 disabled:opacity-60 cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {activeSearchedApplicant.pmesAttended && (

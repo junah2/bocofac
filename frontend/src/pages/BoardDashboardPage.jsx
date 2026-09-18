@@ -36,6 +36,8 @@ import { displayApplicantStatus } from '../utils/applicantStatus';
 import { printSalesReport, printMembershipReport, printInventoryReport } from '../utils/printDocument';
 import ShareCapitalLedger from '../components/ShareCapitalLedger';
 import PmesAttendanceModal from '../components/PmesAttendanceModal';
+import ApplicantDetailModal from '../components/ApplicantDetailModal';
+import MobileScrollHint from '../components/MobileScrollHint';
 import Footer from '../components/Footer';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import bocofacLogo from '../assets/bocofac-logo.jpg';
@@ -68,6 +70,9 @@ export default function BoardDashboardPage({
   const [attendanceSession, setAttendanceSession] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef(null);
+  // Full-size preview for the small avatar thumbnail in Settings - clicking
+  // it opens the actual photo instead of leaving it stuck at 48x48px.
+  const [viewedAvatarUrl, setViewedAvatarUrl] = useState(null);
 
   const handleAvatarFileChange = async (e) => {
     const file = e.target.files[0];
@@ -474,6 +479,7 @@ export default function BoardDashboardPage({
             <div className="space-y-6">
               <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Membership Management</h2>
 
+              <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
@@ -522,6 +528,7 @@ export default function BoardDashboardPage({
               </div>
 
               <h3 className="font-bold text-slate-900 dark:text-white">Active Shareholders</h3>
+              <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
@@ -562,6 +569,7 @@ export default function BoardDashboardPage({
                 </p>
               </div>
 
+              <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
@@ -649,7 +657,13 @@ export default function BoardDashboardPage({
                     className="hidden"
                   />
                   {bod?.avatarUrl ? (
-                    <img src={resolveImageUrl(bod.avatarUrl)} alt="" className="w-12 h-12 rounded-full object-cover" />
+                    <img
+                      src={resolveImageUrl(bod.avatarUrl)}
+                      alt=""
+                      onClick={() => setViewedAvatarUrl(resolveImageUrl(bod.avatarUrl))}
+                      title="View full photo"
+                      className="w-12 h-12 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
+                    />
                   ) : (
                     <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold uppercase">
                       {(bod?.name || 'BD').slice(0, 2)}
@@ -699,6 +713,25 @@ export default function BoardDashboardPage({
           onToast={onToast}
         />
       )}
+      {viewedAvatarUrl && (
+        <div
+          className="fixed inset-0 z-[70] bg-slate-950/80 flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setViewedAvatarUrl(null)}
+        >
+          <button
+            onClick={() => setViewedAvatarUrl(null)}
+            className="absolute top-4 right-4 p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img
+            src={viewedAvatarUrl}
+            alt=""
+            className="max-w-[90vw] max-h-[90vh] rounded-2xl object-contain cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -717,351 +750,3 @@ function ReportStatRow({ label, value, tone }) {
   );
 }
 
-function Field({ label, value }) {
-  return (
-    <div>
-      <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{value || value === 0 ? value : '—'}</p>
-    </div>
-  );
-}
-
-function Section({ title, children }) {
-  return (
-    <div className="space-y-3">
-      <h4 className="text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 border-b border-slate-100 dark:border-slate-800 pb-2">{title}</h4>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">{children}</div>
-    </div>
-  );
-}
-
-// Mirrors backend/src/utils/shareCapital.js - every member's required share
-// capital target must fall inside this range.
-const MIN_REQUIRED_SHARE_CAPITAL = 4000;
-const MAX_REQUIRED_SHARE_CAPITAL = 10000;
-
-function ApplicantDetailModal({ applicant: a, onClose, onUpdateApplicantStatus, onToast }) {
-  const docs = a.documentsUploaded || {};
-  const [rejectReasonDraft, setRejectReasonDraft] = useState('');
-  const [requiredShareCapitalDraft, setRequiredShareCapitalDraft] = useState('10000');
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60" onClick={onClose}>
-      <div
-        className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between p-6 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-900 z-10">
-          <div>
-            <p className="text-xs text-slate-400 font-mono">{a.id}</p>
-            <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">{a.fullName}</h3>
-            <p className="text-xs text-slate-500">{a.email}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-              a.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
-              a.status === 'Rejected' ? 'bg-rose-100 text-rose-800' :
-              'bg-amber-100 text-amber-800'
-            }`}>{displayApplicantStatus(a.status)}</span>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
-              <X className="w-5 h-5 text-slate-500" />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-6">
-          <Section title="Personal Data Sheet">
-            <Field label="First Name" value={a.firstName} />
-            <Field label="Middle Name" value={a.middleName} />
-            <Field label="Family Name" value={a.lastName} />
-            <Field label="Suffix" value={a.suffix} />
-            <Field label="Birthday" value={a.birthdate ? new Date(a.birthdate).toLocaleDateString() : null} />
-            <Field label="Birthplace" value={a.birthplace} />
-            <Field label="Gender" value={a.gender} />
-            <Field label="Civil Status" value={a.civilStatus} />
-            <Field label="Mobile / CP #" value={a.phone || a.cpNumber} />
-            <Field label="Email" value={a.email} />
-          </Section>
-
-          <Section title="Address & Background">
-            <Field label="Address #" value={a.addressNumber} />
-            <Field label="Street" value={a.street} />
-            <Field label="Zone" value={a.zone} />
-            <Field label="Barangay" value={a.barangay} />
-            <Field label="Mun. / City" value={a.munCity} />
-            <Field label="Facebook" value={a.facebook} />
-            <Field label="Occupation" value={a.occupation} />
-            <Field label="Employer" value={a.employer} />
-            <Field label="Annual Income" value={a.annualIncome != null ? `₱${Number(a.annualIncome).toLocaleString()}` : null} />
-            <Field label="Business Owned / Connected" value={a.businessOwned} />
-            <Field label="TIN" value={a.tin} />
-            <Field label="Religion" value={a.religion} />
-          </Section>
-
-          <Section title="Family & Dependents">
-            <Field label="Spouse / Contact Person" value={a.spouseContactPerson} />
-            <Field label="CP #s" value={a.spouseCpNumber} />
-            <Field label="No. of Dependents" value={a.noOfDependents ?? 0} />
-          </Section>
-          {a.dependents && a.dependents.length > 0 && (
-            <div className="border rounded-xl overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-[10px] uppercase text-slate-400">
-                    <th className="p-2.5 font-bold">Name</th>
-                    <th className="p-2.5 font-bold">Birthdate</th>
-                    <th className="p-2.5 font-bold">Age</th>
-                    <th className="p-2.5 font-bold">Sex</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {a.dependents.map((d, i) => (
-                    <tr key={i} className="border-t border-slate-100 dark:border-slate-800">
-                      <td className="p-2.5 font-semibold text-slate-700 dark:text-slate-300">{d.name}</td>
-                      <td className="p-2.5 text-slate-500">{d.birthdate ? new Date(d.birthdate).toLocaleDateString() : '—'}</td>
-                      <td className="p-2.5 text-slate-500">{d.age ?? '—'}</td>
-                      <td className="p-2.5 text-slate-500">{d.sex || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <Section title="Farm & Education">
-            <Field label="Educational Attainment" value={a.eduAttainment} />
-          </Section>
-
-          {a.farmProfile && (
-            <>
-              <Section title="Coconut">
-                <Field label="Area (ha)" value={a.farmProfile.coconut?.areaHa} />
-                <Field label="Bearing" value={a.farmProfile.coconut?.bearing} />
-                <Field label="Non-Bearing" value={a.farmProfile.coconut?.nonBearing} />
-                <Field label="Months / Harvest" value={a.farmProfile.coconut?.monthsPerHarvest} />
-                <Field label="Ave Nuts / Harvest" value={a.farmProfile.coconut?.aveNutsHarvest} />
-                <Field label="Last Harvest" value={a.farmProfile.coconut?.lastHarvest ? new Date(a.farmProfile.coconut.lastHarvest).toLocaleDateString() : null} />
-                <Field label="Ave Kopra Sold (kg)" value={a.farmProfile.coconut?.aveKopraSoldKg} />
-                <Field label="Ave Harvest Charcoal" value={a.farmProfile.coconut?.aveHarvestCharcoal} />
-              </Section>
-
-              <Section title="Swine">
-                <Field label="Sow" value={a.farmProfile.swine?.sow} />
-                <Field label="Piglets" value={a.farmProfile.swine?.piglets} />
-                <Field label="Farrowing Date" value={a.farmProfile.swine?.farrowingDate ? new Date(a.farmProfile.swine.farrowingDate).toLocaleDateString() : null} />
-                <Field label="Fattening" value={a.farmProfile.swine?.fattening} />
-              </Section>
-
-              <Section title="Livestock">
-                <Field label="Cow - Male" value={a.farmProfile.livestock?.cowMale} />
-                <Field label="Cow - Female" value={a.farmProfile.livestock?.cowFemale} />
-                <Field label="Goat" value={a.farmProfile.livestock?.goat} />
-                <Field label="Carabao - Female" value={a.farmProfile.livestock?.carabaoFemale} />
-                <Field label="Carabao - Male" value={a.farmProfile.livestock?.carabaoMale} />
-                <Field label="Others" value={a.farmProfile.livestock?.others} />
-              </Section>
-
-              <Section title="Cacao">
-                <Field label="Area (ha/sqm)" value={a.farmProfile.cacao?.areaHaSqm} />
-                <Field label="Bearing" value={a.farmProfile.cacao?.bearing} />
-                <Field label="Non-Bearing" value={a.farmProfile.cacao?.nonBearing} />
-                <Field label="Harvest Cycle" value={a.farmProfile.cacao?.harvestCycle} />
-                <Field label="Ave Nuts / Harvest" value={a.farmProfile.cacao?.aveNutsHarvest} />
-                <Field label="Last Harvest" value={a.farmProfile.cacao?.lastHarvest ? new Date(a.farmProfile.cacao.lastHarvest).toLocaleDateString() : null} />
-                <Field label="Total / Harvest" value={a.farmProfile.cacao?.totalHarvest} />
-                <Field label="Unit Price" value={a.farmProfile.cacao?.unitPrice} />
-                <Field label="Ave Beans Sold (kg)" value={a.farmProfile.cacao?.aveBeansSoldKg} />
-              </Section>
-
-              <Section title="Rice & Corn">
-                <Field label="Rice Area (ha/sqm)" value={a.farmProfile.rice?.areaHaSqm} />
-                <Field label="Rice Location" value={a.farmProfile.rice?.location} />
-                <Field label="Corn Area (ha/sqm)" value={a.farmProfile.corn?.areaHaSqm} />
-                <Field label="Corn Location" value={a.farmProfile.corn?.location} />
-              </Section>
-
-              {a.farmProfile.otherCrops && a.farmProfile.otherCrops.length > 0 && (
-                <div className="border rounded-xl overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-[10px] uppercase text-slate-400">
-                        <th className="p-2.5 font-bold">Crop</th>
-                        <th className="p-2.5 font-bold">Area (ha/sqm)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {a.farmProfile.otherCrops.map((c, i) => (
-                        <tr key={i} className="border-t border-slate-100 dark:border-slate-800">
-                          <td className="p-2.5 font-semibold text-slate-700 dark:text-slate-300">{c.crop}</td>
-                          <td className="p-2.5 text-slate-500">{c.areaHaSqm || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {a.farmProfile.otherRemarks && (
-                <Section title="Other Remarks">
-                  <div className="sm:col-span-3">
-                    <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{a.farmProfile.otherRemarks}</p>
-                  </div>
-                </Section>
-              )}
-            </>
-          )}
-
-          <Section title="Requirements & Documents">
-            <Field label="EDUCOM Chairperson" value={a.educomChairperson} />
-            <Field label="ID Type" value={a.idType} />
-            <Field label="ID #" value={a.idNumber} />
-            <Field label="ID Date Issued" value={a.idDateIssued ? new Date(a.idDateIssued).toLocaleDateString() : null} />
-            <Field label="ID Place Issued" value={a.idPlaceIssued} />
-          </Section>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              ['Valid ID', 'valid_id', docs.validId],
-              ['Farm Declaration', 'farm_declaration', docs.farmDeclaration],
-              ['Barangay Clearance', 'barangay_clearance', docs.barangayClearance],
-              ['PMES Certificate', 'pmes_certificate', docs.pmesCertificate],
-              ['Payment Receipt', 'registration_fee_receipt', docs.registrationFeeReceipt],
-            ].map(([label, docType, uploaded]) => {
-              if (!uploaded) {
-                return (
-                  <div key={label} className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 aspect-[4/3] flex flex-col items-center justify-center gap-1 text-slate-400">
-                    <X className="w-5 h-5" />
-                    <p className="text-[11px] font-semibold text-center px-1">{label}</p>
-                  </div>
-                );
-              }
-              const url = `${API_BASE}/applicants/${a.id}/documents/${docType}`;
-              return (
-                <a
-                  key={label}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden hover:border-emerald-500 transition"
-                >
-                  <div className="aspect-[4/3] bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden relative">
-                    <img
-                      src={url}
-                      alt={label}
-                      className="w-full h-full object-cover"
-                      onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
-                    />
-                    <div className="hidden absolute inset-0 items-center justify-center text-slate-400">
-                      <FileText className="w-8 h-8" />
-                    </div>
-                  </div>
-                  <p className="px-2 py-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                    <Check className="w-3 h-3 shrink-0" /> {label}
-                  </p>
-                </a>
-              );
-            })}
-          </div>
-
-          <Section title="PMES & Membership">
-            <Field label="PMES Attended" value={a.pmesAttended ? `Yes (${a.pmesDate ? new Date(a.pmesDate).toLocaleDateString() : ''})` : 'Not yet'} />
-            <Field label="Registration Fee Paid" value={a.registrationFeePaid ? 'Yes' : 'No'} />
-            <Field label="Payment Reference #" value={a.referenceNumber} />
-            <Field label="Membership Fee" value={a.membershipFee != null ? `₱${Number(a.membershipFee).toFixed(2)}` : '₱300.00'} />
-            <Field label="Subscribed Share" value={a.subscribedShare != null ? `₱${a.subscribedShare}` : null} />
-            <Field label="Paid-up Capital" value={a.paidUpCapital != null ? `₱${a.paidUpCapital}` : null} />
-            <Field label="OR #" value={a.orNumber} />
-            <Field label="Submitted At" value={a.submittedAt ? new Date(a.submittedAt).toLocaleString() : null} />
-          </Section>
-
-          <div className="pt-1 p-3 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800">
-            {a.pmesAttended ? (
-              <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5" /> PMES attendance confirmed{a.pmesDate ? ` on ${new Date(a.pmesDate).toLocaleDateString()}` : ''} - certificate sent from the session roster.
-              </p>
-            ) : (
-              <p className="text-xs text-slate-500">
-                Not yet confirmed. PMES attendance is now checked in from the actual session roster
-                (<span className="font-semibold text-slate-700 dark:text-slate-300">PMES Attendance</span> tab) rather than here,
-                so the certificate is only sent once someone is checked in as physically present.
-              </p>
-            )}
-          </div>
-        </div>
-
-        {a.status === 'Rejected' && a.rejectionReason && (
-          <div className="p-4 border-t border-slate-100 dark:border-slate-800">
-            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900">
-              <p className="text-xs font-bold text-rose-700 dark:text-rose-400 mb-1">Rejection Reason</p>
-              <p className="text-sm text-rose-800 dark:text-rose-300">{a.rejectionReason}</p>
-            </div>
-          </div>
-        )}
-
-        {a.status !== 'Rejected' && a.status !== 'Approved' && (
-          <div className="p-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                Required Share Capital (₱{MIN_REQUIRED_SHARE_CAPITAL.toLocaleString()}–₱{MAX_REQUIRED_SHARE_CAPITAL.toLocaleString()}, required to approve)
-              </label>
-              <input
-                type="number"
-                min={MIN_REQUIRED_SHARE_CAPITAL}
-                max={MAX_REQUIRED_SHARE_CAPITAL}
-                step={500}
-                value={requiredShareCapitalDraft}
-                onChange={(e) => setRequiredShareCapitalDraft(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                Rejection Reason (required to reject)
-              </label>
-              <textarea
-                value={rejectReasonDraft}
-                onChange={(e) => setRejectReasonDraft(e.target.value)}
-                placeholder="E.g., incomplete requirements, ID does not match records, duplicate application..."
-                rows={2}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm resize-none"
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-100 dark:border-slate-800 sticky bottom-0 bg-white dark:bg-slate-900">
-          {a.status !== 'Rejected' && (
-            <button
-              onClick={() => {
-                if (!rejectReasonDraft.trim()) {
-                  onToast?.('Please provide a rejection reason.', 'error');
-                  return;
-                }
-                onUpdateApplicantStatus(a.id, { status: 'Rejected', reason: rejectReasonDraft.trim() });
-                onClose();
-              }}
-              className="px-4 py-2 rounded-xl bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-950/60 font-bold text-sm cursor-pointer"
-            >
-              Reject
-            </button>
-          )}
-          {a.status !== 'Approved' && (
-            <button
-              onClick={() => {
-                const capital = Number(requiredShareCapitalDraft);
-                if (!Number.isFinite(capital) || capital < MIN_REQUIRED_SHARE_CAPITAL || capital > MAX_REQUIRED_SHARE_CAPITAL) {
-                  onToast?.(`Required share capital must be between ₱${MIN_REQUIRED_SHARE_CAPITAL.toLocaleString()} and ₱${MAX_REQUIRED_SHARE_CAPITAL.toLocaleString()}.`, 'error');
-                  return;
-                }
-                onUpdateApplicantStatus(a.id, { status: 'Approved', requiredShareCapital: capital });
-                onClose();
-              }}
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm cursor-pointer"
-            >
-              Approve
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}

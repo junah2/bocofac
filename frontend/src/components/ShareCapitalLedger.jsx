@@ -19,13 +19,14 @@ import {
 import { formatDate } from '../utils/formatDate';
 import { downloadFile } from '../utils/downloadFile';
 import { printOfficialReceipt } from '../utils/printDocument';
+import MobileScrollHint from './MobileScrollHint';
 
 // Required share capital targets are set between these two amounts (see
 // MIN/MAX_REQUIRED_SHARE_CAPITAL in backend/src/utils/shareCapital.js, which
 // enforces the same range server-side). Verified payments only count as
 // share capital up to this cap; anything paid beyond it becomes savings.
 const MIN_SHARE_CAPITAL = 4000;
-const MAX_SHARE_CAPITAL = 10000;
+const MAX_SHARE_CAPITAL = 25000;
 const SHARE_CAPITAL_CAP = MAX_SHARE_CAPITAL;
 
 export default function ShareCapitalLedger({
@@ -197,7 +198,7 @@ export default function ShareCapitalLedger({
       onToast('Payment amount must be greater than zero.', 'error');
       return;
     }
-    if (!txnRef) {
+    if (paymentMethod !== 'Over-the-Counter' && !txnRef) {
       onToast('A payment reference code or deposit ID is strictly required.', 'error');
       return;
     }
@@ -207,7 +208,7 @@ export default function ShareCapitalLedger({
       await onAddLedgerEntry({
         memberId: selectedMemberId,
         amount: paymentAmount,
-        referenceId: txnRef,
+        referenceId: paymentMethod === 'Over-the-Counter' ? null : txnRef,
         paymentMethod,
       });
       setSelectedMemberId('');
@@ -372,6 +373,7 @@ export default function ShareCapitalLedger({
               )}
             </div>
 
+            <MobileScrollHint />
             <div className="overflow-auto max-h-[70vh]">
               <table className="w-full text-left text-xs divide-y divide-slate-200 dark:divide-slate-800">
                 <thead className="sticky top-0 z-10 bg-[#fdfbf6] dark:bg-slate-950 text-slate-500 uppercase text-[10px] font-bold">
@@ -468,7 +470,6 @@ export default function ShareCapitalLedger({
                       className="w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-slate-950 focus:outline-none"
                     >
                       <option value="GCash">GCash</option>
-                      <option value="Bank Transfer">Bank Transfer</option>
                       <option value="Over-the-Counter">Over-the-Counter</option>
                     </select>
                   </div>
@@ -484,17 +485,19 @@ export default function ShareCapitalLedger({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Reference ID / Verification Code</label>
-                  <input
-                    type="text"
-                    required
-                    value={txnRef}
-                    onChange={(e) => setTxnRef(e.target.value)}
-                    placeholder="e.g. GCash Ref 88291..."
-                    className="w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-slate-950"
-                  />
-                </div>
+                {paymentMethod !== 'Over-the-Counter' && (
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Reference ID / Verification Code</label>
+                    <input
+                      type="text"
+                      required
+                      value={txnRef}
+                      onChange={(e) => setTxnRef(e.target.value)}
+                      placeholder="e.g. GCash Ref 88291..."
+                      className="w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-slate-950"
+                    />
+                  </div>
+                )}
 
                 <button
                   type="submit"
@@ -541,6 +544,7 @@ export default function ShareCapitalLedger({
             </button>
           </div>
 
+          <MobileScrollHint />
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs divide-y divide-slate-200 dark:divide-slate-800">
               <thead className="sticky top-0 z-10 bg-[#fdfbf6] dark:bg-slate-950 text-slate-500 uppercase text-[10px] font-bold">
@@ -636,6 +640,7 @@ export default function ShareCapitalLedger({
             <p className="text-[10px] text-slate-500">Members cash out their accrued 10% monthly earnings here - send the money outside the system, then record it below.</p>
           </div>
 
+          <MobileScrollHint />
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs divide-y divide-slate-200 dark:divide-slate-800">
               <thead className="sticky top-0 z-10 bg-[#fdfbf6] dark:bg-slate-950 text-slate-500 uppercase text-[10px] font-bold">
@@ -1065,7 +1070,9 @@ export default function ShareCapitalLedger({
                     {memberTxns.length === 0 ? (
                       <p className="text-xs text-slate-400 text-center py-6">No payments recorded for this shareholder yet.</p>
                     ) : (
-                      <div className="overflow-x-auto max-h-64 overflow-y-auto rounded-xl border">
+                      <>
+                        <MobileScrollHint />
+                        <div className="overflow-x-auto max-h-64 overflow-y-auto rounded-xl border">
                         <table className="w-full text-left text-xs divide-y divide-slate-200 dark:divide-slate-800">
                           <thead className="sticky top-0 bg-[#fdfbf6] dark:bg-slate-950 text-slate-500 uppercase text-[9px] font-bold">
                             <tr>
@@ -1094,6 +1101,7 @@ export default function ShareCapitalLedger({
                           </tbody>
                         </table>
                       </div>
+                      </>
                     )}
                   </div>
                 </>

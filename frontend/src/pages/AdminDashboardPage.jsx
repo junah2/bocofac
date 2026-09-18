@@ -24,11 +24,15 @@ import {
   X,
   Eye,
   Camera,
+  Truck,
 } from 'lucide-react';
 import { formatDate } from '../utils/formatDate';
 import { displayApplicantStatus } from '../utils/applicantStatus';
 import { printSalesReport, printMembershipReport, printInventoryReport } from '../utils/printDocument';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
+import ApplicantDetailModal from '../components/ApplicantDetailModal';
+import MemberDetailModal from '../components/MemberDetailModal';
+import MobileScrollHint from '../components/MobileScrollHint';
 import bocofacLogo from '../assets/bocofac-logo.jpg';
 import ExecDashboard from '../components/ExecDashboard';
 import ShareCapitalLedger from '../components/ShareCapitalLedger';
@@ -123,6 +127,13 @@ export default function AdminDashboardPage({
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [sessionEditDraft, setSessionEditDraft] = useState({});
   const [viewingReceiptOrder, setViewingReceiptOrder] = useState(null);
+  // Read-only profile views for the Membership tab (approve/reject stays a
+  // Board-only action - see the "View-only" banner there).
+  const [viewedApplicant, setViewedApplicant] = useState(null);
+  const [viewedMember, setViewedMember] = useState(null);
+  // Full-size preview for the small avatar thumbnail in Settings - clicking
+  // it opens the actual photo instead of leaving it stuck at 48x48px.
+  const [viewedAvatarUrl, setViewedAvatarUrl] = useState(null);
   const [rejectReasonDraft, setRejectReasonDraft] = useState('');
   // Branded stand-in for window.confirm() on the reject/confirm-payment
   // actions below - shape: { tone: 'danger'|'success', title, message,
@@ -457,7 +468,13 @@ export default function AdminDashboardPage({
             </div>
             <div className="flex items-center gap-2.5">
               {admin?.avatarUrl ? (
-                <img src={resolveImageUrl(admin.avatarUrl)} alt="" className="w-9 h-9 rounded-full object-cover" />
+                <img
+                  src={resolveImageUrl(admin.avatarUrl)}
+                  alt=""
+                  onClick={() => setViewedAvatarUrl(resolveImageUrl(admin.avatarUrl))}
+                  title="View full photo"
+                  className="w-9 h-9 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
+                />
               ) : (
                 <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm">
                   {(admin?.name || 'AD').slice(0, 1)}
@@ -688,6 +705,7 @@ export default function AdminDashboardPage({
                 </div>
               )}
 
+              <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
@@ -807,6 +825,7 @@ export default function AdminDashboardPage({
                 </button>
               </div>
 
+              <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
@@ -855,14 +874,15 @@ export default function AdminDashboardPage({
                       <td className="p-4 font-bold text-emerald-700 dark:text-emerald-400">₱{o.totalAmount.toLocaleString()}</td>
                       <td className="p-4 text-slate-600 dark:text-slate-300">{o.paymentMethod}</td>
                       <td className="p-4 font-mono text-xs text-slate-600 dark:text-slate-300">{o.referenceNumber || '—'}</td>
-                      <td className="p-4">
+                      <td className="p-4 whitespace-nowrap">
                         <span className={`text-xs font-bold ${ORDER_STATUS_COLORS[o.status] || ORDER_STATUS_COLORS['Pending Verification']}`}>{getOrderStatusLabel(o.status)}</span>
                         {o.status === 'Processing' && (
                           <button
                             onClick={() => onUpdateOrderStatus(o.id, 'Shipped')}
-                            className="mt-1 block text-xs px-2 py-1 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-400 font-bold cursor-pointer"
+                            title="Mark as Delivered to Courier"
+                            className="mt-1.5 flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-400 dark:hover:bg-indigo-950/70 font-bold cursor-pointer transition"
                           >
-                            Mark as Delivered to Courier
+                            <Truck className="w-3.5 h-3.5 shrink-0" /> Send to Courier
                           </button>
                         )}
                       </td>
@@ -1092,7 +1112,9 @@ export default function AdminDashboardPage({
           )}
 
           {adminTab === 'inventory' && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto min-h-[calc(100vh-11rem)]">
+            <>
+              <MobileScrollHint />
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto min-h-[calc(100vh-11rem)]">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
                   <tr className="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase text-slate-400">
@@ -1127,7 +1149,8 @@ export default function AdminDashboardPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
 
           {adminTab === 'membership' && (
@@ -1136,6 +1159,7 @@ export default function AdminDashboardPage({
                 <Users className="w-4 h-4 shrink-0" />
                 <p>View-only. Applications are reviewed and approved by the Board of Directors.</p>
               </div>
+              <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
@@ -1143,6 +1167,7 @@ export default function AdminDashboardPage({
                       <th className="p-4 font-bold">Applicant</th>
                       <th className="p-4 font-bold">Agricultural Type</th>
                       <th className="p-4 font-bold">Status</th>
+                      <th className="p-4 font-bold text-right">Profile</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1160,6 +1185,16 @@ export default function AdminDashboardPage({
                             'bg-amber-100 text-amber-800'
                           }`}>{displayApplicantStatus(a.status)}</span>
                         </td>
+                        <td className="p-4 text-right">
+                          <button
+                            onClick={() => setViewedApplicant(a)}
+                            aria-label="View profile"
+                            title="View profile"
+                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1167,6 +1202,7 @@ export default function AdminDashboardPage({
               </div>
 
               <h3 className="font-bold text-slate-900 dark:text-white">Active Shareholders</h3>
+              <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
@@ -1174,6 +1210,7 @@ export default function AdminDashboardPage({
                       <th className="p-4 font-bold">Member</th>
                       <th className="p-4 font-bold">Joined</th>
                       <th className="p-4 font-bold">Status</th>
+                      <th className="p-4 font-bold text-right">Profile</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1189,11 +1226,47 @@ export default function AdminDashboardPage({
                             m.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                           }`}>{m.status}</span>
                         </td>
+                        <td className="p-4 text-right">
+                          <button
+                            onClick={() => setViewedMember(m)}
+                            aria-label="View profile"
+                            title="View profile"
+                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {viewedApplicant && (
+            <ApplicantDetailModal applicant={viewedApplicant} onClose={() => setViewedApplicant(null)} />
+          )}
+          {viewedMember && (
+            <MemberDetailModal member={viewedMember} onClose={() => setViewedMember(null)} />
+          )}
+          {viewedAvatarUrl && (
+            <div
+              className="fixed inset-0 z-[70] bg-slate-950/80 flex items-center justify-center p-4 cursor-pointer"
+              onClick={() => setViewedAvatarUrl(null)}
+            >
+              <button
+                onClick={() => setViewedAvatarUrl(null)}
+                className="absolute top-4 right-4 p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <img
+                src={viewedAvatarUrl}
+                alt=""
+                className="max-w-[90vw] max-h-[90vh] rounded-2xl object-contain cursor-default"
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
           )}
 
@@ -1259,6 +1332,7 @@ export default function AdminDashboardPage({
                 </div>
               )}
 
+              <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
@@ -1434,7 +1508,13 @@ export default function AdminDashboardPage({
                     className="hidden"
                   />
                   {admin?.avatarUrl ? (
-                    <img src={resolveImageUrl(admin.avatarUrl)} alt="" className="w-12 h-12 rounded-full object-cover" />
+                    <img
+                      src={resolveImageUrl(admin.avatarUrl)}
+                      alt=""
+                      onClick={() => setViewedAvatarUrl(resolveImageUrl(admin.avatarUrl))}
+                      title="View full photo"
+                      className="w-12 h-12 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
+                    />
                   ) : (
                     <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold uppercase">
                       {(admin?.name || 'AD').slice(0, 2)}
@@ -1465,12 +1545,6 @@ export default function AdminDashboardPage({
                   </button>
                 </div>
               </div>
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 text-rose-600 font-bold text-sm cursor-pointer"
-              >
-                <LogOut className="w-4 h-4" /> Logout
-              </button>
             </div>
           )}
 

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Camera, Lock, BadgeCheck, ShieldCheck, Hash, Calendar, ShoppingBag, User,
-  HelpCircle, ChevronDown, Phone, Mail, MapPin, Printer,
+  HelpCircle, ChevronDown, Phone, Mail, MapPin, Printer, AlertTriangle, Check,
 } from 'lucide-react';
 import { GreenBtn, FormInput } from '../components/UI';
 import { printStatementOfAccount, printOfficialReceipt } from '../utils/printDocument';
@@ -16,7 +16,7 @@ const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 // this fixed range rather than the member's own requiredShareCapital number,
 // per how the cooperative wants it presented on the customer-facing page.
 const MIN_REQUIRED_SHARE_CAPITAL = 4000;
-const MAX_REQUIRED_SHARE_CAPITAL = 10000;
+const MAX_REQUIRED_SHARE_CAPITAL = 25000;
 
 // Cancellation window matches the backend's own 24-hour cutoff (orders.routes.js).
 const CANCELLABLE_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -85,7 +85,7 @@ function ApplicationStatusPanel({ applicantStatus, setPage }) {
             you can apply - check the PMES Seminars tab for the next available date.
           </p>
         </div>
-        <GreenBtn disabled title="Attend a PMES seminar first" onClick={() => setPage('membership')}>
+        <GreenBtn onClick={() => setPage('membership')}>
           Apply for Membership
         </GreenBtn>
       </div>
@@ -168,8 +168,20 @@ function ApplicationStatusPanel({ applicantStatus, setPage }) {
   );
 }
 
-export default function DashboardPage({ user, setUser, setPage, pmesSessions = [] }) {
+export default function DashboardPage({ user, setUser, setPage, pmesSessions = [], focusTab, onFocusTabConsumed, onToast }) {
   const [activeTab, setActiveTab] = useState('membership');
+  // Branded stand-in for window.confirm() (see AdminDashboardPage.jsx for
+  // the same pattern) - a native confirm() dialog is titled by the raw host
+  // ("localhost:3000 says"), which looks broken/unbranded to a customer.
+  const [confirmPrompt, setConfirmPrompt] = useState(null);
+
+  // A notification click (see Navbar.jsx) asks to land on a specific tab -
+  // apply it once, then hand back control so the sidebar behaves normally.
+  useEffect(() => {
+    if (!focusTab) return;
+    setActiveTab(focusTab);
+    onFocusTabConsumed?.();
+  }, [focusTab, onFocusTabConsumed]);
 
   // Real orders for the signed-in customer, tied to their account via the
   // session cookie (not the localStorage-only demo orders used elsewhere).
@@ -230,7 +242,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
       if (!res.ok) throw new Error(data.error || 'Failed to update profile photo.');
       setUser(data);
     } catch (err) {
-      alert(err.message || 'Failed to update profile photo.');
+      onToast?.(err.message || 'Failed to update profile photo.', 'error');
     } finally {
       setUploadingAvatar(false);
     }
@@ -292,22 +304,29 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
   }, []);
 
   const [cancellingId, setCancellingId] = useState(null);
-  const handleCancelOrder = async (orderId) => {
-    if (!window.confirm('Cancel this order? This cannot be undone.')) return;
-    setCancellingId(orderId);
-    try {
-      const res = await fetch(`${API_BASE}/orders/${orderId}/cancel`, {
-        method: 'PATCH',
-        credentials: 'include',
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Failed to cancel order.');
-      setOrders(prev => prev.map(o => (o.id === orderId ? data : o)));
-    } catch (err) {
-      alert(err.message || 'Failed to cancel order.');
-    } finally {
-      setCancellingId(null);
-    }
+  const handleCancelOrder = (orderId) => {
+    setConfirmPrompt({
+      tone: 'danger',
+      title: 'Cancel this order?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Cancel Order',
+      onConfirm: async () => {
+        setCancellingId(orderId);
+        try {
+          const res = await fetch(`${API_BASE}/orders/${orderId}/cancel`, {
+            method: 'PATCH',
+            credentials: 'include',
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || 'Failed to cancel order.');
+          setOrders(prev => prev.map(o => (o.id === orderId ? data : o)));
+        } catch (err) {
+          onToast?.(err.message || 'Failed to cancel order.', 'error');
+        } finally {
+          setCancellingId(null);
+        }
+      },
+    });
   };
 
   // Signed-in customers used to have no way to see/reserve PMES seminars
@@ -316,17 +335,19 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
   // signed in regardless of where they are in the pipeline: an approved
   // member registers by memberId, an in-progress applicant by
   // applicantId+email (same as MembershipPortal's own flow), and anyone with
-  // neither yet gets a clear nudge to apply first rather than a silent 403.
+  // neither yet (hasn't applied at all) self-registers by their own account.
   const [registeringSessionId, setRegisteringSessionId] = useState(null);
   const upcomingPmesSessions = pmesSessions.filter(
     s => getPmesDisplayStatus(s) === 'Upcoming' && s.registeredCount < s.capacity
   );
   const handleReservePmesSlot = async (session) => {
+    // Signed-in on this page by definition, so there's always an account to
+    // attach the reservation to even before an application exists - a
+    // member registers by memberId, an in-progress applicant by
+    // applicantId+email, and anyone with neither yet (hasn't applied at all)
+    // still self-registers by their own account (backend fills that in from
+    // the session), since PMES attendance has to happen before applying.
     const memberId = membership?.member?.id;
-    if (!memberId && !applicantStatus) {
-      alert('Please apply for membership first (see the Contribution tab) before reserving a PMES slot.');
-      return;
-    }
     setRegisteringSessionId(session.id);
     try {
       const res = await fetch(`${API_BASE}/pmes-sessions/${session.id}/register`, {
@@ -336,16 +357,18 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
         body: JSON.stringify(
           memberId
             ? { memberId }
-            : { applicantId: applicantStatus.id, email: applicantStatus.email }
+            : applicantStatus
+              ? { applicantId: applicantStatus.id, email: applicantStatus.email }
+              : {}
         ),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to reserve a slot for this session.');
       }
-      alert(`Slot reserved! See you on ${new Date(session.date).toLocaleDateString()} at ${session.venue || 'the announced venue'}.`);
+      onToast?.(`Slot reserved! See you on ${new Date(session.date).toLocaleDateString()} at ${session.venue || 'the announced venue'}.`, 'success');
     } catch (err) {
-      alert(err.message || 'Could not reserve a slot for this session.');
+      onToast?.(err.message || 'Could not reserve a slot for this session.', 'error');
     } finally {
       setRegisteringSessionId(null);
     }
@@ -355,7 +378,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
     e.preventDefault();
     const amount = Number(paymentForm.amount);
     if (!amount || amount <= 0) {
-      alert('Please enter a valid payment amount.');
+      onToast?.('Please enter a valid payment amount.', 'error');
       return;
     }
     setSubmittingPayment(true);
@@ -375,9 +398,9 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
       setShowPaymentForm(false);
       setPaymentForm({ amount: '', paymentMethod: 'GCash', referenceId: '' });
       await loadMembershipData();
-      alert('Payment submitted! It will be added to your share capital contribution once the cooperative confirms your reference number.');
+      onToast?.('Payment submitted! It will be added to your share capital contribution once the cooperative confirms your reference number.', 'success');
     } catch (err) {
-      alert(err.message || 'Failed to submit payment.');
+      onToast?.(err.message || 'Failed to submit payment.', 'error');
     } finally {
       setSubmittingPayment(false);
     }
@@ -387,7 +410,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
     e.preventDefault();
     const amount = Number(withdrawAmount);
     if (!amount || amount <= 0) {
-      alert('Please enter a valid amount.');
+      onToast?.('Please enter a valid amount.', 'error');
       return;
     }
     setSubmittingWithdrawal(true);
@@ -403,9 +426,9 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
       setShowWithdrawForm(false);
       setWithdrawAmount('');
       await loadMembershipData();
-      alert('Your withdrawal request has been submitted. Please visit our office to process your withdrawal.');
+      onToast?.('Your withdrawal request has been submitted. Please visit our office to process your withdrawal.', 'success');
     } catch (err) {
-      alert(err.message || 'Failed to submit withdrawal request.');
+      onToast?.(err.message || 'Failed to submit withdrawal request.', 'error');
     } finally {
       setSubmittingWithdrawal(false);
     }
@@ -413,7 +436,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
 
   const handleSaveProfile = async () => {
     if (!profileDraft.name || !profileDraft.email) {
-      alert('Name and email are required.');
+      onToast?.('Name and email are required.', 'error');
       return;
     }
     setSavingProfile(true);
@@ -428,9 +451,9 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
       if (!res.ok) throw new Error(data.error || 'Failed to update profile.');
       setUser(data);
       setProfileDraft({ name: data.name, email: data.email, phone: data.phone || '' });
-      alert('Profile saved!');
+      onToast?.('Profile saved!', 'success');
     } catch (err) {
-      alert(err.message || 'Failed to update profile.');
+      onToast?.(err.message || 'Failed to update profile.', 'error');
     } finally {
       setSavingProfile(false);
     }
@@ -440,27 +463,27 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
     e.preventDefault();
     const { currentPassword, newPassword, confirmPassword } = passwordForm;
     if (!currentPassword || !newPassword) {
-      alert('Please fill in your current and new password.');
+      onToast?.('Please fill in your current and new password.', 'error');
       return;
     }
     if (newPassword.length < 8) {
-      alert('New password must be at least 8 characters.');
+      onToast?.('New password must be at least 8 characters.', 'error');
       return;
     }
     if (!/[A-Za-z]/.test(newPassword)) {
-      alert('New password must include at least one letter.');
+      onToast?.('New password must include at least one letter.', 'error');
       return;
     }
     if (!/[0-9]/.test(newPassword)) {
-      alert('New password must include at least one number.');
+      onToast?.('New password must include at least one number.', 'error');
       return;
     }
     if (!/[^A-Za-z0-9]/.test(newPassword)) {
-      alert('New password must include at least one special character.');
+      onToast?.('New password must include at least one special character.', 'error');
       return;
     }
     if (newPassword !== confirmPassword) {
-      alert('New password and confirmation do not match.');
+      onToast?.('New password and confirmation do not match.', 'error');
       return;
     }
     setChangingPassword(true);
@@ -474,9 +497,9 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to update password.');
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      alert('Password updated successfully.');
+      onToast?.('Password updated successfully.', 'success');
     } catch (err) {
-      alert(err.message || 'Failed to update password.');
+      onToast?.(err.message || 'Failed to update password.', 'error');
     } finally {
       setChangingPassword(false);
     }
@@ -751,7 +774,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                         Facilitator: {session.speaker}
                       </p>
                       <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
-                        {Math.max(session.capacity - session.registeredCount, 0)} slot(s) left
+                        {session.registeredCount}/{session.capacity} registered · {Math.max(session.capacity - session.registeredCount, 0)} slot(s) left
                       </p>
                       <GreenBtn
                         small
@@ -1068,6 +1091,49 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
 
         </main>
       </div>
+
+      {/* Branded confirmation prompt, replacing window.confirm() (see
+          AdminDashboardPage.jsx for the same pattern) - a native confirm()
+          dialog is titled by the raw host ("localhost:3000 says"), which
+          looks broken/unbranded to a customer. */}
+      {confirmPrompt && (
+        <div className="fixed inset-0 z-[60] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 space-y-4">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+              confirmPrompt.tone === 'danger' ? 'bg-rose-100 dark:bg-rose-950/50' : 'bg-emerald-100 dark:bg-emerald-950/50'
+            }`}>
+              {confirmPrompt.tone === 'danger' ? (
+                <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400" />
+              ) : (
+                <Check className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+              )}
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{confirmPrompt.title}</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{confirmPrompt.message}</p>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setConfirmPrompt(null)}
+                className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 text-slate-700 font-semibold text-sm transition"
+              >
+                Never mind
+              </button>
+              <button
+                onClick={() => {
+                  confirmPrompt.onConfirm();
+                  setConfirmPrompt(null);
+                }}
+                className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition text-white ${
+                  confirmPrompt.tone === 'danger' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-emerald-600 hover:bg-emerald-500'
+                }`}
+              >
+                {confirmPrompt.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1101,9 +1167,15 @@ function MembershipContributionPanel({
   submittingWithdrawal,
   onSubmitWithdrawal,
 }) {
-  const { member, totalContribution = 0, savingsBalance = 0, remainingBalance = 0, subscribedShare, paidUpCapital } = membership;
+  const { member, totalContribution = 0, savingsBalance = 0, subscribedShare, paidUpCapital } = membership;
   const { availableBalance = 0, requests: withdrawalRequests = [] } = withdrawalData || {};
   const target = Number(member.requiredShareCapital) || 0;
+  // "Remaining Balance" tracks the same fixed 4k-25k range shown in "Target
+  // Amount" (not the member's own requiredShareCapital) - it's that range
+  // minus what they've paid so far, floored at 0. With no payments yet it's
+  // identical to the Target Amount range.
+  const remainingMin = Math.max(MIN_REQUIRED_SHARE_CAPITAL - totalContribution, 0);
+  const remainingMax = Math.max(MAX_REQUIRED_SHARE_CAPITAL - totalContribution, 0);
   const progressPct = target > 0 ? Math.min(100, Math.round((totalContribution / target) * 100)) : 0;
   const contributionStatus = target > 0 && totalContribution >= target
     ? 'Complete'
@@ -1142,7 +1214,14 @@ function MembershipContributionPanel({
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5" style={{ marginBottom: 18 }}>
           <StatTile label="Total Paid" value={`₱${totalContribution.toLocaleString()}`} color="var(--green)" background="var(--tile-green-bg)" />
-          <StatTile label="Remaining Balance" value={`₱${remainingBalance.toLocaleString()}`} color="#d97706" background="var(--tile-amber-bg)" />
+          <StatTile
+            label="Remaining Balance"
+            value={remainingMin === remainingMax
+              ? `₱${remainingMin.toLocaleString()}`
+              : `₱${remainingMin.toLocaleString()} - ₱${remainingMax.toLocaleString()}`}
+            color="#d97706"
+            background="var(--tile-amber-bg)"
+          />
           <StatTile label="Target Amount" value={`₱${MIN_REQUIRED_SHARE_CAPITAL.toLocaleString()} - ₱${MAX_REQUIRED_SHARE_CAPITAL.toLocaleString()}`} color="#2563eb" background="var(--tile-blue-bg)" />
           <StatTile label="Savings" value={`₱${savingsBalance.toLocaleString()}`} color="#0284c7" background="rgba(2, 132, 199, 0.12)" />
         </div>
@@ -1242,15 +1321,22 @@ function MembershipContributionPanel({
                 }}
               >
                 <option value="GCash">GCash</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Over-the-Counter">Over-the-Counter</option>
               </select>
+            </div>
+            <div style={{
+              marginBottom: 18, padding: '14px 16px', borderRadius: 12,
+              background: 'rgba(217, 119, 6, 0.06)', border: '1px solid rgba(217, 119, 6, 0.25)',
+            }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: '#92400e', marginBottom: 2 }}>Send Payment To - GCash Official Wallet</p>
+              <p style={{ fontSize: 18, fontWeight: 800, fontFamily: 'monospace', color: 'var(--text)' }}>0917-889-4402</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Account: BOCOFAC Coop Central Inc.</p>
             </div>
             <FormInput
               label="Reference Number"
               placeholder="e.g. GCash reference no."
               value={paymentForm.referenceId}
-              onChange={e => setPaymentForm(f => ({ ...f, referenceId: e.target.value }))}
+              onChange={e => setPaymentForm(f => ({ ...f, referenceId: e.target.value.slice(0, 13) }))}
+              maxLength={13}
             />
             <GreenBtn type="submit" disabled={submittingPayment}>
               {submittingPayment ? 'Submitting…' : 'Submit Payment'}

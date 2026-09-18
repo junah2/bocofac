@@ -7,6 +7,15 @@
 
 const COOP_NAME = 'BOCOFAC Coconut Farmers Cooperative';
 
+// Mirrors backend/src/utils/shareCapital.js and the Dashboard's "Target
+// Amount" tile (DashboardPage.jsx) - the Statement of Account shows this
+// fixed range for "Required Share Capital" rather than the member's own
+// requiredShareCapital number, and "Remaining Balance" is that same range
+// minus what they've paid so far (floored at 0), not the member's own
+// target minus what they've paid.
+const MIN_REQUIRED_SHARE_CAPITAL = 4000;
+const MAX_REQUIRED_SHARE_CAPITAL = 25000;
+
 // Every value below (buyer names, member names/emails, product names...)
 // can originate from a customer/applicant-controlled form field, not just
 // staff input, and it's about to be dropped straight into document.write().
@@ -84,7 +93,11 @@ export function printOfficialReceipt(entry) {
 export function printStatementOfAccount(member, entries) {
   const verified = entries.filter((e) => e.status === 'Verified');
   const totalPaid = verified.reduce((sum, e) => sum + Number(e.amount), 0);
-  const target = Number(member.requiredShareCapital) || 0;
+  const remainingMin = Math.max(MIN_REQUIRED_SHARE_CAPITAL - totalPaid, 0);
+  const remainingMax = Math.max(MAX_REQUIRED_SHARE_CAPITAL - totalPaid, 0);
+  const remainingBalanceText = remainingMin === remainingMax
+    ? `₱${remainingMin.toLocaleString()}`
+    : `₱${remainingMin.toLocaleString()} - ₱${remainingMax.toLocaleString()}`;
   const rows = verified
     .slice()
     .sort((a, b) => new Date(a.paymentDate) - new Date(b.paymentDate))
@@ -103,7 +116,7 @@ export function printStatementOfAccount(member, entries) {
     <table>
       <tr><td class="label">Shareholder</td><td class="value">${escapeHtml(member.name)}</td></tr>
       <tr><td class="label">Member ID</td><td class="value">${escapeHtml(member.id)}</td></tr>
-      <tr><td class="label">Required Share Capital</td><td class="value">₱${target.toLocaleString()}</td></tr>
+      <tr><td class="label">Required Share Capital</td><td class="value">₱${MIN_REQUIRED_SHARE_CAPITAL.toLocaleString()} - ₱${MAX_REQUIRED_SHARE_CAPITAL.toLocaleString()}</td></tr>
     </table>
     <div class="divider"></div>
     <table>
@@ -122,7 +135,7 @@ export function printStatementOfAccount(member, entries) {
     <div class="divider"></div>
     <table>
       <tr><td class="label total">Total Verified Contribution</td><td class="value total">₱${totalPaid.toLocaleString()}</td></tr>
-      <tr><td class="label">Remaining Balance</td><td class="value">₱${Math.max(target - totalPaid, 0).toLocaleString()}</td></tr>
+      <tr><td class="label">Remaining Balance</td><td class="value">${remainingBalanceText}</td></tr>
     </table>
   `;
   openPrintWindow(`Statement of Account - ${member.name}`, bodyHtml);

@@ -99,7 +99,7 @@ export const INITIAL_LEDGER = [
     paymentDate: '2024-05-18',
     amount: 3000,
     referenceId: 'REF-00948371',
-    paymentMethod: 'Bank Transfer',
+    paymentMethod: 'GCash',
     status: 'Verified',
     verifiedAt: '2024-05-19'
   },

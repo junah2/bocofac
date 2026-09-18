@@ -221,7 +221,15 @@ router.patch('/:id/status', requireRole('admin', 'board'), asyncHandler(async (r
     [status, req.params.id]
   );
   const statusLabel = status === 'Shipped' ? 'Delivered to Courier' : status;
-  await notifyUser(pool, rows[0].user_id, `Your order ${rows[0].id} is now ${statusLabel}.`, 'info');
+  // Handing off to the courier is the one fulfillment step admin actually
+  // triggers from the UI (see ORDER_FULFILLMENT_STATUSES in
+  // AdminDashboardPage.jsx) - give the customer a concrete estimate here
+  // rather than a bare status change, since the coop doesn't track courier
+  // transit itself and can't notify again once it's actually delivered.
+  const statusMessage = status === 'Shipped'
+    ? `Your order ${rows[0].id} is now Delivered to Courier. Estimated delivery is 3-5 days.`
+    : `Your order ${rows[0].id} is now ${statusLabel}.`;
+  await notifyUser(pool, rows[0].user_id, statusMessage, 'info');
   await auditFromRequest(req, 'order.status', { entityType: 'order', entityId: rows[0].id, metadata: { status } });
   broadcast('orders');
   res.json(toClient(rows[0], await loadItems(rows[0].id)));

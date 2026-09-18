@@ -13,12 +13,20 @@ function timeLabel(dateStr) {
 // questions - especially about an order, since an admin reply can carry an
 // order tag (message.orderId) even though the thread itself is a single
 // ongoing conversation, not one thread per order.
-export default function CustomerMessageWidget({ user, onToast }) {
+export default function CustomerMessageWidget({ user, onToast, forceOpen, onForceOpenConsumed }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const listRef = useRef(null);
+
+  // A "new message" notification click (see Navbar.jsx) asks this bubble to
+  // pop open, from wherever on the site the customer clicked it.
+  useEffect(() => {
+    if (!forceOpen) return;
+    setOpen(true);
+    onForceOpenConsumed?.();
+  }, [forceOpen, onForceOpenConsumed]);
 
   const unreadCount = messages.filter((m) => m.senderRole === 'admin' && !m.readByCustomer).length;
 

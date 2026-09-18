@@ -99,6 +99,14 @@ export default function App() {
   // membership updates) - polled while a customer is signed in, same spirit
   // as the admin/board SSE fetchers above but scoped to this one account.
   const [notifications, setNotifications] = useState([]);
+  // Which Dashboard sidebar tab to land on next time the Dashboard mounts/
+  // updates - set when a notification is clicked (see resolveNotificationTarget
+  // in Navbar.jsx) so it opens straight to the relevant section, the same way
+  // an admin notification jumps to its tab.
+  const [dashboardTab, setDashboardTab] = useState(null);
+  // Asks CustomerMessageWidget to pop open - set when a "new message"
+  // notification is clicked (see resolveNotificationTarget in Navbar.jsx).
+  const [openMessageWidget, setOpenMessageWidget] = useState(false);
 
   const [toasts, setToasts] = useState([]);
   // Date.now() alone collides when addToast fires twice in the same
@@ -674,7 +682,12 @@ export default function App() {
       const member = members.find(m => m.id === memberId);
       const entryWithName = { ...data, memberName: member ? member.name : data.memberName };
       setLedger(prev => [entryWithName, ...prev]);
-      addToast(`Payment of ₱${data.amount.toLocaleString()} logged as Pending - another admin or board member must verify it.`, 'success');
+      addToast(
+        data.status === 'Verified'
+          ? `Payment of ₱${data.amount.toLocaleString()} recorded and verified (OR: ${data.orNumber}).`
+          : `Payment of ₱${data.amount.toLocaleString()} logged as Pending - another admin or board member must verify it.`,
+        'success'
+      );
     } catch (err) {
       addToast(err.message || 'Failed to log contribution.', 'error');
     }
@@ -817,6 +830,14 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Notification bell click - jumps straight to the Dashboard tab the
+  // notification is about (mirrors the admin notification bell, which jumps
+  // straight to its tab too), instead of just popping up the message text.
+  const goToDashboardTab = (tab) => {
+    setDashboardTab(tab);
+    navigate('dashboard');
+  };
+
   const pagesWithFooter = ['home', 'products', 'about', 'membership', 'dashboard'];
 
   return (
@@ -834,6 +855,8 @@ export default function App() {
           notifications={notifications}
           onMarkNotificationRead={handleMarkNotificationRead}
           onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+          onNotificationNavigate={goToDashboardTab}
+          onOpenMessages={() => setOpenMessageWidget(true)}
           isDarkMode={isDarkMode}
           onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
         />
@@ -877,7 +900,15 @@ export default function App() {
         </div>
       )}
       {page === 'dashboard' && user && (
-        <DashboardPage user={user} setUser={setUser} setPage={navigate} pmesSessions={pmesSessions} />
+        <DashboardPage
+          user={user}
+          setUser={setUser}
+          setPage={navigate}
+          pmesSessions={pmesSessions}
+          focusTab={dashboardTab}
+          onFocusTabConsumed={() => setDashboardTab(null)}
+          onToast={addToast}
+        />
       )}
       {page === 'admin-dashboard' && admin && (
         <AdminDashboardPage
@@ -950,7 +981,14 @@ export default function App() {
 
       {pagesWithFooter.includes(page) && <Footer />}
 
-      {user && <CustomerMessageWidget user={user} onToast={addToast} />}
+      {user && (
+        <CustomerMessageWidget
+          user={user}
+          onToast={addToast}
+          forceOpen={openMessageWidget}
+          onForceOpenConsumed={() => setOpenMessageWidget(false)}
+        />
+      )}
       {admin && (
         <AdminMessageWidget
           conversations={messageConversations}

@@ -30,6 +30,7 @@ import {
   Lightbulb,
   Percent,
 } from 'lucide-react';
+import MobileScrollHint from './MobileScrollHint';
 
 // Chart colors, pulled straight from this app's own brand palette
 // (tailwind.config.js `theme.colors.emerald` + `brand-*`/`coconut-*`) rather
@@ -816,6 +817,7 @@ export default function ExecDashboard({
           Formula: <span className="p-1 px-1.5 rounded font-mono bg-slate-100 dark:bg-slate-950 text-emerald-700 dark:text-emerald-400 font-semibold">Remaining Stock = Current Stock - Quantity Sold</span>
         </p>
 
+        <MobileScrollHint />
         <div className="overflow-auto max-h-[70vh]">
           <table className="w-full text-left text-xs divide-y divide-slate-200 dark:divide-slate-800">
             <thead className="sticky top-0 z-10 bg-[#fdfbf7] dark:bg-slate-950 text-slate-500 uppercase text-[10px] font-bold">

@@ -93,15 +93,20 @@ router.get('/', requireRole('admin', 'board'), asyncHandler(async (req, res) => 
   res.json(rows.map(toClient));
 }));
 
-// Admin-entered payments still start Pending (see the `entered_by` column
-// and PATCH /:id/verify below) - the same admin who logs a contribution
-// must not be the one who verifies it. Real proof of payment (bank/GCash
-// screenshot review) still needs a second person to actually check.
+// Admin-entered digital payments (GCash) still start Pending (see the
+// `entered_by` column and PATCH /:id/verify below) - the same admin who logs
+// a contribution must not be the one who verifies it, since a GCash
+// reference still needs a second person to actually check it against the
+// real transfer. Over-the-Counter is different: the admin taking the walk-in
+// cash payment witnesses it directly (no receipt/reference to cross-check
+// later), so it's recorded as Verified immediately instead of sitting
+// Pending for a maker-checker that has nothing left to verify.
 router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
   const { memberId, amount, referenceId, paymentMethod, paymentDate } = req.body;
   if (!memberId || !amount || amount <= 0 || !paymentMethod) {
     return res.status(400).json({ error: 'memberId, a positive amount, and paymentMethod are required.' });
   }
+  const isOverTheCounter = paymentMethod === 'Over-the-Counter';
 
   const client = await pool.connect();
   try {
@@ -112,12 +117,28 @@ router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
       return res.status(404).json({ error: 'Member not found.' });
     }
     const id = await nextLedgerId(client);
+    const orNumber = isOverTheCounter ? await nextOrNumber(client) : null;
     const { rows } = await client.query(
-      `INSERT INTO ledger (id, member_id, payment_date, amount, reference_id, payment_method, status, entered_by)
-       VALUES ($1,$2,COALESCE($3, CURRENT_DATE),$4,$5,$6,'Pending',$7)
+      `INSERT INTO ledger (id, member_id, payment_date, amount, reference_id, payment_method, status, entered_by, verified_at, verified_by, or_number)
+       VALUES ($1,$2,COALESCE($3, CURRENT_DATE),$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING *`,
-      [id, memberId, paymentDate || null, amount, referenceId || null, paymentMethod, req.user.sub]
+      [
+        id, memberId, paymentDate || null, amount, referenceId || null, paymentMethod,
+        isOverTheCounter ? 'Verified' : 'Pending',
+        req.user.sub,
+        isOverTheCounter ? new Date() : null,
+        isOverTheCounter ? req.user.sub : null,
+        orNumber,
+      ]
     );
+    if (isOverTheCounter) {
+      await notifyByMemberId(
+        client,
+        memberId,
+        `Your payment of ₱${Number(amount).toLocaleString()} was recorded (OR: ${orNumber}).`,
+        'success'
+      );
+    }
     await client.query('COMMIT');
     broadcast('ledger');
     res.status(201).json(toClient(rows[0]));

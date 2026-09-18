@@ -81,7 +81,7 @@ function toClient(row, documents, dependents) {
 // UI actually shows instead of reusing the full toClient() - TIN, ID number,
 // birthdate, dependents, farm profile, income, etc. have no business being
 // reachable by email-guessing alone.
-function toPublicStatusClient(row) {
+function toPublicStatusClient(row, pmesCertificateAttached) {
   return {
     id: row.id,
     email: row.email,
@@ -92,6 +92,10 @@ function toPublicStatusClient(row) {
     agriculturalType: row.agricultural_type,
     farmSizeHectares: row.farm_size_hectares === null ? null : Number(row.farm_size_hectares),
     referenceNumber: row.reference_number,
+    // Just a flag, not the document itself - lets the "Check Application
+    // Status" UI stop prompting for a certificate that's already on file
+    // without needing the full (staff-only) documentsUploaded set.
+    pmesCertificateAttached: !!pmesCertificateAttached,
     barangay: row.barangay,
     munCity: row.mun_city,
     civilStatus: row.civil_status,
@@ -139,7 +143,8 @@ router.get('/by-email/:email', applicantLookupLimiter, asyncHandler(async (req, 
     [req.params.email]
   );
   if (!rows[0]) return res.status(404).json({ error: 'No application found for that email.' });
-  res.json(toPublicStatusClient(rows[0]));
+  const { pmesCertificate } = await loadDocumentFlags(rows[0].id);
+  res.json(toPublicStatusClient(rows[0], pmesCertificate));
 }));
 
 router.post('/', validate(applicantCreateSchema), asyncHandler(async (req, res) => {

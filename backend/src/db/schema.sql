@@ -59,13 +59,18 @@ CREATE TABLE IF NOT EXISTS ledger (
   payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
   amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
   reference_id TEXT,
-  payment_method TEXT NOT NULL CHECK (payment_method IN ('GCash', 'Bank Transfer', 'Over-the-Counter')),
+  payment_method TEXT NOT NULL CHECK (payment_method IN ('GCash', 'Over-the-Counter')),
   status TEXT NOT NULL DEFAULT 'Pending' CHECK (status IN ('Verified', 'Pending')),
   verified_at DATE,
   verified_by INTEGER REFERENCES users(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_ledger_member_id ON ledger(member_id);
+-- Bank Transfer dropped as a share capital payment method - GCash (online)
+-- and Over-the-Counter (walk-in) cover how members actually pay in.
+ALTER TABLE ledger DROP CONSTRAINT IF EXISTS ledger_payment_method_check;
+ALTER TABLE ledger ADD CONSTRAINT ledger_payment_method_check
+  CHECK (payment_method IN ('GCash', 'Over-the-Counter'));
 -- Maker-checker control: whoever logs a payment (member self-report or an
 -- admin manually posting one) cannot be the same person who verifies it.
 ALTER TABLE ledger ADD COLUMN IF NOT EXISTS entered_by INTEGER REFERENCES users(id);
