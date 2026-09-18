@@ -66,11 +66,17 @@ CREATE TABLE IF NOT EXISTS ledger (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_ledger_member_id ON ledger(member_id);
--- Bank Transfer dropped as a share capital payment method - GCash (online)
--- and Over-the-Counter (walk-in) cover how members actually pay in.
+-- Bank Transfer dropped as a share capital payment method going forward -
+-- GCash (online) and Over-the-Counter (walk-in) cover how members actually
+-- pay in, and the UI no longer offers it. Still allowed here (like
+-- orders_payment_method_check below does for orders) purely so any
+-- pre-existing "Bank Transfer" ledger rows already on file stay valid - a
+-- straight narrowing would fail this migration outright on a database that
+-- already has one, since Postgres validates existing rows against a new
+-- CHECK constraint at ALTER time.
 ALTER TABLE ledger DROP CONSTRAINT IF EXISTS ledger_payment_method_check;
 ALTER TABLE ledger ADD CONSTRAINT ledger_payment_method_check
-  CHECK (payment_method IN ('GCash', 'Over-the-Counter'));
+  CHECK (payment_method IN ('GCash', 'Over-the-Counter', 'Bank Transfer'));
 -- Maker-checker control: whoever logs a payment (member self-report or an
 -- admin manually posting one) cannot be the same person who verifies it.
 ALTER TABLE ledger ADD COLUMN IF NOT EXISTS entered_by INTEGER REFERENCES users(id);
