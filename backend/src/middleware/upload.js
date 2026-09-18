@@ -15,7 +15,24 @@ const UPLOADS_ROOT = process.env.UPLOADS_DIR
   ? path.resolve(process.env.UPLOADS_DIR)
   : path.join(__dirname, '..', '..', 'uploads');
 
-function makeStorage(subfolder) {
+// A one-time, git-tracked snapshot of the product photos/avatars that were
+// on file as of the deploy-persistence fix - copied into a freshly attached
+// (empty) Volume on first boot so the storefront isn't blank right after
+// switching to persistent storage. Deliberately doesn't cover
+// applicants/orders: those are private documents (IDs, payment
+// screenshots), not brand assets, and have no business sitting in git.
+const UPLOADS_SEED_ROOT = path.join(__dirname, '..', '..', 'uploads-seed');
+
+function seedIfEmpty(subfolder, destination) {
+  const seedDir = path.join(UPLOADS_SEED_ROOT, subfolder);
+  if (!fsSync.existsSync(seedDir)) return;
+  if (fsSync.readdirSync(destination).length > 0) return; // real content already there - never overwrite
+  for (const file of fsSync.readdirSync(seedDir)) {
+    fsSync.copyFileSync(path.join(seedDir, file), path.join(destination, file));
+  }
+}
+
+function makeStorage(subfolder, { seedFromDeploy = false } = {}) {
   const destination = path.join(UPLOADS_ROOT, subfolder);
   // multer.diskStorage never creates its destination - it just errors
   // (ENOENT) if the folder isn't already there. Locally it always exists
@@ -24,6 +41,7 @@ function makeStorage(subfolder) {
   // in it isn't trackable by git at all, so this recreates it defensively
   // on every boot instead of relying on deploy-time file layout.
   fsSync.mkdirSync(destination, { recursive: true });
+  if (seedFromDeploy) seedIfEmpty(subfolder, destination);
   return multer.diskStorage({
     destination,
     filename: (req, file, cb) => {
@@ -90,7 +108,7 @@ const uploadOrderReceipt = multer({
 // authenticated sendFile route - so this one also restricts to actual image
 // types rather than accepting any file.
 const uploadProductImage = multer({
-  storage: makeStorage('products'),
+  storage: makeStorage('products', { seedFromDeploy: true }),
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: extensionFilter(IMAGE_EXTENSIONS, 'image (JPG/PNG/WebP)'),
 });
@@ -98,7 +116,7 @@ const uploadProductImage = multer({
 // Profile avatars are publicly served (see the /uploads/avatars static
 // mount in app.js), same reasoning as product photos above.
 const uploadAvatar = multer({
-  storage: makeStorage('avatars'),
+  storage: makeStorage('avatars', { seedFromDeploy: true }),
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: extensionFilter(IMAGE_EXTENSIONS, 'image (JPG/PNG/WebP)'),
 });
