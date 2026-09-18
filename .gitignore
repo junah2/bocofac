@@ -3,7 +3,13 @@ frontend/build
 
 backend/node_modules
 backend/.env
-backend/uploads/*
+# Ignore uploaded file content but keep the folder structure itself tracked
+# (via .gitkeep) - a bare "backend/uploads/*" ignores the subfolders
+# themselves, which then hides anything inside them from the "!" exceptions
+# below regardless of what they match. Un-ignoring the directories first is
+# what makes the .gitkeep exceptions actually take effect.
+backend/uploads/**
+!backend/uploads/**/
 !backend/uploads/**/.gitkeep
 
 .claude/settings.local.json

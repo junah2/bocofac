@@ -1,13 +1,31 @@
+const fsSync = require('fs');
 const fs = require('fs/promises');
 const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
 
-const UPLOADS_ROOT = path.join(__dirname, '..', '..', 'uploads');
+// On Railway (and most container/PaaS hosts) the app's own filesystem is
+// ephemeral - anything written here gets wiped on every redeploy, restart,
+// or scale event, not just a fresh clone. UPLOADS_DIR should point at a
+// mounted persistent Volume in production (e.g. "/data/uploads" - see
+// Railway's Volumes settings for this service); it falls back to a local
+// "uploads" folder next to the repo for development, where the plain
+// filesystem already persists fine on its own.
+const UPLOADS_ROOT = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.join(__dirname, '..', '..', 'uploads');
 
 function makeStorage(subfolder) {
+  const destination = path.join(UPLOADS_ROOT, subfolder);
+  // multer.diskStorage never creates its destination - it just errors
+  // (ENOENT) if the folder isn't already there. Locally it always exists
+  // because dev uploads accumulate in it over time, but a freshly deployed
+  // server only has what git actually tracked; an empty folder with nothing
+  // in it isn't trackable by git at all, so this recreates it defensively
+  // on every boot instead of relying on deploy-time file layout.
+  fsSync.mkdirSync(destination, { recursive: true });
   return multer.diskStorage({
-    destination: path.join(UPLOADS_ROOT, subfolder),
+    destination,
     filename: (req, file, cb) => {
       const ext = path.extname(file.originalname);
       cb(null, `${crypto.randomUUID()}${ext}`);
