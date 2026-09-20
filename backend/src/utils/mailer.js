@@ -43,6 +43,7 @@ function getTransporter() {
       host: testAccount.smtp.host,
       port: testAccount.smtp.port,
       secure: testAccount.smtp.secure,
+      family: 4,
       auth: { user: testAccount.user, pass: testAccount.pass },
     });
   })();
