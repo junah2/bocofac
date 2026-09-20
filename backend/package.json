@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "main": "src/server.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
