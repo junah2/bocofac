@@ -21,6 +21,11 @@ function getTransporter() {
         // SMTP relays other than Gmail) negotiate TLS via STARTTLS instead,
         // which nodemailer only does when `secure` is false.
         secure: smtpPort === 465,
+        // Many container hosts (Railway included) advertise IPv6 but can't
+        // actually route it, so a connection to Gmail's AAAA address just
+        // hangs until it times out instead of falling back to IPv4. Forcing
+        // IPv4 here skips that dead end.
+        family: 4,
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS,

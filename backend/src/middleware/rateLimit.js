@@ -1,9 +1,8 @@
 const rateLimit = require('express-rate-limit');
 
-// Keyed by req.ip. If this app is ever deployed behind a reverse proxy/load
-// balancer, `app.set('trust proxy', ...)` must be configured correctly in
-// app.js first, or every request behind the proxy shares one IP (over-blocks
-// everyone together) - not needed for the current direct-connection deployment.
+// Keyed by req.ip. This is deployed behind Railway's reverse proxy, so
+// app.js sets `app.set('trust proxy', 1)` - without it, every request would
+// share the proxy's own IP (over-blocking everyone together).
 function jsonRateLimitHandler(req, res) {
   res.status(429).json({ error: 'Too many attempts. Please try again later.' });
 }

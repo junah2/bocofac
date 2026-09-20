@@ -26,6 +26,14 @@ const auditLogRoutes = require('./routes/auditLog.routes');
 
 const app = express();
 
+// Railway (and most PaaS hosts) sits in front of this app as a reverse
+// proxy, adding an X-Forwarded-For header with the real client IP. Trusting
+// exactly one hop tells Express/express-rate-limit to key rate limits off
+// that real IP instead of either erroring on the unexpected header (see
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR) or, if trusted too broadly, letting a
+// client spoof its own X-Forwarded-For to dodge rate limiting.
+app.set('trust proxy', 1);
+
 // Only these origins may make credentialed (cookie-carrying) requests.
 // FRONTEND_ORIGIN can hold a comma-separated list for local dev (e.g. a LAN
 // IP or a forwarded/tunneled dev URL alongside plain localhost) - it must
