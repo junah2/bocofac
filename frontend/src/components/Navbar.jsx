@@ -2,6 +2,18 @@
 import React, { useState } from 'react';
 import { ShoppingCart, ShieldCheck, UserCircle, Landmark, Menu, X, Sun, Moon, Bell } from 'lucide-react';
 import bocofacLogo from '../assets/bocofac-logo.jpg';
+import { resolveImageUrl } from '../utils/resolveImageUrl';
+
+// Same tab ids as DashboardPage's own sidebar (see sidebarTabs there) - kept
+// in sync manually since the sidebar is hidden on mobile now and this menu
+// is a phone's only way to reach those tabs without a full page visit.
+const PROFILE_TABS = [
+  { id: 'membership', label: 'Contribution' },
+  { id: 'pmes', label: 'PMES Seminars' },
+  { id: 'orders', label: 'My Orders' },
+  { id: 'profile', label: 'Profile' },
+  { id: 'settings', label: 'Settings' },
+];
 
 // Every customer notification message is one of a fixed handful of strings
 // this app itself generates server-side (see notifyUser/notifyByMemberId/
@@ -33,10 +45,11 @@ function timeAgo(dateStr) {
 export default function Navbar({
   page, setPage, cartCount, onOpenCart, user, admin, bod, isApprovedMember,
   notifications = [], onMarkNotificationRead, onMarkAllNotificationsRead,
-  onNotificationNavigate, onOpenMessages, isDarkMode, onToggleDarkMode,
+  onNotificationNavigate, onOpenMessages, isDarkMode, onToggleDarkMode, onLogout,
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   // Jumps straight to whatever the notification is actually about - the
@@ -135,7 +148,7 @@ export default function Navbar({
                 )}
               </button>
               {notifOpen && (
-                <div className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-50 overflow-hidden">
+                <div className="fixed left-4 right-4 top-20 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-50 overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
                     <p className="text-sm font-bold text-slate-900 dark:text-white">Notifications</p>
                     <div className="flex items-center gap-3">
@@ -201,6 +214,72 @@ export default function Navbar({
               <AccountIcon className="w-3.5 h-3.5" /> {accountLabel}
             </button>
           )}
+          {/* Mobile-only quick account menu - the customer Dashboard's own
+              sidebar (Contribution/PMES/Orders/Profile/Settings/Logout) is
+              hidden on phones now, so this is how a signed-in customer
+              reaches those without a full page visit. Desktop already has
+              the "Me" pill above for that. */}
+          {user && (
+            <div className="relative md:hidden">
+              <button
+                onClick={() => setProfileMenuOpen(v => !v)}
+                className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900 transition cursor-pointer"
+              >
+                {user.avatarUrl ? (
+                  <img
+                    src={resolveImageUrl(user.avatarUrl)}
+                    alt=""
+                    className="w-6 h-6 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-[#313826] text-white text-[11px] font-bold flex items-center justify-center">
+                    {(user.name || 'U')[0].toUpperCase()}
+                  </div>
+                )}
+              </button>
+              {profileMenuOpen && (
+                <div className="fixed left-4 right-4 top-20 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-50 overflow-hidden">
+                  <div className="flex flex-col items-center text-center px-5 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800">
+                    {user.avatarUrl ? (
+                      <img
+                        src={resolveImageUrl(user.avatarUrl)}
+                        alt=""
+                        className="w-14 h-14 rounded-full object-cover mb-2"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-[#313826] text-white text-xl font-bold flex items-center justify-center mb-2">
+                        {(user.name || 'U')[0].toUpperCase()}
+                      </div>
+                    )}
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">{user.name || 'User Account'}</p>
+                    <p className="text-xs text-slate-400">{user.email}</p>
+                  </div>
+                  <div className="p-2">
+                    {PROFILE_TABS.map((tab, i) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => { onNotificationNavigate?.(tab.id); setProfileMenuOpen(false); }}
+                        className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold mb-1 cursor-pointer transition ${
+                          i === 0
+                            ? 'bg-[#313826] text-white'
+                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                    <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
+                    <button
+                      onClick={() => { onLogout?.(); setProfileMenuOpen(false); }}
+                      className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-900"
@@ -226,7 +305,9 @@ export default function Navbar({
               {link.label}
             </button>
           ))}
-          {showAccountButton && (
+          {/* Signed-in customers reach their account via the new profile
+              icon instead (see above) - this stays for guests/admin/board. */}
+          {showAccountButton && !user && (
             <button
               onClick={() => { setPage(accountTarget); setMobileMenuOpen(false); }}
               className="w-full flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-sm font-bold cursor-pointer"

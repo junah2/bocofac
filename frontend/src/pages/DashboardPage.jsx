@@ -524,7 +524,14 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
       <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-8" style={{ alignItems: 'start' }}>
 
         {/* ── Sidebar ── */}
-        <aside style={{
+        {/* Hidden below md: on a phone this card (avatar + 5 nav buttons +
+            logout) was rendering inline above the page content, pushing the
+            thing the member actually came to see (e.g. the membership
+            status/apply prompt) below the fold. Mobile navigates via the
+            profile icon in the Navbar instead (see Navbar.jsx); the photo
+            upload that used to live only here also has a mobile-only copy
+            in the Profile tab below so it isn't lost on small screens. */}
+        <aside className="hidden md:block" style={{
           background: 'var(--card-bg)', borderRadius: 16,
           border: '1.5px solid var(--border)', padding: '28px 20px',
           boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
@@ -828,6 +835,61 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                 </div>
               </div>
 
+              {/* Mobile-only photo editor - the sidebar this normally lives
+                  in is hidden below md so it stops crowding out page
+                  content on a phone, so this is mobile's only way to reach it. */}
+              <div className="md:hidden" style={{
+                background: 'var(--card-bg)', borderRadius: 14, border: '1.5px solid var(--border)',
+                padding: '18px 24px', display: 'flex', alignItems: 'center', gap: 16,
+              }}>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleAvatarFileChange}
+                  style={{ display: 'none' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  title="Change profile photo"
+                  style={{
+                    position: 'relative', width: 56, height: 56, flexShrink: 0,
+                    border: 'none', padding: 0, cursor: uploadingAvatar ? 'wait' : 'pointer',
+                    borderRadius: '50%', display: 'block',
+                  }}
+                >
+                  {user?.avatarUrl ? (
+                    <img
+                      src={resolveImageUrl(user.avatarUrl)}
+                      alt=""
+                      style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', opacity: uploadingAvatar ? 0.5 : 1 }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: 56, height: 56, borderRadius: '50%',
+                      background: 'var(--green)', color: '#fff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 22, fontWeight: 700, opacity: uploadingAvatar ? 0.5 : 1,
+                    }}>
+                      {(user?.name || 'U')[0].toUpperCase()}
+                    </div>
+                  )}
+                  <span style={{
+                    position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: '50%',
+                    background: 'var(--green)', border: '2px solid var(--card-bg)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Camera size={10} color="#fff" />
+                  </span>
+                </button>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: 14 }}>Profile Photo</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>Tap your photo to change it.</p>
+                </div>
+              </div>
+
               <div style={{ background: 'var(--card-bg)', borderRadius: 14, border: '1.5px solid var(--border)', padding: '28px' }}>
                 <h2 style={{ fontWeight: 700, fontSize: 16, marginBottom: 18 }}>Account Info</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
@@ -995,7 +1057,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                     <p style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Your control</p>
                     <p>
                       You can update your name, email, and phone anytime from the Settings page, and your photo
-                      from the sidebar here. To
+                      from your account avatar (the sidebar on desktop, or here on the Profile tab on mobile). To
                       request a correction or removal of other data, reach out through the Help Center above.
                     </p>
                   </div>

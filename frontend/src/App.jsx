@@ -830,12 +830,22 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Notification bell click - jumps straight to the Dashboard tab the
-  // notification is about (mirrors the admin notification bell, which jumps
-  // straight to its tab too), instead of just popping up the message text.
+  // Jumps straight to a Dashboard tab - used by the notification bell (which
+  // mirrors the admin notification bell jumping straight to its tab, instead
+  // of just popping up the message text) and by the mobile Navbar's profile
+  // menu (the customer Dashboard's own sidebar is hidden on phones).
   const goToDashboardTab = (tab) => {
     setDashboardTab(tab);
     navigate('dashboard');
+  };
+
+  // Shared by the mobile Navbar's profile menu - mirrors DashboardPage's own
+  // logout button, since that sidebar (and the logout button on it) is
+  // hidden on phones now.
+  const handleCustomerLogout = () => {
+    fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
+    setUser(null);
+    navigate('home');
   };
 
   const pagesWithFooter = ['home', 'products', 'about', 'membership', 'dashboard'];
@@ -857,6 +867,7 @@ export default function App() {
           onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
           onNotificationNavigate={goToDashboardTab}
           onOpenMessages={() => setOpenMessageWidget(true)}
+          onLogout={handleCustomerLogout}
           isDarkMode={isDarkMode}
           onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
         />
