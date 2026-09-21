@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   FileText,
   Upload,
   Check,
   Calendar,
   ChevronRight,
+  ChevronDown,
   UserCheck,
   Info,
   Sparkles,
@@ -103,16 +104,59 @@ const VALID_ID_TYPES = [
   "Senior Citizen's ID", 'Single Parent', 'SSS', 'TIN', "Voter's ID",
 ];
 
+// Custom-built instead of a plain <select> - the native options popup can't
+// be styled at all (font size, spacing, colors are entirely up to the
+// device's own OS/browser), so on mobile it renders as an oversized,
+// visually jarring list that clashes with the rest of this app's design.
+// onChange still receives a { target: { value } } shape so every existing
+// call site (written for a real <select>'s change event) keeps working.
 function SelectField({ label, value, onChange, options, placeholder = 'Select...' }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onOutside = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onOutside);
+    return () => document.removeEventListener('mousedown', onOutside);
+  }, [open]);
+
+  const pick = (opt) => {
+    onChange({ target: { value: opt } });
+    setOpen(false);
+  };
+
   return (
-    <div>
+    <div ref={wrapRef} className="relative">
       <label className={labelClass}>{label}</label>
-      <select value={value} onChange={onChange} className={`${inputClass} focus:outline-none`}>
-        <option value="">{placeholder}</option>
-        {options.map((opt) => (
-          <option key={opt} value={opt}>{opt}</option>
-        ))}
-      </select>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`${inputClass} flex items-center justify-between gap-2 text-left cursor-pointer focus:outline-none`}
+      >
+        <span className={`truncate ${value ? '' : 'text-slate-400'}`}>{value || placeholder}</span>
+        <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 w-full max-h-60 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-lg">
+          {options.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => pick(opt)}
+              className={`w-full text-left px-4 py-2.5 text-sm cursor-pointer transition ${
+                opt === value
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold'
+                  : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900'
+              }`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -730,24 +774,15 @@ export default function MembershipPortal({
                     <label className={labelClass}>Birthplace</label>
                     <input type="text" value={birthplace} onChange={onLetters(setBirthplace)} placeholder="Naga City" className={inputClass} />
                   </div>
-                  <div>
-                    <label className={labelClass}>Gender</label>
-                    <select value={gender} onChange={(e) => setGender(e.target.value)} className={inputClass}>
-                      <option>Female</option>
-                      <option>Male</option>
-                    </select>
-                  </div>
+                  <SelectField label="Gender" value={gender} onChange={(e) => setGender(e.target.value)} options={['Female', 'Male']} />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelClass}>Civil Status</label>
-                    <select value={civilStatus} onChange={(e) => setCivilStatus(e.target.value)} className={inputClass}>
-                      <option>Single</option>
-                      <option>Married</option>
-                      <option>Widowed</option>
-                      <option>Separated</option>
-                    </select>
-                  </div>
+                  <SelectField
+                    label="Civil Status"
+                    value={civilStatus}
+                    onChange={(e) => setCivilStatus(e.target.value)}
+                    options={['Single', 'Married', 'Widowed', 'Separated']}
+                  />
                   <div>
                     <label className={labelClass}>CP # / Mobile Number</label>
                     <input
@@ -925,13 +960,12 @@ export default function MembershipPortal({
                         <label className={labelClass}>Birthdate</label>
                         <input type="date" value={dep.birthdate} onChange={(e) => updateDependentField(idx, 'birthdate', e.target.value)} className={inputClass} />
                       </div>
-                      <div>
-                        <label className={labelClass}>Sex</label>
-                        <select value={dep.sex} onChange={(e) => updateDependentField(idx, 'sex', e.target.value)} className={inputClass}>
-                          <option>Male</option>
-                          <option>Female</option>
-                        </select>
-                      </div>
+                      <SelectField
+                        label="Sex"
+                        value={dep.sex}
+                        onChange={(e) => updateDependentField(idx, 'sex', e.target.value)}
+                        options={['Male', 'Female']}
+                      />
                       <button
                         type="button"
                         onClick={() => removeDependentRow(idx)}
