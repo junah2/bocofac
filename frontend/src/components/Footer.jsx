@@ -30,21 +30,27 @@ export default function Footer() {
       ref={footerRef}
       className="fixed inset-x-0 bottom-0 z-30 bg-[#1e2318] dark:bg-black text-slate-300 border-t border-slate-800 shadow-[0_-4px_16px_rgba(0,0,0,0.12)]"
     >
-      <div className="max-w-[1680px] mx-auto px-4 sm:px-8 h-11 flex items-center justify-center gap-x-6 gap-y-1 flex-wrap text-xs">
+      {/* No fixed height here on purpose - on a narrow phone these three
+          items wrap onto multiple lines, and a fixed height clipped that
+          wrapped text instead of letting the bar grow. Padding lets it size
+          to its actual content; the ResizeObserver above already keeps
+          --footer-h (and therefore every other layout's reserved space) in
+          sync with however tall that ends up being. */}
+      <div className="max-w-[1680px] mx-auto px-4 sm:px-8 py-2 flex items-center justify-center gap-x-6 gap-y-1.5 flex-wrap text-xs text-center">
         <a
           href="https://www.google.com/maps/search/?api=1&query=Sitio+Torens%2C+North+Villazar%2C+Sipocot%2C+Camarines+Sur"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 text-slate-400 hover:text-emerald-400 transition"
+          className="flex items-center gap-1.5 min-w-0 text-slate-400 hover:text-emerald-400 transition"
         >
           <MapPin className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
           Sitio Torens, North Villazar, Sipocot, Camarines Sur
         </a>
-        <a href="tel:+639178894402" className="flex items-center gap-1.5 text-slate-400 hover:text-emerald-400 transition">
+        <a href="tel:+639178894402" className="flex items-center gap-1.5 min-w-0 text-slate-400 hover:text-emerald-400 transition">
           <Phone className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
           0917-889-4402
         </a>
-        <a href="mailto:info@bocofac.coop" className="flex items-center gap-1.5 text-slate-400 hover:text-emerald-400 transition">
+        <a href="mailto:info@bocofac.coop" className="flex items-center gap-1.5 min-w-0 text-slate-400 hover:text-emerald-400 transition">
           <Mail className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
           info@bocofac.coop
         </a>
