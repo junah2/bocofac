@@ -45,6 +45,28 @@ const LOW_STOCK_THRESHOLD = 20;
 const PRODUCT_CATEGORIES = ['Charcoal', 'Fertilizer', 'Fibre & Coir', 'Handicraft'];
 const EMPTY_PRODUCT_FORM = { name: '', category: PRODUCT_CATEGORIES[0], description: '', price: '', stock: '', unit: '', specifications: '', imageFile: null, variantGroup: '', variantLabel: '', discountPercent: '' };
 
+// Products sharing a variantGroup (e.g. the four "Coconut Husk Pole" lengths)
+// collapse into one catalog row here too, mirroring how Storefront.jsx
+// groups them into one card - so admin manages one product with a size
+// picker instead of scanning near-duplicate rows for every length.
+function groupProductsForDisplay(products) {
+  const seenGroups = new Set();
+  const items = [];
+  for (const product of products) {
+    if (product.variantGroup) {
+      if (seenGroups.has(product.variantGroup)) continue;
+      seenGroups.add(product.variantGroup);
+      items.push({
+        key: product.variantGroup,
+        variants: products.filter(p => p.variantGroup === product.variantGroup),
+      });
+    } else {
+      items.push({ key: product.id, variants: [product] });
+    }
+  }
+  return items;
+}
+
 // The cooperative doesn't track courier hand-off in stages - once payment is
 // verified an order sits as 'Processing' until admin hands it to the
 // courier, which is the one action exposed in the UI. That action still
@@ -82,6 +104,99 @@ const NAV_ITEMS = [
   { key: 'reports', label: 'Reports', icon: FileText },
   { key: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
+
+function ProductRow({ variants, restockDrafts, setRestockDrafts, startRestock, submitRestock, openEditProduct, handleDeleteProduct }) {
+  const [selectedId, setSelectedId] = useState(variants[0].id);
+  const p = variants.find(v => v.id === selectedId) || variants[0];
+  const hasSizes = variants.length > 1;
+  const baseName = hasSizes ? variants[0].name.replace(/\s*\([^)]*\)\s*$/, '') : p.name;
+
+  return (
+    <tr className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
+      <td className="p-4 font-semibold text-slate-900 dark:text-white">
+        <div className="flex items-center gap-3">
+          <img src={resolveImageUrl(p.image)} alt={baseName} className="w-10 h-10 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0" />
+          <div>
+            <span>{baseName}</span>
+            {hasSizes && (
+              <select
+                value={selectedId}
+                onChange={(e) => setSelectedId(e.target.value)}
+                className="block mt-1 px-1.5 py-0.5 text-[11px] rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 cursor-pointer"
+              >
+                {variants.map(v => (
+                  <option key={v.id} value={v.id}>{v.variantLabel}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+      </td>
+      <td className="p-4 text-slate-500">{p.category}</td>
+      <td className="p-4 font-bold">
+        {p.discountPercent > 0 ? (
+          <div className="flex flex-col">
+            <span className="flex items-center gap-1.5">
+              <span className="text-emerald-700 dark:text-emerald-400">₱{p.salePrice.toLocaleString()}</span>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400">
+                -{p.discountPercent}%
+              </span>
+            </span>
+            <span className="text-[10px] text-slate-400 line-through font-normal">₱{p.price.toLocaleString()}</span>
+          </div>
+        ) : (
+          <span className="text-emerald-700 dark:text-emerald-400">₱{p.price.toLocaleString()}</span>
+        )}
+      </td>
+      <td className="p-4">
+        <div className="flex items-center gap-2">
+          <span className={p.stock < LOW_STOCK_THRESHOLD ? 'text-rose-600 font-bold' : 'text-slate-700 dark:text-slate-300'}>
+            {p.stock} {p.unit}
+          </span>
+          {p.stock === 0 ? (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400">Out of Stock</span>
+          ) : p.stock < LOW_STOCK_THRESHOLD ? (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">Low Stock</span>
+          ) : null}
+        </div>
+      </td>
+      <td className="p-4">
+        <div className="flex items-center justify-end gap-2">
+          {restockDrafts[p.id] !== undefined ? (
+            <>
+              <input
+                type="number"
+                value={restockDrafts[p.id]}
+                onChange={(e) => setRestockDrafts(prev => ({ ...prev, [p.id]: e.target.value }))}
+                className="w-20 px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-sm"
+              />
+              <button onClick={() => submitRestock(p.id)} className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 cursor-pointer">
+                <Check className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => startRestock(p.id, p.stock)}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 cursor-pointer"
+            >
+              Update Stock
+            </button>
+          )}
+        </div>
+      </td>
+      <td className="p-4">
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={() => openEditProduct(p)} className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer">
+            <Pencil className="w-4 h-4" />
+          </button>
+          <button onClick={() => handleDeleteProduct(p)} className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-950/60 cursor-pointer">
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
 
 export default function AdminDashboardPage({
   admin,
@@ -719,84 +834,17 @@ export default function AdminDashboardPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {products.map(p => (
-                      <tr key={p.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
-                        <td className="p-4 font-semibold text-slate-900 dark:text-white">
-                          <div className="flex items-center gap-3">
-                            <img src={resolveImageUrl(p.image)} alt={p.name} className="w-10 h-10 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0" />
-                            <span>
-                              {p.name}
-                              {p.variantGroup && (
-                                <span className="ml-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-400 align-middle">
-                                  SIZE: {p.variantLabel}
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-slate-500">{p.category}</td>
-                        <td className="p-4 font-bold">
-                          {p.discountPercent > 0 ? (
-                            <div className="flex flex-col">
-                              <span className="flex items-center gap-1.5">
-                                <span className="text-emerald-700 dark:text-emerald-400">₱{p.salePrice.toLocaleString()}</span>
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400">
-                                  -{p.discountPercent}%
-                                </span>
-                              </span>
-                              <span className="text-[10px] text-slate-400 line-through font-normal">₱{p.price.toLocaleString()}</span>
-                            </div>
-                          ) : (
-                            <span className="text-emerald-700 dark:text-emerald-400">₱{p.price.toLocaleString()}</span>
-                          )}
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <span className={p.stock < LOW_STOCK_THRESHOLD ? 'text-rose-600 font-bold' : 'text-slate-700 dark:text-slate-300'}>
-                              {p.stock} {p.unit}
-                            </span>
-                            {p.stock === 0 ? (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400">Out of Stock</span>
-                            ) : p.stock < LOW_STOCK_THRESHOLD ? (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">Low Stock</span>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-end gap-2">
-                            {restockDrafts[p.id] !== undefined ? (
-                              <>
-                                <input
-                                  type="number"
-                                  value={restockDrafts[p.id]}
-                                  onChange={(e) => setRestockDrafts(prev => ({ ...prev, [p.id]: e.target.value }))}
-                                  className="w-20 px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-sm"
-                                />
-                                <button onClick={() => submitRestock(p.id)} className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 cursor-pointer">
-                                  <Check className="w-4 h-4" />
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                onClick={() => startRestock(p.id, p.stock)}
-                                className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 cursor-pointer"
-                              >
-                                Update Stock
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-end gap-2">
-                            <button onClick={() => openEditProduct(p)} className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer">
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => handleDeleteProduct(p)} className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-950/60 cursor-pointer">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                    {groupProductsForDisplay(products).map(({ key, variants }) => (
+                      <ProductRow
+                        key={key}
+                        variants={variants}
+                        restockDrafts={restockDrafts}
+                        setRestockDrafts={setRestockDrafts}
+                        startRestock={startRestock}
+                        submitRestock={submitRestock}
+                        openEditProduct={openEditProduct}
+                        handleDeleteProduct={handleDeleteProduct}
+                      />
                     ))}
                   </tbody>
                 </table>
