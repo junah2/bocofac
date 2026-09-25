@@ -363,7 +363,7 @@ export default function BoardDashboardPage({
                             <p className="text-xs text-slate-400">{a.agriculturalType}</p>
                           </div>
                           <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${
-                            a.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                            a.status === 'Approved' ? 'bg-emerald-600 text-white' :
                             a.status === 'Rejected' ? 'bg-rose-100 text-rose-800' :
                             'bg-amber-100 text-amber-800'
                           }`}>{a.status}</span>
@@ -506,7 +506,7 @@ export default function BoardDashboardPage({
                         </td>
                         <td className="p-4">
                           <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                            a.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                            a.status === 'Approved' ? 'bg-emerald-600 text-white' :
                             a.status === 'Rejected' ? 'bg-rose-100 text-rose-800' :
                             'bg-amber-100 text-amber-800'
                           }`}>{displayApplicantStatus(a.status)}</span>

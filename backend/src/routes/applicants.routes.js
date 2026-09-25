@@ -124,8 +124,6 @@ async function loadDocumentFlags(applicantId) {
   const uploaded = new Set(rows.map((r) => r.doc_type));
   return {
     validId: uploaded.has('valid_id'),
-    farmDeclaration: uploaded.has('farm_declaration'),
-    barangayClearance: uploaded.has('barangay_clearance'),
     pmesCertificate: uploaded.has('pmes_certificate'),
     registrationFeeReceipt: uploaded.has('registration_fee_receipt'),
   };
@@ -238,7 +236,7 @@ router.post('/', validate(applicantCreateSchema), asyncHandler(async (req, res) 
     broadcast('applicants');
     res.status(201).json(toClient(
       applicantRow,
-      { validId: false, farmDeclaration: false, barangayClearance: false },
+      { validId: false },
       dependentList.map((d) => ({ name: d.name, birthdate: d.birthdate || null, age: d.age || null, sex: d.sex || null }))
     ));
   } catch (err) {
@@ -257,7 +255,7 @@ router.post('/', validate(applicantCreateSchema), asyncHandler(async (req, res) 
 // valid ID / clearance / receipt with their own files.
 router.post('/:id/documents', applicantDocsLimiter, uploadApplicantDoc.single('file'), asyncHandler(async (req, res) => {
   const { docType, email } = req.body;
-  const validTypes = ['valid_id', 'farm_declaration', 'barangay_clearance', 'registration_fee_receipt', 'pmes_certificate'];
+  const validTypes = ['valid_id', 'registration_fee_receipt', 'pmes_certificate'];
   if (!validTypes.includes(docType)) {
     return res.status(400).json({ error: `docType must be one of: ${validTypes.join(', ')}` });
   }

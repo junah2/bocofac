@@ -140,9 +140,7 @@ export const INITIAL_APPLICANTS = [
     status: 'PMES Pending',
     pmesAttended: false,
     documentsUploaded: {
-      validId: true,
-      farmDeclaration: true,
-      barangayClearance: true
+      validId: true
     },
     registrationFeePaid: true,
     referenceNumber: 'REF-98761234'
@@ -160,9 +158,7 @@ export const INITIAL_APPLICANTS = [
     pmesAttended: true,
     pmesDate: '2026-06-14',
     documentsUploaded: {
-      validId: true,
-      farmDeclaration: false,
-      barangayClearance: true
+      validId: true
     },
     registrationFeePaid: true,
     referenceNumber: 'REF-88495021'
@@ -179,9 +175,7 @@ export const INITIAL_APPLICANTS = [
     status: 'Draft',
     pmesAttended: false,
     documentsUploaded: {
-      validId: false,
-      farmDeclaration: false,
-      barangayClearance: false
+      validId: false
     },
     registrationFeePaid: false
   }

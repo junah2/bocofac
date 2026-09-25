@@ -1,6 +1,6 @@
 // src/components/ApplicantDetailModal.jsx
 import React, { useState } from 'react';
-import { X, Check, FileText } from 'lucide-react';
+import { X, Check, FileText, AlertTriangle } from 'lucide-react';
 import { displayApplicantStatus } from '../utils/applicantStatus';
 import { Field, Section } from './ProfileField';
 
@@ -22,6 +22,11 @@ export default function ApplicantDetailModal({ applicant: a, onClose, onUpdateAp
   const docs = a.documentsUploaded || {};
   const [rejectReasonDraft, setRejectReasonDraft] = useState('');
   const [requiredShareCapitalDraft, setRequiredShareCapitalDraft] = useState('10000');
+  // Confirms the final Approve/Reject decision before it's actually sent -
+  // both are hard to walk back (approval auto-creates the member account;
+  // rejection is final for that submission), so a stray click shouldn't
+  // decide someone's membership outright.
+  const [confirmAction, setConfirmAction] = useState(null);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60" onClick={onClose}>
@@ -37,7 +42,7 @@ export default function ApplicantDetailModal({ applicant: a, onClose, onUpdateAp
           </div>
           <div className="flex items-center gap-3">
             <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-              a.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+              a.status === 'Approved' ? 'bg-emerald-600 text-white' :
               a.status === 'Rejected' ? 'bg-rose-100 text-rose-800' :
               'bg-amber-100 text-amber-800'
             }`}>{displayApplicantStatus(a.status)}</span>
@@ -199,8 +204,6 @@ export default function ApplicantDetailModal({ applicant: a, onClose, onUpdateAp
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               ['Valid ID', 'valid_id', docs.validId],
-              ['Farm Declaration', 'farm_declaration', docs.farmDeclaration],
-              ['Barangay Clearance', 'barangay_clearance', docs.barangayClearance],
               ['PMES Certificate', 'pmes_certificate', docs.pmesCertificate],
               ['Payment Receipt', 'registration_fee_receipt', docs.registrationFeeReceipt],
             ].map(([label, docType, uploaded]) => {
@@ -308,15 +311,14 @@ export default function ApplicantDetailModal({ applicant: a, onClose, onUpdateAp
 
         {!readOnly && (
           <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-100 dark:border-slate-800 sticky bottom-0 bg-white dark:bg-slate-900">
-            {a.status !== 'Rejected' && (
+            {a.status !== 'Rejected' && a.status !== 'Approved' && (
               <button
                 onClick={() => {
                   if (!rejectReasonDraft.trim()) {
                     onToast?.('Please provide a rejection reason.', 'error');
                     return;
                   }
-                  onUpdateApplicantStatus(a.id, { status: 'Rejected', reason: rejectReasonDraft.trim() });
-                  onClose();
+                  setConfirmAction('reject');
                 }}
                 className="px-4 py-2 rounded-xl bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-950/60 font-bold text-sm cursor-pointer"
               >
@@ -331,8 +333,7 @@ export default function ApplicantDetailModal({ applicant: a, onClose, onUpdateAp
                     onToast?.(`Required share capital must be between ₱${MIN_REQUIRED_SHARE_CAPITAL.toLocaleString()} and ₱${MAX_REQUIRED_SHARE_CAPITAL.toLocaleString()}.`, 'error');
                     return;
                   }
-                  onUpdateApplicantStatus(a.id, { status: 'Approved', requiredShareCapital: capital });
-                  onClose();
+                  setConfirmAction('approve');
                 }}
                 className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm cursor-pointer"
               >
@@ -342,6 +343,61 @@ export default function ApplicantDetailModal({ applicant: a, onClose, onUpdateAp
           </div>
         )}
       </div>
+
+      {confirmAction && (
+        <div className="fixed inset-0 z-[60] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 space-y-4">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+              confirmAction === 'approve' ? 'bg-emerald-100 dark:bg-emerald-950/50' : 'bg-rose-100 dark:bg-rose-950/50'
+            }`}>
+              {confirmAction === 'approve' ? (
+                <Check className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400" />
+              )}
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                {confirmAction === 'approve' ? `Approve ${a.fullName}'s application?` : `Reject ${a.fullName}'s application?`}
+              </h3>
+              {confirmAction === 'approve' ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  This creates their member account with a required share capital of <span className="font-semibold">₱{Number(requiredShareCapitalDraft).toLocaleString()}</span>. Double-check this is the right person before confirming.
+                </p>
+              ) : (
+                <div className="mt-1 space-y-2">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">This is final for this submission and emails the applicant. Reason to be sent:</p>
+                  <p className="text-sm p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-300">{rejectReasonDraft.trim()}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setConfirmAction(null)}
+                className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 text-slate-700 font-semibold text-sm transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (confirmAction === 'approve') {
+                    onUpdateApplicantStatus(a.id, { status: 'Approved', requiredShareCapital: Number(requiredShareCapitalDraft) });
+                  } else {
+                    onUpdateApplicantStatus(a.id, { status: 'Rejected', reason: rejectReasonDraft.trim() });
+                  }
+                  setConfirmAction(null);
+                  onClose();
+                }}
+                className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition text-white cursor-pointer ${
+                  confirmAction === 'approve' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'
+                }`}
+              >
+                {confirmAction === 'approve' ? 'Yes, Approve' : 'Yes, Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

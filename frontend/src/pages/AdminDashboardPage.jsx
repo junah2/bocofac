@@ -609,40 +609,40 @@ export default function AdminDashboardPage({
             <>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">Overview</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex items-center justify-between">
-                  <div>
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
                     <p className="text-sm text-slate-500">Total Sales</p>
-                    <p className="text-2xl font-extrabold text-emerald-600">₱{totalSales.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    <p className="text-lg font-extrabold text-emerald-600 break-words">₱{totalSales.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                     <p className="text-xs font-semibold text-emerald-600 mt-1">Verified revenue to date</p>
                   </div>
                   <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
                     <TrendingUp className="w-6 h-6" />
                   </div>
                 </div>
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex items-center justify-between">
-                  <div>
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
                     <p className="text-sm text-slate-500">Total Orders</p>
-                    <p className="text-2xl font-extrabold text-sky-600">{orders.length}</p>
+                    <p className="text-2xl font-extrabold text-sky-600 break-words">{orders.length}</p>
                     <p className="text-xs font-semibold text-sky-600 mt-1">{pendingOrders} pending</p>
                   </div>
                   <div className="w-14 h-14 rounded-full bg-sky-100 dark:bg-sky-950/50 flex items-center justify-center text-sky-700 dark:text-sky-400 shrink-0">
                     <ShoppingBag className="w-6 h-6" />
                   </div>
                 </div>
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex items-center justify-between">
-                  <div>
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
                     <p className="text-sm text-slate-500">Total Members</p>
-                    <p className="text-2xl font-extrabold text-violet-600">{members.length}</p>
+                    <p className="text-2xl font-extrabold text-violet-600 break-words">{members.length}</p>
                     <p className="text-xs font-semibold text-violet-600 mt-1">{pendingApplicants} pending applications</p>
                   </div>
                   <div className="w-14 h-14 rounded-full bg-violet-100 dark:bg-violet-950/50 flex items-center justify-center text-violet-700 dark:text-violet-400 shrink-0">
                     <Users className="w-6 h-6" />
                   </div>
                 </div>
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex items-center justify-between">
-                  <div>
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
                     <p className="text-sm text-slate-500">Low Stock Alert</p>
-                    <p className="text-2xl font-extrabold text-rose-600">{lowStockProducts.length}</p>
+                    <p className="text-2xl font-extrabold text-rose-600 break-words">{lowStockProducts.length}</p>
                     <p className="text-xs font-semibold text-rose-600 mt-1">Products below {LOW_STOCK_THRESHOLD} units</p>
                   </div>
                   <div className="w-14 h-14 rounded-full bg-rose-100 dark:bg-rose-950/50 flex items-center justify-center text-rose-700 dark:text-rose-400 shrink-0">
@@ -1228,7 +1228,7 @@ export default function AdminDashboardPage({
                         <td className="p-4 text-slate-600 dark:text-slate-300">{a.agriculturalType}</td>
                         <td className="p-4">
                           <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                            a.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                            a.status === 'Approved' ? 'bg-emerald-600 text-white' :
                             a.status === 'Rejected' ? 'bg-rose-100 text-rose-800' :
                             'bg-amber-100 text-amber-800'
                           }`}>{displayApplicantStatus(a.status)}</span>
@@ -1296,7 +1296,7 @@ export default function AdminDashboardPage({
             <ApplicantDetailModal applicant={viewedApplicant} onClose={() => setViewedApplicant(null)} />
           )}
           {viewedMember && (
-            <MemberDetailModal member={viewedMember} onClose={() => setViewedMember(null)} />
+            <MemberDetailModal member={viewedMember} onClose={() => setViewedMember(null)} onToast={onToast} />
           )}
           {viewedAvatarUrl && (
             <div

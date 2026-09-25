@@ -7,7 +7,7 @@ export function Field({ label, value }) {
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{value || value === 0 ? value : '—'}</p>
+      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 break-words">{value || value === 0 ? value : '—'}</p>
     </div>
   );
 }

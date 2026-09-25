@@ -38,6 +38,13 @@ ALTER TABLE members ADD COLUMN IF NOT EXISTS has_share_cert BOOLEAN NOT NULL DEF
 ALTER TABLE members ADD COLUMN IF NOT EXISTS farm_profile_notes TEXT;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS civic_org_affiliation TEXT;
 
+-- "Removed" lets admin revoke a delinquent member's standing after a
+-- reminder goes unheeded, without deleting the row (their share capital
+-- ledger, orders, and withdrawal history all stay intact for the record).
+ALTER TABLE members DROP CONSTRAINT IF EXISTS members_status_check;
+ALTER TABLE members ADD CONSTRAINT members_status_check
+  CHECK (status IN ('Active', 'Delinquent', 'Removed'));
+
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -235,18 +242,19 @@ CREATE INDEX IF NOT EXISTS idx_applicant_dependents_applicant_id ON applicant_de
 CREATE TABLE IF NOT EXISTS applicant_documents (
   id SERIAL PRIMARY KEY,
   applicant_id TEXT NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
-  doc_type TEXT NOT NULL CHECK (doc_type IN ('valid_id', 'farm_declaration', 'barangay_clearance', 'registration_fee_receipt', 'pmes_certificate')),
+  doc_type TEXT NOT NULL CHECK (doc_type IN ('valid_id', 'registration_fee_receipt', 'pmes_certificate')),
   file_path TEXT NOT NULL,
   original_filename TEXT,
   uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(applicant_id, doc_type)
 );
 
--- applicant_documents may already exist with the older, narrower doc_type
--- CHECK constraint, so widen it to also allow the PMES certificate upload.
+-- farm_declaration and barangay_clearance were never actually collectible (no
+-- upload UI ever asked applicants for them) and the client doesn't require
+-- them, so they're dropped from the allowed doc_type list here too.
 ALTER TABLE applicant_documents DROP CONSTRAINT IF EXISTS applicant_documents_doc_type_check;
 ALTER TABLE applicant_documents ADD CONSTRAINT applicant_documents_doc_type_check
-  CHECK (doc_type IN ('valid_id', 'farm_declaration', 'barangay_clearance', 'registration_fee_receipt', 'pmes_certificate'));
+  CHECK (doc_type IN ('valid_id', 'registration_fee_receipt', 'pmes_certificate'));
 
 CREATE TABLE IF NOT EXISTS pmes_sessions (
   id TEXT PRIMARY KEY,

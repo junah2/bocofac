@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { nextMemberId } = require('../utils/ids');
 const { broadcast } = require('../sse');
 const { auditFromRequest } = require('../utils/audit');
+const { notifyUser } = require('../utils/notify');
 const {
   MIN_REQUIRED_SHARE_CAPITAL,
   MAX_REQUIRED_SHARE_CAPITAL,
@@ -185,6 +186,49 @@ router.patch('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
   }
 
   await auditFromRequest(req, 'member.update', { entityType: 'member', entityId: req.params.id });
+  broadcast('members');
+  res.json(toClient(rows[0]));
+}));
+
+// Lets admin/board nudge a Delinquent member before escalating to removal,
+// instead of the only options being "do nothing" or "remove them" - sends an
+// in-app notification to whichever account is linked to this member record.
+router.patch('/:id/remind', requireRole('admin', 'board'), asyncHandler(async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM members WHERE id = $1', [req.params.id]);
+  const member = rows[0];
+  if (!member) return res.status(404).json({ error: 'Member not found.' });
+
+  const { rows: userRows } = await pool.query('SELECT id FROM users WHERE member_id = $1', [member.id]);
+  if (!userRows[0]) {
+    return res.status(409).json({ error: 'This member has no linked account to notify.' });
+  }
+
+  await notifyUser(
+    pool,
+    userRows[0].id,
+    'Reminder: Your BOCOFAC share capital account is marked Delinquent. Please settle your required contribution to remain in good standing.',
+    'error'
+  );
+  await auditFromRequest(req, 'member.reminder_sent', { entityType: 'member', entityId: member.id });
+  res.json({ ok: true });
+}));
+
+// Admin-only, same operational-management reasoning as PATCH /:id above.
+// "Removed" is a soft status (the row, and every ledger/order/withdrawal
+// record that references this member id, stays intact for history) - this
+// does not delete anything or touch the linked user account.
+router.patch('/:id/status', requireRole('admin'), asyncHandler(async (req, res) => {
+  const { status } = req.body;
+  if (!['Active', 'Delinquent', 'Removed'].includes(status)) {
+    return res.status(400).json({ error: "status must be 'Active', 'Delinquent', or 'Removed'." });
+  }
+  const { rows } = await pool.query(
+    'UPDATE members SET status = $1 WHERE id = $2 RETURNING *',
+    [status, req.params.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Member not found.' });
+
+  await auditFromRequest(req, 'member.status_changed', { entityType: 'member', entityId: rows[0].id, metadata: { status } });
   broadcast('members');
   res.json(toClient(rows[0]));
 }));

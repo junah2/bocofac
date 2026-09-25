@@ -34,7 +34,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'What are the requirements to apply for membership?',
-    a: 'A valid ID, a farm declaration, a barangay clearance, and proof of the ₱300 one-time registration fee (GCash receipt or reference number) - all uploaded on the membership application form.',
+    a: 'A valid ID and proof of the ₱300 one-time registration fee (GCash receipt or reference number) - both uploaded on the membership application form.',
   },
   {
     q: 'What is the PMES seminar, and do I need to attend it?',
@@ -1374,16 +1374,17 @@ function MembershipContributionPanel({
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)' }}>
                 Payment Method
               </label>
-              <select
-                value={paymentForm.paymentMethod}
-                onChange={e => setPaymentForm(f => ({ ...f, paymentMethod: e.target.value }))}
-                style={{
-                  width: '100%', padding: '11px 14px', border: '1.5px solid var(--border)',
-                  borderRadius: 10, fontSize: 14, color: 'var(--text)', background: 'var(--card-bg)',
-                }}
-              >
-                <option value="GCash">GCash</option>
-              </select>
+              {/* GCash is the cooperative's only accepted method right now, so
+                  this is shown as a fixed value instead of a dropdown with
+                  nothing else to pick - an arrow implying other options that
+                  don't exist would just be misleading. */}
+              <div style={{
+                width: '100%', padding: '11px 14px', border: '1.5px solid var(--border)',
+                borderRadius: 10, fontSize: 14, fontWeight: 600, color: 'var(--text)', background: 'var(--card-bg)',
+                boxSizing: 'border-box',
+              }}>
+                GCash
+              </div>
             </div>
             <div style={{
               marginBottom: 18, padding: '14px 16px', borderRadius: 12,

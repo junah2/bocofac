@@ -22,6 +22,49 @@ import { displayApplicantStatus } from '../utils/applicantStatus';
 import { Field, Section } from './ProfileField';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
+// Where an in-progress, not-yet-filed application is auto-saved in the
+// browser, so an applicant who leaves before finishing (e.g. no PMES
+// certificate yet) can pick up where they left off instead of retyping
+// everything.
+// Suffixed with the signed-in account's id/email at the point of use (see
+// draftStorageKey below) - never used bare, so one account's draft is never
+// read back on a different account sharing the same browser.
+const DRAFT_STORAGE_KEY_PREFIX = 'bocofac_membership_draft_v1:';
+// Attached files (Valid ID, GCash receipt, PMES certificate) are saved
+// separately from the text draft above, as base64, so a large/near-quota
+// image never blocks the always-important text fields from saving. Capped
+// per file so three attachments together can't blow past the browser's
+// localStorage limit (~5MB on most browsers).
+const DRAFT_FILES_STORAGE_KEY_PREFIX = 'bocofac_membership_draft_files_v1:';
+const MAX_PERSISTABLE_FILE_BYTES = 2 * 1024 * 1024; // 2MB
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+// A valid GCash/bank transfer confirmation always carries some subset of
+// these words - mirrors Storefront.jsx's RECEIPT_OCR_KEYWORDS so the
+// membership fee receipt gets the same content sanity check as an order
+// payment receipt.
+const RECEIPT_OCR_KEYWORDS = [
+  'gcash', 'reference', 'ref no', 'amount', 'transaction', 'payment',
+  'sent', 'transfer', 'total', 'php', 'bank', 'received',
+];
+
+function dataURLToFile(dataURL, filename) {
+  const [header, base64] = dataURL.split(',');
+  const mimeMatch = header.match(/data:(.*?);base64/);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new File([bytes], filename, { type: mime });
+}
 
 function computeAge(birthdateStr) {
   if (!birthdateStr) return null;
@@ -177,6 +220,13 @@ export default function MembershipPortal({
     s => getPmesDisplayStatus(s) === 'Upcoming' && s.registeredCount < s.capacity
   );
 
+  // Scoped to the signed-in account (id, falling back to email) so one
+  // account's in-progress draft is never read back on a different account
+  // that happens to share the same browser/device.
+  const draftOwnerKey = user?.id || user?.email || 'guest';
+  const draftStorageKey = `${DRAFT_STORAGE_KEY_PREFIX}${draftOwnerKey}`;
+  const draftFilesStorageKey = `${DRAFT_FILES_STORAGE_KEY_PREFIX}${draftOwnerKey}`;
+
   // Wizard state for applicant submission
   const [wizardStep, setWizardStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -246,6 +296,7 @@ export default function MembershipPortal({
   const [refNum, setRefNum] = useState('');
   const [feeReceiptPreview, setFeeReceiptPreview] = useState('');
   const [feeReceiptFile, setFeeReceiptFile] = useState(null);
+  const [scanningFeeReceipt, setScanningFeeReceipt] = useState(false);
 
   // Sandbox active applicant status lookups
   const [lookupEmail, setLookupEmail] = useState('');
@@ -259,6 +310,170 @@ export default function MembershipPortal({
   const [pmesCertFile, setPmesCertFile] = useState(null);
   const [pmesCertPreview, setPmesCertPreview] = useState('');
   const [submittingPmesCert, setSubmittingPmesCert] = useState(false);
+
+  // Attached files (Valid ID, GCash receipt, PMES certificate) mirrored here
+  // as base64 so the draft-save/restore effects below can persist and bring
+  // them back, instead of the applicant having to re-attach every picture.
+  const [persistedFiles, setPersistedFiles] = useState({});
+  // Full-size preview of whichever attached image the applicant clicks on
+  // (Valid ID / receipt / certificate thumbnail) in the Review step, so they
+  // can double check it's the right, legible photo before filing.
+  const [viewedAttachmentUrl, setViewedAttachmentUrl] = useState(null);
+
+  // Restore a saved in-progress application (if any) once, when this page
+  // first opens - so an applicant who leaves mid-form (e.g. because they
+  // haven't attended PMES yet) doesn't lose everything they already typed
+  // or already attached (Valid ID / GCash receipt / PMES certificate are
+  // restored too, from DRAFT_FILES_STORAGE_KEY).
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+
+    // One-time cleanup: an earlier version of this feature saved the draft
+    // under one bare key shared by every account on the browser, so any
+    // account that opened this page could see whatever the previous account
+    // had typed. Remove that old shared draft so it can never leak again.
+    try {
+      window.localStorage.removeItem('bocofac_membership_draft_v1');
+      window.localStorage.removeItem('bocofac_membership_draft_files_v1');
+    } catch { /* ignore */ }
+
+    try {
+      const raw = window.localStorage.getItem(draftStorageKey);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (!draft || typeof draft !== 'object') return;
+
+      if (draft.firstName) setFirstName(draft.firstName);
+      if (draft.middleName) setMiddleName(draft.middleName);
+      if (draft.lastName) setLastName(draft.lastName);
+      if (draft.suffix) setSuffix(draft.suffix);
+      if (draft.birthdate) setBirthdate(draft.birthdate);
+      if (draft.birthplace) setBirthplace(draft.birthplace);
+      if (draft.gender) setGender(draft.gender);
+      if (draft.civilStatus) setCivilStatus(draft.civilStatus);
+      if (draft.email) setEmail(draft.email);
+      if (draft.phone) setPhone(draft.phone);
+
+      if (draft.addressNumber) setAddressNumber(draft.addressNumber);
+      if (draft.street) setStreet(draft.street);
+      if (draft.zone) setZone(draft.zone);
+      if (draft.barangay) setBarangay(draft.barangay);
+      if (draft.munCity) setMunCity(draft.munCity);
+      if (draft.facebook) setFacebook(draft.facebook);
+      if (draft.occupation) setOccupation(draft.occupation);
+      if (draft.employer) setEmployer(draft.employer);
+      if (draft.annualIncome !== undefined && draft.annualIncome !== '') setAnnualIncome(draft.annualIncome);
+      if (draft.businessOwned) setBusinessOwned(draft.businessOwned);
+      if (draft.tin) setTin(draft.tin);
+      if (draft.religion) setReligion(draft.religion);
+
+      if (draft.spouseContactPerson) setSpouseContactPerson(draft.spouseContactPerson);
+      if (draft.spouseCpNumber) setSpouseCpNumber(draft.spouseCpNumber);
+      if (Array.isArray(draft.dependents) && draft.dependents.length) setDependents(draft.dependents);
+
+      if (draft.eduAttainment) setEduAttainment(draft.eduAttainment);
+      if (draft.farmProfile) setFarmProfile(draft.farmProfile);
+      if (Array.isArray(draft.otherCrops) && draft.otherCrops.length) setOtherCrops(draft.otherCrops);
+
+      if (draft.educomChairperson) setEducomChairperson(draft.educomChairperson);
+      if (draft.idType) setIdType(draft.idType);
+      if (draft.idNumber) setIdNumber(draft.idNumber);
+      if (draft.idDateIssued) setIdDateIssued(draft.idDateIssued);
+      if (draft.idPlaceIssued) setIdPlaceIssued(draft.idPlaceIssued);
+
+      if (draft.refNum) setRefNum(draft.refNum);
+      if (draft.wizardStep) setWizardStep(draft.wizardStep);
+
+      let restoredFileCount = 0;
+      try {
+        const rawFiles = window.localStorage.getItem(draftFilesStorageKey);
+        const files = rawFiles ? JSON.parse(rawFiles) : null;
+        if (files && typeof files === 'object') {
+          if (files.validId?.dataUrl) {
+            const file = dataURLToFile(files.validId.dataUrl, files.validId.name || 'valid-id');
+            setValidIdAttached(true);
+            setValidIdName(file.name);
+            setValidIdFile(file);
+            setValidIdPreview(files.validId.dataUrl);
+            restoredFileCount++;
+          }
+          if (files.feeReceipt?.dataUrl) {
+            const file = dataURLToFile(files.feeReceipt.dataUrl, files.feeReceipt.name || 'gcash-receipt');
+            setRegFeePaid(true);
+            setFeeReceiptFile(file);
+            setFeeReceiptPreview(files.feeReceipt.dataUrl);
+            restoredFileCount++;
+          }
+          if (files.pmesCert?.dataUrl) {
+            const file = dataURLToFile(files.pmesCert.dataUrl, files.pmesCert.name || 'pmes-certificate');
+            setPmesCertFile(file);
+            setPmesCertPreview(files.pmesCert.dataUrl);
+            restoredFileCount++;
+          }
+          setPersistedFiles(files);
+        }
+      } catch {
+        // Corrupted/old file draft - the text fields above still restored fine.
+      }
+
+      onToast?.(
+        restoredFileCount > 0
+          ? 'Restored your unfinished application draft, including your attached files.'
+          : 'Restored your unfinished application draft. Please re-attach any files (ID photo, receipt, certificate).',
+        'success'
+      );
+    } catch {
+      // Corrupted/old draft - ignore it rather than blocking the page.
+    }
+  }, []);
+
+  // Auto-save everything typed so far (except files, which browsers won't
+  // let us persist to localStorage) every time it changes, so progress isn't
+  // lost if the applicant navigates away or closes the tab before filing.
+  useEffect(() => {
+    const hasAnyInput = firstName || lastName || phone || barangay || munCity || email !== (user?.email || '');
+    if (!hasAnyInput) return;
+    const draft = {
+      wizardStep,
+      firstName, middleName, lastName, suffix, birthdate, birthplace, gender, civilStatus, email, phone,
+      addressNumber, street, zone, barangay, munCity, facebook, occupation, employer, annualIncome, businessOwned, tin, religion,
+      spouseContactPerson, spouseCpNumber, dependents,
+      eduAttainment, farmProfile, otherCrops,
+      educomChairperson, idType, idNumber, idDateIssued, idPlaceIssued,
+      refNum,
+    };
+    try {
+      window.localStorage.setItem(draftStorageKey, JSON.stringify(draft));
+    } catch {
+      // Storage full or unavailable (e.g. private browsing) - draft-saving
+      // is a convenience, not a requirement, so this fails silently.
+    }
+  }, [
+    wizardStep,
+    firstName, middleName, lastName, suffix, birthdate, birthplace, gender, civilStatus, email, phone,
+    addressNumber, street, zone, barangay, munCity, facebook, occupation, employer, annualIncome, businessOwned, tin, religion,
+    spouseContactPerson, spouseCpNumber, dependents,
+    eduAttainment, farmProfile, otherCrops,
+    educomChairperson, idType, idNumber, idDateIssued, idPlaceIssued,
+    refNum, user,
+  ]);
+
+  // Attached files are saved to their own storage key, separately from the
+  // text draft above, so a large image failing to fit in localStorage never
+  // stops the (always-important) text fields from being saved.
+  useEffect(() => {
+    try {
+      if (!persistedFiles || Object.keys(persistedFiles).length === 0) {
+        window.localStorage.removeItem(draftFilesStorageKey);
+        return;
+      }
+      window.localStorage.setItem(draftFilesStorageKey, JSON.stringify(persistedFiles));
+    } catch {
+      // Over quota or unavailable - the applicant just re-attaches the file(s) next time.
+    }
+  }, [persistedFiles, draftFilesStorageKey]);
 
   const addDependentRow = () => {
     setDependents(prev => [...prev, { name: '', birthdate: '', sex: 'Male' }]);
@@ -283,6 +498,13 @@ export default function MembershipPortal({
     setOtherCrops(prev => prev.filter((_, i) => i !== idx));
   };
 
+  const rememberFileForDraft = (key, file) => {
+    if (!file || file.size > MAX_PERSISTABLE_FILE_BYTES) return;
+    readFileAsDataURL(file)
+      .then((dataUrl) => setPersistedFiles((prev) => ({ ...prev, [key]: { dataUrl, name: file.name } })))
+      .catch(() => { /* best-effort only - the file still works for this session either way */ });
+  };
+
   const handleDocumentUpload = (docType, file) => {
     if (!file) return;
     if (docType === 'id') {
@@ -290,18 +512,53 @@ export default function MembershipPortal({
       setValidIdName(file.name);
       setValidIdFile(file);
       setValidIdPreview(file.type === 'application/pdf' ? '' : URL.createObjectURL(file));
+      rememberFileForDraft('validId', file);
     }
     onToast(`Attached: ${file.name}`, 'success');
   };
 
-  const handleFeeReceiptUpload = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
+  // Same client-side OCR sanity check used at storefront checkout (see
+  // Storefront.jsx's handleReceiptUpload/RECEIPT_OCR_KEYWORDS) - scans the
+  // image for words any real GCash/bank confirmation would contain, so an
+  // applicant can't accidentally (or otherwise) attach an unrelated photo as
+  // their membership fee proof of payment.
+  const handleFeeReceiptUpload = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ''; // allow re-picking the same file to re-trigger onChange
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      onToast('Please upload an image (JPG, PNG, or WebP) of your payment receipt.', 'error');
+      return;
+    }
+
+    setScanningFeeReceipt(true);
+    try {
+      const { default: Tesseract } = await import('tesseract.js');
+      const { data: { text } } = await Tesseract.recognize(file, 'eng');
+      const normalized = text.toLowerCase();
+      const matchCount = RECEIPT_OCR_KEYWORDS.filter((kw) => normalized.includes(kw)).length;
+      if (matchCount < 2) {
+        onToast("This doesn't look like a payment receipt screenshot. Please attach the actual GCash/bank transfer confirmation.", 'error');
+        return;
+      }
       setRegFeePaid(true);
       setFeeReceiptFile(file);
       setFeeReceiptPreview(URL.createObjectURL(file));
-      onToast(`Attached fee remittance: ${file.name}`, 'success');
+      rememberFileForDraft('feeReceipt', file);
+      onToast(`Receipt "${file.name}" looks valid and is attached.`, 'success');
+    } catch (err) {
+      onToast('Could not scan that image - please try a clearer screenshot of the receipt.', 'error');
+    } finally {
+      setScanningFeeReceipt(false);
     }
+  };
+
+  const removeFeeReceipt = () => {
+    setRegFeePaid(false);
+    setFeeReceiptFile(null);
+    setFeeReceiptPreview('');
+    setPersistedFiles((prev) => { const next = { ...prev }; delete next.feeReceipt; return next; });
   };
 
   const resetWizard = () => {
@@ -428,6 +685,11 @@ export default function MembershipPortal({
       setLookupEmail(finalApplicant.email);
 
       resetWizard();
+      try {
+        window.localStorage.removeItem(draftStorageKey);
+        window.localStorage.removeItem(draftFilesStorageKey);
+      } catch { /* ignore */ }
+      setPersistedFiles({});
       onToast('Digital Registration filed and saved to the cooperative registry! Submitted for board verification.', 'success');
       setActivePortalTab('status');
     } catch (err) {
@@ -746,33 +1008,33 @@ export default function MembershipPortal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <label className={labelClass}>First Name</label>
-                    <input type="text" value={firstName} onChange={onLetters(setFirstName)} placeholder="Estela" className={inputClass} />
+                    <input type="text" value={firstName} onChange={onLetters(setFirstName)} placeholder="Estela" className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Middle Name</label>
-                    <input type="text" value={middleName} onChange={onLetters(setMiddleName)} placeholder="Reyes" className={inputClass} />
+                    <input type="text" value={middleName} onChange={onLetters(setMiddleName)} placeholder="Reyes" className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Family Name</label>
-                    <input type="text" value={lastName} onChange={onLetters(setLastName)} placeholder="Custodio" className={inputClass} />
+                    <input type="text" value={lastName} onChange={onLetters(setLastName)} placeholder="Custodio" className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Suffix</label>
-                    <input type="text" value={suffix} onChange={onLetters(setSuffix)} placeholder="Jr., Sr., III" className={inputClass} />
+                    <input type="text" value={suffix} onChange={onLetters(setSuffix)} placeholder="Jr., Sr., III" className={inputClass}  autoComplete="off"/>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <label className={labelClass}>Birthday</label>
-                    <input type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)} className={inputClass} />
+                    <input type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)} className={inputClass} autoComplete="off" />
                   </div>
                   <div>
                     <label className={labelClass}>Age</label>
-                    <input type="text" readOnly value={computeAge(birthdate) ?? ''} placeholder="Auto-computed" className={`${inputClass} opacity-70`} />
+                    <input type="text" readOnly value={computeAge(birthdate) ?? ''} placeholder="Auto-computed" className={`${inputClass} opacity-70`}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Birthplace</label>
-                    <input type="text" value={birthplace} onChange={onLetters(setBirthplace)} placeholder="Naga City" className={inputClass} />
+                    <input type="text" value={birthplace} onChange={onLetters(setBirthplace)} placeholder="Naga City" className={inputClass}  autoComplete="off"/>
                   </div>
                   <SelectField label="Gender" value={gender} onChange={(e) => setGender(e.target.value)} options={['Female', 'Male']} />
                 </div>
@@ -793,7 +1055,7 @@ export default function MembershipPortal({
                       onChange={onDigits(setPhone, 11)}
                       placeholder="09171234567"
                       className={inputClass}
-                    />
+                     autoComplete="off"/>
                     {phone && !isValidPhone(phone) && (
                       <p className="text-[11px] text-red-600 dark:text-red-400 mt-1">Must be 11 digits starting with 09 (e.g., 09171234567).</p>
                     )}
@@ -809,6 +1071,7 @@ export default function MembershipPortal({
                     placeholder="estela@outlook.com"
                     readOnly={!!user}
                     className={`${inputClass} ${user ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    autoComplete="off"
                   />
                   {!user && email && !isValidEmail(email) && (
                     <p className="text-[11px] text-red-600 dark:text-red-400 mt-1">Invalid email format.</p>
@@ -849,54 +1112,54 @@ export default function MembershipPortal({
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   <div>
                     <label className={labelClass}>Address #</label>
-                    <input type="text" value={addressNumber} onChange={onAlnum(setAddressNumber)} className={inputClass} />
+                    <input type="text" value={addressNumber} onChange={onAlnum(setAddressNumber)} className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Street</label>
-                    <input type="text" value={street} onChange={onAlnum(setStreet)} className={inputClass} />
+                    <input type="text" value={street} onChange={onAlnum(setStreet)} className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Zone</label>
-                    <input type="text" value={zone} onChange={onAlnum(setZone)} className={inputClass} />
+                    <input type="text" value={zone} onChange={onAlnum(setZone)} className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Barangay</label>
-                    <input type="text" value={barangay} onChange={onLetters(setBarangay)} placeholder="North Villazar" className={inputClass} />
+                    <input type="text" value={barangay} onChange={onLetters(setBarangay)} placeholder="North Villazar" className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Mun. / City</label>
-                    <input type="text" value={munCity} onChange={onLetters(setMunCity)} placeholder="Sipocot" className={inputClass} />
+                    <input type="text" value={munCity} onChange={onLetters(setMunCity)} placeholder="Sipocot" className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Facebook</label>
-                    <input type="text" value={facebook} onChange={(e) => setFacebook(e.target.value)} className={inputClass} />
+                    <input type="text" value={facebook} onChange={(e) => setFacebook(e.target.value)} className={inputClass} autoComplete="off" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={labelClass}>Occupation</label>
-                    <input type="text" value={occupation} onChange={onLetters(setOccupation)} className={inputClass} />
+                    <input type="text" value={occupation} onChange={onLetters(setOccupation)} className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Employer</label>
-                    <input type="text" value={employer} onChange={onAlnum(setEmployer)} className={inputClass} />
+                    <input type="text" value={employer} onChange={onAlnum(setEmployer)} className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Annual Income (₱)</label>
-                    <input type="number" min="0" value={annualIncome} onChange={(e) => setAnnualIncome(e.target.value)} className={inputClass} />
+                    <input type="number" min="0" value={annualIncome} onChange={(e) => setAnnualIncome(e.target.value)} className={inputClass} autoComplete="off" />
                   </div>
                   <div>
                     <label className={labelClass}>Business owned / connected</label>
-                    <input type="text" value={businessOwned} onChange={onAlnum(setBusinessOwned)} className={inputClass} />
+                    <input type="text" value={businessOwned} onChange={onAlnum(setBusinessOwned)} className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>TIN</label>
-                    <input type="text" inputMode="numeric" maxLength={12} value={tin} onChange={onDigits(setTin, 12)} className={inputClass} />
+                    <input type="text" inputMode="numeric" maxLength={12} value={tin} onChange={onDigits(setTin, 12)} className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Religion</label>
-                    <input type="text" value={religion} onChange={onLetters(setReligion)} className={inputClass} />
+                    <input type="text" value={religion} onChange={onLetters(setReligion)} className={inputClass}  autoComplete="off"/>
                   </div>
                 </div>
 
@@ -925,11 +1188,11 @@ export default function MembershipPortal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={labelClass}>Spouse / Contact Person</label>
-                    <input type="text" value={spouseContactPerson} onChange={onLetters(setSpouseContactPerson)} className={inputClass} />
+                    <input type="text" value={spouseContactPerson} onChange={onLetters(setSpouseContactPerson)} className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>CP #s</label>
-                    <input type="tel" inputMode="numeric" maxLength={11} value={spouseCpNumber} onChange={onDigits(setSpouseCpNumber, 11)} placeholder="09171234567" className={inputClass} />
+                    <input type="tel" inputMode="numeric" maxLength={11} value={spouseCpNumber} onChange={onDigits(setSpouseCpNumber, 11)} placeholder="09171234567" className={inputClass}  autoComplete="off"/>
                     {spouseCpNumber && !isValidPhone(spouseCpNumber) && (
                       <p className="text-[11px] text-red-600 dark:text-red-400 mt-1">Must be 11 digits starting with 09.</p>
                     )}
@@ -954,11 +1217,11 @@ export default function MembershipPortal({
                     <div key={idx} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end p-3 rounded-xl border bg-slate-50/50 dark:bg-slate-950/20">
                       <div className="col-span-2 sm:col-span-2">
                         <label className={labelClass}>Name</label>
-                        <input type="text" value={dep.name} onChange={(e) => updateDependentField(idx, 'name', lettersOnly(e.target.value))} className={inputClass} />
+                        <input type="text" value={dep.name} onChange={(e) => updateDependentField(idx, 'name', lettersOnly(e.target.value))} className={inputClass} autoComplete="off" />
                       </div>
                       <div>
                         <label className={labelClass}>Birthdate</label>
-                        <input type="date" value={dep.birthdate} onChange={(e) => updateDependentField(idx, 'birthdate', e.target.value)} className={inputClass} />
+                        <input type="date" value={dep.birthdate} onChange={(e) => updateDependentField(idx, 'birthdate', e.target.value)} className={inputClass} autoComplete="off" />
                       </div>
                       <SelectField
                         label="Sex"
@@ -1013,7 +1276,7 @@ export default function MembershipPortal({
                   <SelectField label="Coconut Ave Nuts / Harvest" value={farmProfile.coconut.aveNutsHarvest} onChange={(e) => updateFarmField('coconut', 'aveNutsHarvest', e.target.value)} options={COCONUT_NUTS_OPTIONS} />
                   <div>
                     <label className={labelClass}>Coconut Last Harvest</label>
-                    <input type="date" value={farmProfile.coconut.lastHarvest} onChange={(e) => updateFarmField('coconut', 'lastHarvest', e.target.value)} className={inputClass} />
+                    <input type="date" value={farmProfile.coconut.lastHarvest} onChange={(e) => updateFarmField('coconut', 'lastHarvest', e.target.value)} className={inputClass} autoComplete="off" />
                   </div>
                   <SelectField label="Ave Kopra Sold (kg)" value={farmProfile.coconut.aveKopraSoldKg} onChange={(e) => updateFarmField('coconut', 'aveKopraSoldKg', e.target.value)} options={KOPRA_KG_OPTIONS} />
                   <SelectField label="Ave Harvest Charcoal" value={farmProfile.coconut.aveHarvestCharcoal} onChange={(e) => updateFarmField('coconut', 'aveHarvestCharcoal', e.target.value)} options={CHARCOAL_OPTIONS} />
@@ -1021,7 +1284,7 @@ export default function MembershipPortal({
                   <SelectField label="Piglets" value={farmProfile.swine.piglets} onChange={(e) => updateFarmField('swine', 'piglets', e.target.value)} options={SWINE_COUNT_OPTIONS} />
                   <div>
                     <label className={labelClass}>Farrowing Date</label>
-                    <input type="date" value={farmProfile.swine.farrowingDate} onChange={(e) => updateFarmField('swine', 'farrowingDate', e.target.value)} className={inputClass} />
+                    <input type="date" value={farmProfile.swine.farrowingDate} onChange={(e) => updateFarmField('swine', 'farrowingDate', e.target.value)} className={inputClass} autoComplete="off" />
                   </div>
                   <SelectField label="Fattening" value={farmProfile.swine.fattening} onChange={(e) => updateFarmField('swine', 'fattening', e.target.value)} options={SWINE_COUNT_OPTIONS} />
                   <SelectField label="Cow - Male" value={farmProfile.livestock.cowMale} onChange={(e) => updateFarmField('livestock', 'cowMale', e.target.value)} options={ANIMAL_COUNT_OPTIONS} />
@@ -1037,7 +1300,7 @@ export default function MembershipPortal({
                   <SelectField label="Cacao Ave Nuts / Harvest" value={farmProfile.cacao.aveNutsHarvest} onChange={(e) => updateFarmField('cacao', 'aveNutsHarvest', e.target.value)} options={CACAO_NUTS_OPTIONS} />
                   <div>
                     <label className={labelClass}>Cacao Last Harvest</label>
-                    <input type="date" value={farmProfile.cacao.lastHarvest} onChange={(e) => updateFarmField('cacao', 'lastHarvest', e.target.value)} className={inputClass} />
+                    <input type="date" value={farmProfile.cacao.lastHarvest} onChange={(e) => updateFarmField('cacao', 'lastHarvest', e.target.value)} className={inputClass} autoComplete="off" />
                   </div>
                   <SelectField label="Cacao Total / Harvest" value={farmProfile.cacao.totalHarvest} onChange={(e) => updateFarmField('cacao', 'totalHarvest', e.target.value)} options={CACAO_HARVEST_KG_OPTIONS} />
                   <SelectField label="Cacao Unit Price" value={farmProfile.cacao.unitPrice} onChange={(e) => updateFarmField('cacao', 'unitPrice', e.target.value)} options={UNIT_PRICE_OPTIONS} />
@@ -1045,12 +1308,12 @@ export default function MembershipPortal({
                   <SelectField label="Rice Area (ha/sqm)" value={farmProfile.rice.areaHaSqm} onChange={(e) => updateFarmField('rice', 'areaHaSqm', e.target.value)} options={AREA_OPTIONS} />
                   <div>
                     <label className={labelClass}>Rice Location</label>
-                    <input type="text" value={farmProfile.rice.location} onChange={(e) => updateFarmField('rice', 'location', e.target.value)} className={inputClass} />
+                    <input type="text" value={farmProfile.rice.location} onChange={(e) => updateFarmField('rice', 'location', e.target.value)} className={inputClass} autoComplete="off" />
                   </div>
                   <SelectField label="Corn Area (ha/sqm)" value={farmProfile.corn.areaHaSqm} onChange={(e) => updateFarmField('corn', 'areaHaSqm', e.target.value)} options={AREA_OPTIONS} />
                   <div>
                     <label className={labelClass}>Corn Location</label>
-                    <input type="text" value={farmProfile.corn.location} onChange={(e) => updateFarmField('corn', 'location', e.target.value)} className={inputClass} />
+                    <input type="text" value={farmProfile.corn.location} onChange={(e) => updateFarmField('corn', 'location', e.target.value)} className={inputClass} autoComplete="off" />
                   </div>
                 </div>
 
@@ -1074,7 +1337,7 @@ export default function MembershipPortal({
                       {c.crop === 'Others' && (
                         <div>
                           <label className={labelClass}>Specify Crop</label>
-                          <input type="text" value={c.cropOther} onChange={(e) => updateCropField(idx, 'cropOther', e.target.value)} className={inputClass} />
+                          <input type="text" value={c.cropOther} onChange={(e) => updateCropField(idx, 'cropOther', e.target.value)} className={inputClass} autoComplete="off" />
                         </div>
                       )}
                       <div>
@@ -1125,7 +1388,7 @@ export default function MembershipPortal({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className={labelClass}>EDUCOM Chairperson</label>
-                      <input type="text" value={educomChairperson} onChange={onLetters(setEducomChairperson)} className={inputClass} />
+                      <input type="text" value={educomChairperson} onChange={onLetters(setEducomChairperson)} className={inputClass}  autoComplete="off"/>
                     </div>
                     <SelectField label="ID Type" value={idType} onChange={(e) => { setIdType(e.target.value); setIdNumber(''); }} options={VALID_ID_TYPES} />
                     <div>
@@ -1136,7 +1399,7 @@ export default function MembershipPortal({
                         onChange={onAlnum(setIdNumber)}
                         placeholder={idFormat?.example || ''}
                         className={inputClass}
-                      />
+                       autoComplete="off"/>
                       {idFormat && (
                         <p className="text-[11px] text-slate-400 mt-1">Format: {idFormat.example} — {idFormat.hint}</p>
                       )}
@@ -1148,11 +1411,11 @@ export default function MembershipPortal({
                     </div>
                     <div>
                       <label className={labelClass}>Date Issued</label>
-                      <input type="date" value={idDateIssued} onChange={(e) => setIdDateIssued(e.target.value)} className={inputClass} />
+                      <input type="date" value={idDateIssued} onChange={(e) => setIdDateIssued(e.target.value)} className={inputClass} autoComplete="off" />
                     </div>
                     <div>
                       <label className={labelClass}>Place Issued</label>
-                      <input type="text" value={idPlaceIssued} onChange={onLetters(setIdPlaceIssued)} className={inputClass} />
+                      <input type="text" value={idPlaceIssued} onChange={onLetters(setIdPlaceIssued)} className={inputClass}  autoComplete="off"/>
                     </div>
                   </div>
                 </div>
@@ -1242,8 +1505,13 @@ export default function MembershipPortal({
                       <p className="text-[10px] text-slate-400">Account Name: BOCOFAC Coop Primary</p>
                     </div>
                     {/* File chooser */}
-                    <div className="relative overflow-hidden inline">
-                      {feeReceiptPreview ? (
+                    <div className="relative inline-block">
+                      {scanningFeeReceipt ? (
+                        <div className="flex flex-col items-center gap-1 px-3 py-1.5">
+                          <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                          <p className="text-[10px] font-medium text-slate-500">Scanning receipt…</p>
+                        </div>
+                      ) : feeReceiptPreview ? (
                         <div className="text-center">
                           <img src={feeReceiptPreview} alt="Receipt preview" className="h-16 rounded-lg shadow-md border object-contain" />
                           <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">Attached: {feeReceiptFile?.name}</p>
@@ -1253,12 +1521,24 @@ export default function MembershipPortal({
                           Attach Receipt Screenshot
                         </button>
                       )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFeeReceiptUpload}
-                        className="absolute inset-0 opacity-0 w-full cursor-pointer"
-                      />
+                      {!scanningFeeReceipt && (
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFeeReceiptUpload}
+                          className="absolute inset-0 opacity-0 w-full cursor-pointer"
+                        />
+                      )}
+                      {feeReceiptPreview && !scanningFeeReceipt && (
+                        <button
+                          type="button"
+                          onClick={removeFeeReceipt}
+                          title="Remove attached receipt"
+                          className="absolute -top-2 -right-2 z-10 p-1 rounded-full border bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer shadow"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1271,7 +1551,7 @@ export default function MembershipPortal({
                       value={refNum}
                       onChange={onDigits(setRefNum, 13)}
                       className="w-full px-4 text-sm py-2 rounded-lg border bg-white dark:bg-slate-950"
-                    />
+                     autoComplete="off"/>
                     <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-medium">
                       Warning: The reference number you entered must match the one shown in your receipt screenshot. Payment will not be accepted if they don't match.
                     </p>
@@ -1287,7 +1567,8 @@ export default function MembershipPortal({
                   </button>
                   <button
                     onClick={() => setWizardStep(7)}
-                    className="px-6 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center gap-1 transition shadow-lg hover:shadow-emerald-900/10 cursor-pointer"
+                    disabled={scanningFeeReceipt}
+                    className="px-6 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-xs flex items-center gap-1 transition shadow-lg hover:shadow-emerald-900/10 cursor-pointer"
                   >
                     Review Application <ChevronRight className="w-3.5 h-3.5" />
                   </button>
@@ -1339,13 +1620,47 @@ export default function MembershipPortal({
                 <Section title="Requirements & Documents">
                   <Field label="EDUCOM Chairperson" value={educomChairperson} />
                   <Field label="ID Type / #" value={[idType, idNumber].filter(Boolean).join(' / ')} />
-                  <Field label="Valid ID Attached" value={validIdAttached ? `Yes (${validIdName})` : 'Not yet'} />
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400">Valid ID Attached</p>
+                    {validIdAttached ? (
+                      validIdPreview ? (
+                        <img
+                          src={validIdPreview}
+                          alt="Valid ID"
+                          onClick={() => setViewedAttachmentUrl(validIdPreview)}
+                          title="Click to view full size"
+                          className="mt-1 h-16 rounded-lg border object-contain cursor-pointer hover:opacity-80 transition"
+                        />
+                      ) : (
+                        <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Yes (PDF file)</p>
+                      )
+                    ) : (
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Not yet</p>
+                    )}
+                  </div>
                 </Section>
 
                 <Section title="Payment">
                   <Field label="Membership Fee" value="₱300.00" />
                   <Field label="Reference Number" value={refNum} />
-                  <Field label="Receipt Attached" value={feeReceiptFile ? `Yes (${feeReceiptFile.name})` : 'Not yet'} />
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400">Receipt Attached</p>
+                    {feeReceiptFile ? (
+                      feeReceiptPreview ? (
+                        <img
+                          src={feeReceiptPreview}
+                          alt="GCash receipt"
+                          onClick={() => setViewedAttachmentUrl(feeReceiptPreview)}
+                          title="Click to view full size"
+                          className="mt-1 h-16 rounded-lg border object-contain cursor-pointer hover:opacity-80 transition"
+                        />
+                      ) : (
+                        <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Yes (PDF file)</p>
+                      )
+                    ) : (
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Not yet</p>
+                    )}
+                  </div>
                 </Section>
 
                 <Section title="PMES Certificate">
@@ -1359,8 +1674,10 @@ export default function MembershipPortal({
                         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                         <p>
                           <span className="font-bold">No PMES Certificate attached yet</span> - attach the copy emailed
-                          to you once the Board confirmed your seminar attendance. This is required before you can
-                          file the application.
+                          to you once the Board confirms your seminar attendance. This is required before you can
+                          file the application. Don&apos;t worry, everything you&apos;ve typed in this form is saved
+                          automatically on this device, so you can come back and finish once you have your
+                          certificate without filling it out again.
                         </p>
                       </div>
                     )}
@@ -1379,6 +1696,7 @@ export default function MembershipPortal({
                             const file = e.target.files?.[0] || null;
                             setPmesCertFile(file);
                             setPmesCertPreview(file && file.type !== 'application/pdf' ? URL.createObjectURL(file) : '');
+                            if (file) rememberFileForDraft('pmesCert', file);
                           }}
                           className="absolute inset-0 opacity-0 w-full cursor-pointer"
                         />
@@ -1386,7 +1704,11 @@ export default function MembershipPortal({
                       {pmesCertFile && (
                         <button
                           type="button"
-                          onClick={() => { setPmesCertFile(null); setPmesCertPreview(''); }}
+                          onClick={() => {
+                            setPmesCertFile(null);
+                            setPmesCertPreview('');
+                            setPersistedFiles((prev) => { const next = { ...prev }; delete next.pmesCert; return next; });
+                          }}
                           title="Remove attached certificate"
                           className="p-1.5 rounded-lg border text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer"
                         >
@@ -1513,6 +1835,7 @@ export default function MembershipPortal({
               required
               value={lookupEmail}
               onChange={(e) => setLookupEmail(e.target.value)}
+              autoComplete="off"
               placeholder="e.g., estela.custodio@outlook.com"
               className="flex-1 px-4 py-2 text-sm rounded-xl border bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
             />
@@ -1682,6 +2005,10 @@ export default function MembershipPortal({
                               const file = e.target.files?.[0] || null;
                               setPmesCertFile(file);
                               setPmesCertPreview(file && file.type !== 'application/pdf' ? URL.createObjectURL(file) : '');
+                              // Only staged locally until "Submit" below is clicked -
+                              // remembering it here just means a refresh/back doesn't
+                              // silently lose the pick; it never auto-uploads on its own.
+                              if (file) rememberFileForDraft('pmesCert', file);
                             }}
                             className="absolute inset-0 opacity-0 w-full cursor-pointer"
                           />
@@ -1695,6 +2022,7 @@ export default function MembershipPortal({
                               await uploadPmesCertificateForActiveApplicant(pmesCertFile);
                               setPmesCertFile(null);
                               setPmesCertPreview('');
+                              setPersistedFiles((prev) => { const next = { ...prev }; delete next.pmesCert; return next; });
                               setSubmittingPmesCert(false);
                             }}
                             className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold text-xs cursor-pointer"
@@ -1706,7 +2034,11 @@ export default function MembershipPortal({
                           <button
                             type="button"
                             disabled={submittingPmesCert}
-                            onClick={() => { setPmesCertFile(null); setPmesCertPreview(''); }}
+                            onClick={() => {
+                              setPmesCertFile(null);
+                              setPmesCertPreview('');
+                              setPersistedFiles((prev) => { const next = { ...prev }; delete next.pmesCert; return next; });
+                            }}
                             title="Remove attached certificate"
                             className="p-1.5 rounded-lg border text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-950/30 disabled:opacity-60 cursor-pointer"
                           >
@@ -1765,6 +2097,26 @@ export default function MembershipPortal({
         </div>
       )}
       </>
+      )}
+
+      {viewedAttachmentUrl && (
+        <div
+          className="fixed inset-0 z-[70] bg-slate-950/80 flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setViewedAttachmentUrl(null)}
+        >
+          <button
+            onClick={() => setViewedAttachmentUrl(null)}
+            className="absolute top-4 right-4 p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img
+            src={viewedAttachmentUrl}
+            alt=""
+            className="max-w-[90vw] max-h-[90vh] rounded-2xl object-contain cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
 
     </div>
