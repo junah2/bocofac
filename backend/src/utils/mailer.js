@@ -3,9 +3,9 @@ const nodemailer = require('nodemailer');
 let transporterPromise = null;
 let usingEtherealTestInbox = false;
 
-// Raw SMTP (any host, any port) times out from Railway's network - confirmed
-// against both Gmail (465) and Brevo (587), so it's a platform-level block,
-// not a provider issue. BREVO_API_KEY sends over plain HTTPS instead (Brevo's
+// Raw SMTP (any host, any port) times out from many cloud hosts' networks -
+// seen against both Gmail (465) and Brevo (587), so it's a platform-level
+// block, not a provider issue. BREVO_API_KEY sends over plain HTTPS instead (Brevo's
 // transactional email API), which isn't blocked. Prefer it whenever it's set;
 // SMTP_USER/SMTP_PASS remain a fallback for local dev where SMTP still works,
 // and the Ethereal test inbox is the last resort when neither is configured.
@@ -63,7 +63,7 @@ function getTransporter() {
         // SMTP relays other than Gmail) negotiate TLS via STARTTLS instead,
         // which nodemailer only does when `secure` is false.
         secure: smtpPort === 465,
-        // Many container hosts (Railway included) advertise IPv6 but can't
+        // Many container hosts advertise IPv6 but can't
         // actually route it, so a connection to Gmail's AAAA address just
         // hangs until it times out instead of falling back to IPv4. Forcing
         // IPv4 here skips that dead end.

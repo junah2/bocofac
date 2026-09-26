@@ -4,6 +4,9 @@ frontend/build
 
 backend/node_modules
 backend/.env
+frontend/.env
+frontend/.env.local
+.firebase/
 # Ignore uploaded file content but keep the folder structure itself tracked
 # (via .gitkeep) - a bare "backend/uploads/*" ignores the subfolders
 # themselves, which then hides anything inside them from the "!" exceptions

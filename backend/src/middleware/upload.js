@@ -4,11 +4,10 @@ const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
 
-// On Railway (and most container/PaaS hosts) the app's own filesystem is
-// ephemeral - anything written here gets wiped on every redeploy, restart,
-// or scale event, not just a fresh clone. UPLOADS_DIR should point at a
-// mounted persistent Volume in production (e.g. "/data/uploads" - see
-// Railway's Volumes settings for this service); it falls back to a local
+// On most container/PaaS hosts the app's own filesystem is ephemeral -
+// anything written here gets wiped on every redeploy, restart, or scale
+// event, not just a fresh clone. UPLOADS_DIR should point at a mounted
+// persistent volume in production (e.g. "/data/uploads"); it falls back to a local
 // "uploads" folder next to the repo for development, where the plain
 // filesystem already persists fine on its own.
 const UPLOADS_ROOT = process.env.UPLOADS_DIR

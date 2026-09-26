@@ -1,6 +1,6 @@
 const rateLimit = require('express-rate-limit');
 
-// Keyed by req.ip. This is deployed behind Railway's reverse proxy, so
+// Keyed by req.ip. This is deployed behind the host's reverse proxy, so
 // app.js sets `app.set('trust proxy', 1)` - without it, every request would
 // share the proxy's own IP (over-blocking everyone together).
 function jsonRateLimitHandler(req, res) {

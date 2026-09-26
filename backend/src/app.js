@@ -26,7 +26,7 @@ const auditLogRoutes = require('./routes/auditLog.routes');
 
 const app = express();
 
-// Railway (and most PaaS hosts) sits in front of this app as a reverse
+// The hosting platform (like most PaaS hosts) sits in front of this app as a reverse
 // proxy, adding an X-Forwarded-For header with the real client IP. Trusting
 // exactly one hop tells Express/express-rate-limit to key rate limits off
 // that real IP instead of either erroring on the unexpected header (see
