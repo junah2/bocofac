@@ -11,7 +11,9 @@
     "start": "node src/server.js",
     "migrate": "node src/db/migrate.js",
     "seed": "node src/db/seed.js",
-    "sync-products": "node src/db/syncProducts.js"
+    "sync-products": "node src/db/syncProducts.js",
+    "import-sql": "node src/db/importSqlFile.js",
+    "set-password": "node src/db/setPassword.js"
   },
   "dependencies": {
     "@google-cloud/cloud-sql-connector": "^1.12.0",
