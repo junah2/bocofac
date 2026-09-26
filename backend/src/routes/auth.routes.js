@@ -189,7 +189,6 @@ router.post('/forgot-password', forgotPasswordLimiter, asyncHandler(async (req, 
   }
 
   const { rows } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
-  console.log(`[forgot-password] lookup for "${email}":`, rows[0] ? `found user id ${rows[0].id}` : 'no matching user');
   if (rows[0]) {
     // 6-digit code instead of a link token - the customer types this back
     // into the app themselves, so it needs to stay short/typeable. Padded
@@ -206,11 +205,10 @@ router.post('/forgot-password', forgotPasswordLimiter, asyncHandler(async (req, 
     // change the response) would leak whether the address exists via
     // response timing/content. Both outcomes are logged so a delivery
     // failure is still visible to whoever is watching the server console.
-    console.log(`[forgot-password] kicking off send to ${email}`);
     sendPasswordResetCodeEmail(email, code)
       .then(() => console.log(`Password reset code sent to ${email}`))
       .catch((err) => {
-        console.error('Failed to send password reset code:', err.message, err.code || '');
+        console.error('Failed to send password reset code:', err.message);
       });
     await logAudit(pool, {
       actorUserId: rows[0].id, actorEmail: email, action: 'auth.password_reset.requested',

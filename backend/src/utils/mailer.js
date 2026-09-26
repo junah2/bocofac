@@ -3,11 +3,53 @@ const nodemailer = require('nodemailer');
 let transporterPromise = null;
 let usingEtherealTestInbox = false;
 
-// Real SMTP (SMTP_USER/SMTP_PASS in .env) is used when configured. Until
-// then, this lazily spins up a disposable Ethereal test inbox via
-// nodemailer's own API (no signup, no verification) so email-dependent
-// flows still work end-to-end in development. Mail sent through Ethereal
-// never reaches a real inbox - each send instead gets a preview URL.
+// Raw SMTP (any host, any port) times out from Railway's network - confirmed
+// against both Gmail (465) and Brevo (587), so it's a platform-level block,
+// not a provider issue. BREVO_API_KEY sends over plain HTTPS instead (Brevo's
+// transactional email API), which isn't blocked. Prefer it whenever it's set;
+// SMTP_USER/SMTP_PASS remain a fallback for local dev where SMTP still works,
+// and the Ethereal test inbox is the last resort when neither is configured.
+function usingBrevoApi() {
+  return !!process.env.BREVO_API_KEY;
+}
+
+function senderEmail() {
+  return process.env.SMTP_FROM || process.env.BREVO_SENDER_EMAIL || process.env.SMTP_USER || 'no-reply@bocofac.coop';
+}
+
+async function sendViaBrevoApi({ to, subject, html, attachments }) {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': process.env.BREVO_API_KEY,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: 'BOCOFAC', email: senderEmail() },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+      ...(attachments && attachments.length
+        ? { attachment: attachments.map(a => ({ name: a.filename, content: a.content.toString('base64') })) }
+        : {}),
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    const err = new Error(`Brevo API send failed (${res.status}): ${body.slice(0, 300)}`);
+    err.code = 'BREVO_API_ERROR';
+    throw err;
+  }
+}
+
+// Real SMTP (SMTP_USER/SMTP_PASS in .env) is used when configured and Brevo's
+// API isn't. Until either is set up, this lazily spins up a disposable
+// Ethereal test inbox via nodemailer's own API (no signup, no verification)
+// so email-dependent flows still work end-to-end in development. Mail sent
+// through Ethereal never reaches a real inbox - each send instead gets a
+// preview URL.
 function getTransporter() {
   if (transporterPromise) return transporterPromise;
 
@@ -59,43 +101,57 @@ function getTransporter() {
 }
 
 function fromAddress() {
-  return process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@bocofac.coop';
+  return senderEmail();
 }
 
 // Code instead of a clickable link - simpler to deliver reliably (no link
 // scanners/proxies rewriting or pre-fetching it, nothing for a mail client
 // to flag) and the customer just types it back into the same page.
 async function sendPasswordResetCodeEmail(to, code) {
-  console.log('[mailer] getting transporter...');
+  const subject = 'Your BOCOFAC password reset code';
+  const html = `
+    <p>We received a request to reset your BOCOFAC account password.</p>
+    <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px; margin: 20px 0;">${code}</p>
+    <p>Enter this code on the password reset page. It expires in 15 minutes.</p>
+    <p>If you didn't request this, you can safely ignore this email.</p>
+  `;
+
+  if (usingBrevoApi()) {
+    await sendViaBrevoApi({ to, subject, html });
+    return;
+  }
+
   const transporter = await getTransporter();
-  console.log('[mailer] transporter ready, calling sendMail...');
-  await transporter.sendMail({
-    from: fromAddress(),
-    to,
-    subject: 'Your BOCOFAC password reset code',
-    html: `
-      <p>We received a request to reset your BOCOFAC account password.</p>
-      <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px; margin: 20px 0;">${code}</p>
-      <p>Enter this code on the password reset page. It expires in 15 minutes.</p>
-      <p>If you didn't request this, you can safely ignore this email.</p>
-    `,
-  });
+  await transporter.sendMail({ from: fromAddress(), to, subject, html });
 }
 
 // Returns { previewUrl, isTest } - previewUrl is set (Ethereal-hosted, not a
 // real inbox) whenever no real SMTP is configured yet; isTest flags that case
 // so callers can tell the difference from an actual delivery.
 async function sendPmesCertificateEmail(to, applicantName, pdfBuffer) {
+  const subject = 'Your BOCOFAC PMES Certificate of Attendance';
+  const html = `
+    <p>Hi ${applicantName || 'there'},</p>
+    <p>The BOCOFAC Board of Directors has confirmed your attendance at the Pre-Membership Education Seminar (PMES).</p>
+    <p>Your certificate is attached to this email. Keep a copy for your records — you can also attach it to your application under the "Check Application Status" tab.</p>
+  `;
+
+  if (usingBrevoApi()) {
+    await sendViaBrevoApi({
+      to,
+      subject,
+      html,
+      attachments: [{ filename: 'PMES-Certificate.pdf', content: pdfBuffer }],
+    });
+    return { previewUrl: null, isTest: false };
+  }
+
   const transporter = await getTransporter();
   const info = await transporter.sendMail({
     from: fromAddress(),
     to,
-    subject: 'Your BOCOFAC PMES Certificate of Attendance',
-    html: `
-      <p>Hi ${applicantName || 'there'},</p>
-      <p>The BOCOFAC Board of Directors has confirmed your attendance at the Pre-Membership Education Seminar (PMES).</p>
-      <p>Your certificate is attached to this email. Keep a copy for your records — you can also attach it to your application under the "Check Application Status" tab.</p>
-    `,
+    subject,
+    html,
     attachments: [
       {
         filename: 'PMES-Certificate.pdf',
@@ -120,11 +176,11 @@ async function sendPmesCertificateEmail(to, applicantName, pdfBuffer) {
   };
 }
 
-// True once SMTP_USER/SMTP_PASS are actually filled in (they ship blank in
-// .env.example) - lets callers tell a real send apart from the Ethereal
+// True once a real send path (Brevo API, or SMTP_USER/SMTP_PASS) is actually
+// configured - lets callers tell a real send apart from the Ethereal
 // test-inbox fallback above.
 function isMailConfigured() {
-  return !!(process.env.SMTP_USER && process.env.SMTP_PASS);
+  return usingBrevoApi() || !!(process.env.SMTP_USER && process.env.SMTP_PASS);
 }
 
 module.exports = { sendPasswordResetCodeEmail, sendPmesCertificateEmail, isMailConfigured };
