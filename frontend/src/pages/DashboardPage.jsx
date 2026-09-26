@@ -338,6 +338,21 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
   // applicantId+email (same as MembershipPortal's own flow), and anyone with
   // neither yet (hasn't applied at all) self-registers by their own account.
   const [registeringSessionId, setRegisteringSessionId] = useState(null);
+  // Which session (if any) this account already reserved a slot for - shown
+  // persistently on the matching card so "did I already reserve?" doesn't
+  // depend on remembering a one-time confirmation toast.
+  const [myPmesRegistration, setMyPmesRegistration] = useState(null);
+  const checkMyPmesRegistration = async () => {
+    if (!user?.email) return;
+    try {
+      const res = await fetch(`${API_BASE}/pmes-sessions/my-registration/${encodeURIComponent(user.email)}`);
+      const data = res.ok ? await res.json() : { registered: false };
+      setMyPmesRegistration(data.registered ? data : null);
+    } catch {
+      // Best-effort - just means the persistent reminder won't show.
+    }
+  };
+  useEffect(() => { checkMyPmesRegistration(); }, [user?.email]);
   // Full sessions stay visible (with a disabled "Full" button) rather than
   // vanishing from the list, so a member can see a session exists without
   // wondering where it went - the backend independently rejects any
@@ -372,6 +387,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
         throw new Error(err.error || 'Failed to reserve a slot for this session.');
       }
       await onPmesSessionsRefresh?.();
+      await checkMyPmesRegistration();
       onToast?.(`Slot reserved! See you on ${new Date(session.date).toLocaleDateString()} at ${session.venue || 'the announced venue'}.`, 'success');
     } catch (err) {
       onToast?.(err.message || 'Could not reserve a slot for this session.', 'error');
@@ -784,8 +800,14 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {upcomingPmesSessions.map(session => {
                     const isFull = session.registeredCount >= session.capacity;
+                    const isMine = myPmesRegistration?.session.id === session.id;
                     return (
-                    <div key={session.id} style={{ border: '1.5px solid var(--border)', borderRadius: 12, padding: '16px' }}>
+                    <div key={session.id} style={{ border: isMine ? '1.5px solid #16a34a' : '1.5px solid var(--border)', borderRadius: 12, padding: '16px', background: isMine ? 'rgba(22, 163, 74, 0.06)' : undefined }}>
+                      {isMine && (
+                        <p style={{ fontSize: 11, fontWeight: 700, color: '#16a34a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Check size={12} /> You're registered for this session
+                        </p>
+                      )}
                       <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>{session.title}</p>
                       <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>
                         {new Date(session.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })} · {session.time}
@@ -802,9 +824,9 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                       <GreenBtn
                         small
                         onClick={() => handleReservePmesSlot(session)}
-                        disabled={isFull || registeringSessionId === session.id}
+                        disabled={isFull || isMine || registeringSessionId === session.id}
                       >
-                        {isFull ? 'Full' : registeringSessionId === session.id ? 'Reserving…' : 'Reserve Slot'}
+                        {isMine ? 'Registered' : isFull ? 'Full' : registeringSessionId === session.id ? 'Reserving…' : 'Reserve Slot'}
                       </GreenBtn>
                     </div>
                     );

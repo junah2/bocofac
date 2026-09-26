@@ -56,6 +56,33 @@ router.get('/attendance-check/:email', applicantLookupLimiter, asyncHandler(asyn
   res.json({ attended: !!applicant.rows[0]?.pmes_attended });
 }));
 
+// Lets the Membership page and client dashboard show "you're already
+// registered for X" persistently, instead of only in a one-time toast/modal
+// right after clicking Reserve Slot - covers all three ways a registration
+// can be linked (applicant, member, or a walk-in/self-registered account
+// email), same matching logic /:id/register itself uses to attach one.
+router.get('/my-registration/:email', applicantLookupLimiter, asyncHandler(async (req, res) => {
+  const email = req.params.email.trim().toLowerCase();
+  const { rows } = await pool.query(
+    `SELECT s.id, s.title, s.date, s.time_range AS time, s.venue, s.speaker, r.attended
+     FROM pmes_registrations r
+     JOIN pmes_sessions s ON s.id = r.session_id
+     LEFT JOIN applicants a ON a.id = r.applicant_id
+     LEFT JOIN members m ON m.id = r.member_id
+     WHERE lower(COALESCE(a.email, m.email, r.walk_in_email)) = $1
+     ORDER BY r.registered_at DESC
+     LIMIT 1`,
+    [email]
+  );
+  if (!rows[0]) return res.json({ registered: false });
+  const row = rows[0];
+  res.json({
+    registered: true,
+    attended: row.attended,
+    session: { id: row.id, title: row.title, date: row.date, time: row.time, venue: row.venue, speaker: row.speaker },
+  });
+}));
+
 router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
   const { title, date, time, venue, speaker, capacity, status } = req.body;
   if (!title || !date || !time || !capacity) {

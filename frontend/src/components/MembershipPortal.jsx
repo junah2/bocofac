@@ -804,6 +804,7 @@ export default function MembershipPortal({
       }
       const found = await res.json();
       setActiveSearchedApplicant(found);
+      checkMyPmesRegistration(emailValue);
       onToast(`Found membership application record for ${found.fullName}`, 'success');
     } catch {
       onToast('Could not reach the membership registry service.', 'error');
@@ -833,6 +834,21 @@ export default function MembershipPortal({
     }
   };
   const pmesConfirmed = !!(activeSearchedApplicant?.pmesAttended || pmesAttendanceConfirmed);
+
+  // Which session (if any) this email already reserved a slot for - shown
+  // persistently (gate modal, banner, schedule list) so "did I already
+  // reserve?" doesn't depend on remembering a one-time confirmation popup.
+  const [myPmesRegistration, setMyPmesRegistration] = useState(null);
+  const checkMyPmesRegistration = async (emailValue) => {
+    if (!emailValue || !isValidEmail(emailValue)) return;
+    try {
+      const res = await fetch(`${API_BASE}/pmes-sessions/my-registration/${encodeURIComponent(emailValue.trim())}`);
+      const data = res.ok ? await res.json() : { registered: false };
+      setMyPmesRegistration(data.registered ? data : null);
+    } catch {
+      // Best-effort - just means the persistent reminder won't show.
+    }
+  };
   // True once a certificate is actually on file for this applicant - checked
   // both ways since the field lands under a different name depending on
   // which endpoint last populated activeSearchedApplicant (the by-email
@@ -863,6 +879,7 @@ export default function MembershipPortal({
       setLookupEmail(user.email);
       searchApplicantByEmail(user.email);
       checkPmesAttendance(user.email);
+      checkMyPmesRegistration(user.email);
     }
   }, [user?.email]);
 
@@ -897,6 +914,8 @@ export default function MembershipPortal({
         throw new Error(err.error || 'Failed to reserve a slot for this session.');
       }
       await onSessionsRefresh?.();
+      const registeredEmail = activeSearchedApplicant?.email || user?.email;
+      if (registeredEmail) checkMyPmesRegistration(registeredEmail);
       setReservedSession(session);
     } catch (err) {
       onToast(err.message || 'Could not reserve a slot for this session.', 'error');
@@ -951,16 +970,28 @@ export default function MembershipPortal({
             className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl max-w-sm w-full p-6 space-y-4 text-left"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center">
-              <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${myPmesRegistration ? 'bg-emerald-100 dark:bg-emerald-950/50' : 'bg-amber-100 dark:bg-amber-950/50'}`}>
+              {myPmesRegistration
+                ? <Check className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                : <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" />}
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">You must attend a PMES seminar first</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                You need to attend a Pre-Membership Education Seminar (PMES) in person before you can apply for
-                membership. Pick a schedule below, reserve a slot, attend it, and once you're checked in as present
-                you'll be able to file your application.
-              </p>
+              {myPmesRegistration ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  You're already registered for <span className="font-semibold text-slate-700 dark:text-slate-300">{myPmesRegistration.session.title}</span> on{' '}
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">{formatDate(myPmesRegistration.session.date)}</span>
+                  {myPmesRegistration.session.time ? ` (${myPmesRegistration.session.time})` : ''} at{' '}
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">{myPmesRegistration.session.venue || 'the announced venue'}</span>.
+                  Attend it, and once you're checked in as present you'll be able to file your application.
+                </p>
+              ) : (
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  You need to attend a Pre-Membership Education Seminar (PMES) in person before you can apply for
+                  membership. Pick a schedule below, reserve a slot, attend it, and once you're checked in as present
+                  you'll be able to file your application.
+                </p>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-1">
               <button
@@ -973,7 +1004,7 @@ export default function MembershipPortal({
                 onClick={goToPmesSchedule}
                 className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm cursor-pointer"
               >
-                View PMES Schedule
+                {myPmesRegistration ? 'View My Reservation' : 'View PMES Schedule'}
               </button>
             </div>
           </div>
@@ -1058,7 +1089,20 @@ export default function MembershipPortal({
         </div>
       </div>
 
-      {activePortalTab === 'apply' && !pmesConfirmed && (
+      {activePortalTab === 'apply' && !pmesConfirmed && myPmesRegistration && (
+        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 text-sm text-emerald-800 dark:text-emerald-300">
+          <p className="font-bold mb-1 flex items-center gap-1.5"><Check className="w-4 h-4" /> You're registered for a PMES seminar</p>
+          <p>
+            <span className="font-semibold">{myPmesRegistration.session.title}</span> on{' '}
+            <span className="font-semibold">{formatDate(myPmesRegistration.session.date)}</span>
+            {myPmesRegistration.session.time ? ` (${myPmesRegistration.session.time})` : ''} at{' '}
+            <span className="font-semibold">{myPmesRegistration.session.venue || 'the announced venue'}</span>.
+            Attend it, and once you're checked in as present you'll be able to file your application.
+          </p>
+        </div>
+      )}
+
+      {activePortalTab === 'apply' && !pmesConfirmed && !myPmesRegistration && (
         <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 text-sm text-amber-800 dark:text-amber-300">
           <p className="font-bold mb-1">You must attend a PMES seminar first</p>
           <p>
@@ -1169,7 +1213,7 @@ export default function MembershipPortal({
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    onBlur={(e) => !user && checkPmesAttendance(e.target.value)}
+                    onBlur={(e) => { if (!user) { checkPmesAttendance(e.target.value); checkMyPmesRegistration(e.target.value); } }}
                     placeholder="estela@outlook.com"
                     readOnly={!!user}
                     className={`${inputClass} ${user ? 'opacity-70 cursor-not-allowed' : ''}`}
@@ -1924,9 +1968,13 @@ export default function MembershipPortal({
                 <div className="space-y-3">
                   {upcomingSessions.map(session => {
                     const isFull = session.registeredCount >= session.capacity;
+                    const isMine = myPmesRegistration?.session.id === session.id;
                     return (
-                    <div key={session.id} className="border rounded-xl p-3 space-y-2 bg-slate-50/50 dark:bg-slate-950/20">
+                    <div key={session.id} className={`border rounded-xl p-3 space-y-2 ${isMine ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800' : 'bg-slate-50/50 dark:bg-slate-950/20'}`}>
                       <div className="space-y-1">
+                        {isMine && (
+                          <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1"><Check className="w-3 h-3" /> You're registered for this session</p>
+                        )}
                         <p className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1">{session.title}</p>
                         <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
                           <Calendar className="w-3 h-3 text-slate-400" /> {formatDate(session.date)} | {session.time}
@@ -1943,10 +1991,10 @@ export default function MembershipPortal({
                         <button
                           type="button"
                           onClick={() => registerForPmesSession(session)}
-                          disabled={isFull}
+                          disabled={isFull || isMine}
                           className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white font-semibold text-xs cursor-pointer disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                         >
-                          {isFull ? 'Full' : 'Reserve Slot'}
+                          {isMine ? 'Registered' : isFull ? 'Full' : 'Reserve Slot'}
                         </button>
                       </div>
                     </div>
@@ -2086,9 +2134,13 @@ export default function MembershipPortal({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                           {upcomingSessions.map(session => {
                             const isFull = session.registeredCount >= session.capacity;
+                            const isMine = myPmesRegistration?.session.id === session.id;
                             return (
-                            <div key={session.id} className="border rounded-xl p-3 space-y-2 bg-white dark:bg-slate-900">
+                            <div key={session.id} className={`border rounded-xl p-3 space-y-2 ${isMine ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800' : 'bg-white dark:bg-slate-900'}`}>
                               <div className="space-y-1">
+                                {isMine && (
+                                  <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1"><Check className="w-3 h-3" /> You're registered for this session</p>
+                                )}
                                 <p className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1">{session.title}</p>
                                 <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
                                   <Calendar className="w-3 h-3 text-slate-400" /> {formatDate(session.date)} | {session.time}
@@ -2104,10 +2156,10 @@ export default function MembershipPortal({
                               <div className="flex justify-end pt-1 border-t">
                                 <button
                                   onClick={() => registerForPmesSession(session)}
-                                  disabled={isFull}
+                                  disabled={isFull || isMine}
                                   className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white font-semibold text-xs cursor-pointer disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                                 >
-                                  {isFull ? 'Full' : 'Reserve Slot'}
+                                  {isMine ? 'Registered' : isFull ? 'Full' : 'Reserve Slot'}
                                 </button>
                               </div>
                             </div>
