@@ -1535,6 +1535,15 @@ export default function MembershipPortal({
                       <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{idType || 'Valid Govt ID'} Photo</p>
                       <p className="text-[10px] text-slate-400 line-clamp-1">{validIdAttached ? validIdName : 'Click to attach (PNG/PDF)'}</p>
                       {validIdAttached && <p className="text-[10px] text-slate-400">Click or drag again to replace</p>}
+                      {validIdPreview && (
+                        <button
+                          type="button"
+                          onClick={() => setViewedAttachmentUrl(validIdPreview)}
+                          className="text-[10px] text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 underline cursor-pointer relative z-10"
+                        >
+                          View full size
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1599,6 +1608,13 @@ export default function MembershipPortal({
                         <div className="text-center">
                           <img src={feeReceiptPreview} alt="Receipt preview" className="h-16 rounded-lg shadow-md border object-contain" />
                           <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">Attached: {feeReceiptFile?.name}</p>
+                          <button
+                            type="button"
+                            onClick={() => setViewedAttachmentUrl(feeReceiptPreview)}
+                            className="mt-1 text-[10px] text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 underline cursor-pointer relative z-10"
+                          >
+                            View full size
+                          </button>
                         </div>
                       ) : (
                         <button className="px-3 py-1.5 rounded-lg border text-xs bg-white dark:bg-slate-900 text-slate-500 hover:text-slate-800 transition">
@@ -1774,7 +1790,13 @@ export default function MembershipPortal({
                     )}
                     <div className="flex items-center gap-3">
                       {pmesCertPreview && (
-                        <img src={pmesCertPreview} alt="PMES certificate preview" className="h-16 rounded-lg shadow-md border object-contain" />
+                        <img
+                          src={pmesCertPreview}
+                          alt="PMES certificate preview"
+                          onClick={() => setViewedAttachmentUrl(pmesCertPreview)}
+                          title="Click to view full size"
+                          className="h-16 rounded-lg shadow-md border object-contain cursor-pointer hover:opacity-80 transition"
+                        />
                       )}
                       {!scanningPmesCert && (
                         <div className="relative overflow-hidden inline-block">
@@ -2091,7 +2113,13 @@ export default function MembershipPortal({
                       </p>
                       {pmesCertPreview && (
                         <div className="text-center">
-                          <img src={pmesCertPreview} alt="PMES certificate preview" className="h-24 mx-auto rounded-lg shadow-md border object-contain" />
+                          <img
+                            src={pmesCertPreview}
+                            alt="PMES certificate preview"
+                            onClick={() => setViewedAttachmentUrl(pmesCertPreview)}
+                            title="Click to view full size"
+                            className="h-24 mx-auto rounded-lg shadow-md border object-contain cursor-pointer hover:opacity-80 transition"
+                          />
                           <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">Attached: {pmesCertFile?.name}</p>
                         </div>
                       )}

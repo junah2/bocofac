@@ -199,6 +199,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
   const [checkoutStep, setCheckoutStep] = useState(1);
   const [activeProductDetail, setActiveProductDetail] = useState(null);
   const [submittingOrder, setSubmittingOrder] = useState(false);
+  const [viewedAttachmentUrl, setViewedAttachmentUrl] = useState(null);
   const [showAccountRequiredModal, setShowAccountRequiredModal] = useState(false);
 
   // Manual payment state - prefilled for signed-in customers so a repeat
@@ -972,6 +973,13 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                                 <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center justify-center gap-1">
                                   <Check className="w-4 h-4" /> Attached: {receiptFile?.name}
                                 </p>
+                                <button
+                                  type="button"
+                                  onClick={() => setViewedAttachmentUrl(receiptPreview)}
+                                  className="text-[10px] text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 underline cursor-pointer relative z-10"
+                                >
+                                  View full size
+                                </button>
                                 <p className="text-[10px] text-slate-400">Click or drag again to replace</p>
                               </div>
                             ) : (
@@ -1171,6 +1179,26 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {viewedAttachmentUrl && (
+        <div
+          className="fixed inset-0 z-[70] bg-slate-950/80 flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setViewedAttachmentUrl(null)}
+        >
+          <button
+            onClick={() => setViewedAttachmentUrl(null)}
+            className="absolute top-4 right-4 p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img
+            src={viewedAttachmentUrl}
+            alt=""
+            className="max-w-[90vw] max-h-[90vh] rounded-2xl object-contain cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
 
