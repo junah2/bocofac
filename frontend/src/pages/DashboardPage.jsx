@@ -396,6 +396,46 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
     }
   };
 
+  const cancelPmesReservation = async (session) => {
+    const memberId = membership?.member?.id;
+    setRegisteringSessionId(session.id);
+    try {
+      const res = await fetch(`${API_BASE}/pmes-sessions/${session.id}/register`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(
+          memberId
+            ? { memberId }
+            : applicantStatus
+              ? { applicantId: applicantStatus.id, email: applicantStatus.email }
+              : {}
+        ),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to cancel your reservation.');
+      }
+      await onPmesSessionsRefresh?.();
+      await checkMyPmesRegistration();
+      onToast?.('Your reservation was cancelled.', 'success');
+    } catch (err) {
+      onToast?.(err.message || 'Could not cancel your reservation.', 'error');
+    } finally {
+      setRegisteringSessionId(null);
+    }
+  };
+
+  const handleCancelPmesSlot = (session) => {
+    setConfirmPrompt({
+      title: 'Cancel this reservation?',
+      message: `You'll lose your slot for "${session.title}" on ${new Date(session.date).toLocaleDateString()}. You can reserve again later if a slot is still open.`,
+      tone: 'danger',
+      confirmLabel: 'Cancel Reservation',
+      onConfirm: () => cancelPmesReservation(session),
+    });
+  };
+
   const handleSubmitPayment = async (e) => {
     e.preventDefault();
     const amount = Number(paymentForm.amount);
@@ -821,13 +861,29 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                       <p style={{ fontSize: 12, color: isFull ? '#e24b4a' : 'var(--text-muted)', marginBottom: 14, fontWeight: isFull ? 700 : 400 }}>
                         {session.registeredCount}/{session.capacity} registered · {isFull ? 'Full' : `${session.capacity - session.registeredCount} slot(s) left`}
                       </p>
-                      <GreenBtn
-                        small
-                        onClick={() => handleReservePmesSlot(session)}
-                        disabled={isFull || isMine || registeringSessionId === session.id}
-                      >
-                        {isMine ? 'Registered' : isFull ? 'Full' : registeringSessionId === session.id ? 'Reserving…' : 'Reserve Slot'}
-                      </GreenBtn>
+                      {isMine ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <GreenBtn small disabled>Registered</GreenBtn>
+                          {!myPmesRegistration?.attended && (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelPmesSlot(session)}
+                              disabled={registeringSessionId === session.id}
+                              style={{ fontSize: 12, fontWeight: 600, color: '#e24b4a', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                            >
+                              Cancel Reservation
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <GreenBtn
+                          small
+                          onClick={() => handleReservePmesSlot(session)}
+                          disabled={isFull || registeringSessionId === session.id}
+                        >
+                          {isFull ? 'Full' : registeringSessionId === session.id ? 'Reserving…' : 'Reserve Slot'}
+                        </GreenBtn>
+                      )}
                     </div>
                     );
                   })}

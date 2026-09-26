@@ -454,4 +454,75 @@ router.post('/:id/register', asyncHandler(async (req, res) => {
   }
 }));
 
+// Lets the same identity that reserved a slot (applicant, member, or their
+// own account) cancel it before attending - mirrors POST /:id/register's
+// identity checks exactly, so this can't be used to cancel someone else's
+// reservation. Blocked once attendance is already marked, since undoing that
+// would contradict the roster/certificate trail already tied to it.
+router.delete('/:id/register', asyncHandler(async (req, res) => {
+  const { applicantId, memberId, email } = req.body;
+  let selfEmail = null;
+  if (!applicantId && !memberId) {
+    if (!req.user) {
+      return res.status(400).json({ error: 'applicantId or memberId is required.' });
+    }
+    const { rows: selfRows } = await pool.query('SELECT email FROM users WHERE id = $1', [req.user.sub]);
+    if (!selfRows[0]) {
+      return res.status(400).json({ error: 'applicantId or memberId is required.' });
+    }
+    selfEmail = selfRows[0].email;
+  }
+  if (applicantId && !email) {
+    return res.status(400).json({ error: 'email is required to verify this applicant.' });
+  }
+  if (memberId) {
+    if (!req.user) {
+      return res.status(403).json({ error: 'You may only cancel your own reservation.' });
+    }
+    const { rows: userRows } = await pool.query('SELECT member_id FROM users WHERE id = $1', [req.user.sub]);
+    const actualMemberId = userRows[0] && userRows[0].member_id;
+    if (actualMemberId !== memberId) {
+      return res.status(403).json({ error: 'You may only cancel your own reservation.' });
+    }
+  }
+
+  let where;
+  let params;
+  if (applicantId) {
+    const applicantCheck = await pool.query(
+      'SELECT id FROM applicants WHERE id = $1 AND lower(email) = lower($2)',
+      [applicantId, email]
+    );
+    if (!applicantCheck.rows[0]) {
+      return res.status(403).json({ error: 'Applicant id and email do not match.' });
+    }
+    where = 'session_id = $1 AND applicant_id = $2';
+    params = [req.params.id, applicantId];
+  } else if (memberId) {
+    where = 'session_id = $1 AND member_id = $2';
+    params = [req.params.id, memberId];
+  } else {
+    where = 'session_id = $1 AND lower(walk_in_email) = lower($2)';
+    params = [req.params.id, selfEmail];
+  }
+
+  const { rows } = await pool.query(`SELECT * FROM pmes_registrations WHERE ${where}`, params);
+  const reg = rows[0];
+  if (!reg) {
+    return res.status(404).json({ error: 'No reservation found for this session.' });
+  }
+  if (reg.attended) {
+    return res.status(409).json({ error: 'This attendance is already on record - contact the cooperative if you need it changed.' });
+  }
+
+  await pool.query('DELETE FROM pmes_registrations WHERE id = $1', [reg.id]);
+  await auditFromRequest(req, 'pmes_session.register_cancelled', {
+    actorEmail: email || selfEmail || null,
+    entityType: 'pmes_session', entityId: req.params.id,
+    metadata: { applicantId: applicantId || null, memberId: memberId || null },
+  });
+  broadcast('pmes-sessions');
+  res.json({ cancelled: true });
+}));
+
 module.exports = router;

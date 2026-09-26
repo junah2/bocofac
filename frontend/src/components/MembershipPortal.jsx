@@ -922,6 +922,35 @@ export default function MembershipPortal({
     }
   };
 
+  // Asks for confirmation (see the modal below) before actually cancelling -
+  // losing a slot isn't reversible if the session fills back up.
+  const [cancelConfirmSession, setCancelConfirmSession] = useState(null);
+  const cancelPmesReservation = async (session) => {
+    const body = activeSearchedApplicant
+      ? { applicantId: activeSearchedApplicant.id, email: activeSearchedApplicant.email }
+      : {};
+    try {
+      const res = await fetch(`${API_BASE}/pmes-sessions/${session.id}/register`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to cancel your reservation.');
+      }
+      await onSessionsRefresh?.();
+      const registeredEmail = activeSearchedApplicant?.email || user?.email;
+      if (registeredEmail) checkMyPmesRegistration(registeredEmail);
+      onToast('Your reservation was cancelled.', 'success');
+    } catch (err) {
+      onToast(err.message || 'Could not cancel your reservation.', 'error');
+    } finally {
+      setCancelConfirmSession(null);
+    }
+  };
+
   // PMES attendance is now confirmed at the session roster check-in, then
   // the certificate is sent from there (see BoardDashboardPage's PMES
   // Attendance tab) - not by this upload. This just lets the applicant keep
@@ -1036,6 +1065,41 @@ export default function MembershipPortal({
                 className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm cursor-pointer"
               >
                 Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelConfirmSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60" onClick={() => setCancelConfirmSession(null)}>
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl max-w-sm w-full p-6 space-y-4 text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-950/50 flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Cancel this reservation?</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                You'll lose your slot for <span className="font-semibold text-slate-700 dark:text-slate-300">{cancelConfirmSession.title}</span> on{' '}
+                <span className="font-semibold text-slate-700 dark:text-slate-300">{formatDate(cancelConfirmSession.date)}</span>.
+                You can reserve again later if a slot is still open.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setCancelConfirmSession(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 text-slate-700 font-semibold text-sm cursor-pointer"
+              >
+                Never mind
+              </button>
+              <button
+                onClick={() => cancelPmesReservation(cancelConfirmSession)}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm cursor-pointer"
+              >
+                Cancel Reservation
               </button>
             </div>
           </div>
@@ -1987,7 +2051,16 @@ export default function MembershipPortal({
                           <span className="font-semibold text-slate-700 dark:text-slate-300">{session.registeredCount}/{session.capacity}</span> registered · {isFull ? 'Full' : `${session.capacity - session.registeredCount} slot(s) left`}
                         </p>
                       </div>
-                      <div className="flex justify-end pt-1 border-t">
+                      <div className="flex items-center justify-end gap-3 pt-1 border-t">
+                        {isMine && !myPmesRegistration.attended && (
+                          <button
+                            type="button"
+                            onClick={() => setCancelConfirmSession(session)}
+                            className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
+                          >
+                            Cancel Reservation
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => registerForPmesSession(session)}
@@ -2153,7 +2226,16 @@ export default function MembershipPortal({
                                   <span className="font-semibold text-slate-700 dark:text-slate-300">{session.registeredCount}/{session.capacity}</span> registered · {isFull ? 'Full' : `${session.capacity - session.registeredCount} slot(s) left`}
                                 </p>
                               </div>
-                              <div className="flex justify-end pt-1 border-t">
+                              <div className="flex items-center justify-end gap-3 pt-1 border-t">
+                                {isMine && !myPmesRegistration.attended && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setCancelConfirmSession(session)}
+                                    className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
+                                  >
+                                    Cancel Reservation
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => registerForPmesSession(session)}
                                   disabled={isFull || isMine}
