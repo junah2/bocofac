@@ -57,6 +57,21 @@ const RECEIPT_OCR_KEYWORDS = [
   'sent', 'transfer', 'total', 'php', 'bank', 'received',
 ];
 
+// Pulls every digit run out of OCR'd receipt text, joining runs only split by
+// whitespace (receipts commonly print "1234 5678 9012 3") so a reference
+// number isn't missed just because the receipt grouped its digits.
+function extractDigitRuns(ocrText) {
+  return (ocrText.replace(/\s+/g, '').match(/\d+/g)) || [];
+}
+
+// True once a receipt has been scanned AND the typed reference number
+// actually appears among its digit runs - a 13-digit value that's simply
+// well-formed but absent from the receipt itself shouldn't pass as "correct".
+function refNumberMatchesReceipt(digitRuns, ref) {
+  if (!digitRuns || !ref) return null;
+  return digitRuns.some((run) => run.includes(ref));
+}
+
 function dataURLToFile(dataURL, filename) {
   const [header, base64] = dataURL.split(',');
   const mimeMatch = header.match(/data:(.*?);base64/);
@@ -301,6 +316,10 @@ export default function MembershipPortal({
   const [feeReceiptPreview, setFeeReceiptPreview] = useState('');
   const [feeReceiptFile, setFeeReceiptFile] = useState(null);
   const [scanningFeeReceipt, setScanningFeeReceipt] = useState(false);
+  // Digit runs OCR'd off the receipt itself (see handleFeeReceiptUpload) -
+  // lets the typed reference number be cross-checked against what the
+  // receipt actually shows, not just its own 13-digit format.
+  const [receiptDigitRuns, setReceiptDigitRuns] = useState(null);
 
   // Sandbox active applicant status lookups
   const [lookupEmail, setLookupEmail] = useState('');
@@ -546,6 +565,7 @@ export default function MembershipPortal({
         onToast("This doesn't look like a payment receipt screenshot. Please attach the actual GCash/bank transfer confirmation.", 'error');
         return;
       }
+      setReceiptDigitRuns(extractDigitRuns(text));
       setRegFeePaid(true);
       setFeeReceiptFile(file);
       setFeeReceiptPreview(URL.createObjectURL(file));
@@ -562,6 +582,7 @@ export default function MembershipPortal({
     setRegFeePaid(false);
     setFeeReceiptFile(null);
     setFeeReceiptPreview('');
+    setReceiptDigitRuns(null);
     setPersistedFiles((prev) => { const next = { ...prev }; delete next.feeReceipt; return next; });
   };
 
@@ -577,7 +598,7 @@ export default function MembershipPortal({
     setFarmProfile(emptyFarmProfile()); setOtherCrops([]);
     setValidIdAttached(false); setValidIdFile(null); setValidIdPreview('');
     setEducomChairperson(''); setIdType(''); setIdNumber(''); setIdDateIssued(''); setIdPlaceIssued('');
-    setRegFeePaid(false); setRefNum(''); setFeeReceiptPreview(''); setFeeReceiptFile(null);
+    setRegFeePaid(false); setRefNum(''); setFeeReceiptPreview(''); setFeeReceiptFile(null); setReceiptDigitRuns(null);
   };
 
   const submitApplication = async (e) => {
@@ -608,6 +629,10 @@ export default function MembershipPortal({
     }
     if (refNum && refNum.length !== 13) {
       onToast('Payment reference number must be exactly 13 digits.', 'error');
+      return;
+    }
+    if (refNum && refNumberMatchesReceipt(receiptDigitRuns, refNum) === false) {
+      onToast("The reference number you entered doesn't match your attached receipt. Please double-check it.", 'error');
       return;
     }
     if (!pmesCertFile) {
@@ -1555,11 +1580,17 @@ export default function MembershipPortal({
                       placeholder="Enter 13-digit payment Ref Number"
                       value={refNum}
                       onChange={onDigits(setRefNum, 13)}
-                      className={`w-full px-4 text-sm py-2 rounded-lg border bg-white dark:bg-slate-950 ${validationBorderClass(refNum, isValidGcashRef13(refNum))}`}
+                      className={`w-full px-4 text-sm py-2 rounded-lg border bg-white dark:bg-slate-950 ${validationBorderClass(refNum, isValidGcashRef13(refNum) && refNumberMatchesReceipt(receiptDigitRuns, refNum) !== false)}`}
                      autoComplete="off"/>
-                    <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-medium">
-                      Warning: The reference number you entered must match the one shown in your receipt screenshot. Payment will not be accepted if they don't match.
-                    </p>
+                    {refNum && isValidGcashRef13(refNum) && refNumberMatchesReceipt(receiptDigitRuns, refNum) === false ? (
+                      <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-bold">
+                        This doesn't match the reference number on your attached receipt. Please double-check and correct it.
+                      </p>
+                    ) : (
+                      <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-medium">
+                        Warning: The reference number you entered must match the one shown in your receipt screenshot. Payment will not be accepted if they don't match.
+                      </p>
+                    )}
                   </div>
                 </div>
 
