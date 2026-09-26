@@ -26,6 +26,13 @@ function getTransporter() {
         // hangs until it times out instead of falling back to IPv4. Forcing
         // IPv4 here skips that dead end.
         family: 4,
+        // Nodemailer's defaults (2min/30s/10min) mean a blocked/blackholed
+        // host can sit "sending" for up to 10 minutes before the fire-and-
+        // forget callers below ever log a failure. Fail fast instead so a
+        // network-level block surfaces in seconds, not minutes.
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS,
