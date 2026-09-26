@@ -208,17 +208,19 @@ function SelectField({ label, value, onChange, options, placeholder = 'Select...
 export default function MembershipPortal({
   user,
   sessions,
+  onSessionsRefresh,
   onAddApplicant,
   onUpdateApplicantStatus,
   onToast,
   onGoToDashboard,
 }) {
   // Only 'Upcoming' seminars are ever worth showing here - a Completed/
-  // Cancelled session, a session whose date has already passed, or a
-  // session that's already at capacity isn't something anyone can still
-  // reserve a slot for.
+  // Cancelled session or one whose date has already passed isn't something
+  // anyone can still reserve a slot for. A session at capacity stays in the
+  // list (each render site shows it as disabled/"Full") instead of vanishing,
+  // so it doesn't look like the session was deleted.
   const upcomingSessions = sessions.filter(
-    s => getPmesDisplayStatus(s) === 'Upcoming' && s.registeredCount < s.capacity
+    s => getPmesDisplayStatus(s) === 'Upcoming'
   );
 
   // Scoped to the signed-in account (id, falling back to email) so one
@@ -804,6 +806,7 @@ export default function MembershipPortal({
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to reserve a slot for this session.');
       }
+      await onSessionsRefresh?.();
       setReservedSession(session);
     } catch (err) {
       onToast(err.message || 'Could not reserve a slot for this session.', 'error');
@@ -1789,7 +1792,9 @@ export default function MembershipPortal({
                 <p className="text-xs text-slate-400 py-2">No seminars scheduled yet - check back soon.</p>
               ) : (
                 <div className="space-y-3">
-                  {upcomingSessions.map(session => (
+                  {upcomingSessions.map(session => {
+                    const isFull = session.registeredCount >= session.capacity;
+                    return (
                     <div key={session.id} className="border rounded-xl p-3 space-y-2 bg-slate-50/50 dark:bg-slate-950/20">
                       <div className="space-y-1">
                         <p className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1">{session.title}</p>
@@ -1800,21 +1805,23 @@ export default function MembershipPortal({
                           <span className="font-semibold text-slate-700 dark:text-slate-300">Venue:</span> {session.venue || 'BOCOFAC Cooperative Hall, Sipocot'}
                         </p>
                         <p className="text-[11px] text-slate-500">Facilitator: <span className="font-semibold text-slate-700 dark:text-slate-300">{session.speaker}</span></p>
-                        <p className="text-[11px] text-slate-500">
-                          <span className="font-semibold text-slate-700 dark:text-slate-300">{session.registeredCount}/{session.capacity}</span> registered · {Math.max(session.capacity - session.registeredCount, 0)} slot(s) left
+                        <p className={`text-[11px] ${isFull ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-slate-500'}`}>
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">{session.registeredCount}/{session.capacity}</span> registered · {isFull ? 'Full' : `${session.capacity - session.registeredCount} slot(s) left`}
                         </p>
                       </div>
                       <div className="flex justify-end pt-1 border-t">
                         <button
                           type="button"
                           onClick={() => registerForPmesSession(session)}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white font-semibold text-xs cursor-pointer"
+                          disabled={isFull}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white font-semibold text-xs cursor-pointer disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                         >
-                          Reserve Slot
+                          {isFull ? 'Full' : 'Reserve Slot'}
                         </button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1947,7 +1954,9 @@ export default function MembershipPortal({
 
                       {showPmesSchedule && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                          {upcomingSessions.map(session => (
+                          {upcomingSessions.map(session => {
+                            const isFull = session.registeredCount >= session.capacity;
+                            return (
                             <div key={session.id} className="border rounded-xl p-3 space-y-2 bg-white dark:bg-slate-900">
                               <div className="space-y-1">
                                 <p className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1">{session.title}</p>
@@ -1958,20 +1967,22 @@ export default function MembershipPortal({
                                   <span className="font-semibold text-slate-700 dark:text-slate-300">Venue:</span> {session.venue || 'BOCOFAC Cooperative Hall, Sipocot'}
                                 </p>
                                 <p className="text-[11px] text-slate-500">Facilitator: <span className="font-semibold text-slate-700 dark:text-slate-300">{session.speaker}</span></p>
-                                <p className="text-[11px] text-slate-500">
-                                  <span className="font-semibold text-slate-700 dark:text-slate-300">{session.registeredCount}/{session.capacity}</span> registered · {Math.max(session.capacity - session.registeredCount, 0)} slot(s) left
+                                <p className={`text-[11px] ${isFull ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-slate-500'}`}>
+                                  <span className="font-semibold text-slate-700 dark:text-slate-300">{session.registeredCount}/{session.capacity}</span> registered · {isFull ? 'Full' : `${session.capacity - session.registeredCount} slot(s) left`}
                                 </p>
                               </div>
                               <div className="flex justify-end pt-1 border-t">
                                 <button
                                   onClick={() => registerForPmesSession(session)}
-                                  className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white font-semibold text-xs cursor-pointer"
+                                  disabled={isFull}
+                                  className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white font-semibold text-xs cursor-pointer disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                                 >
-                                  Reserve Slot
+                                  {isFull ? 'Full' : 'Reserve Slot'}
                                 </button>
                               </div>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>

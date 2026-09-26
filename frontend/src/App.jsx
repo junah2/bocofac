@@ -951,6 +951,7 @@ export default function App() {
             user={user}
             applicants={applicants}
             sessions={pmesSessions}
+            onSessionsRefresh={fetchPmesSessions}
             onAddApplicant={handleAddApplicant}
             onUpdateApplicantStatus={handleUpdateApplicantStatus}
             onToast={addToast}
