@@ -1,7 +1,16 @@
 // Firebase Cloud Functions entry point (package.json "main"). Local dev still
 // runs src/server.js via `npm run dev` / `npm start`.
 const { onRequest } = require('firebase-functions/v2/https');
-const app = require('./src/app');
+
+// Loaded on the first request rather than at import time: `firebase deploy`
+// imports this file just to list the functions and gives up after 10s, and
+// the full Express app (every route, pdfkit, mailer, firebase-admin) can
+// blow past that on a cold machine.
+let app;
+function handler(req, res) {
+  if (!app) app = require('./src/app');
+  return app(req, res);
+}
 
 exports.api = onRequest(
   {
@@ -17,5 +26,5 @@ exports.api = onRequest(
     concurrency: 80,
     timeoutSeconds: 300,
   },
-  app
+  handler
 );
