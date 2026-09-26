@@ -57,6 +57,13 @@ const RECEIPT_OCR_KEYWORDS = [
   'sent', 'transfer', 'total', 'php', 'bank', 'received',
 ];
 
+// A real BOCOFAC PMES certificate always carries some subset of these words,
+// so an unrelated photo can't be attached in its place.
+const PMES_CERT_OCR_KEYWORDS = [
+  'bocofac', 'pmes', 'certificate', 'seminar', 'attendance', 'membership',
+  'coconut', 'cooperative', 'pre-membership', 'education',
+];
+
 // Pulls every digit run out of OCR'd receipt text, joining runs only split by
 // spaces WITHIN the same line (receipts commonly print "1234 5678 9012 3") -
 // scoped per line so an amount, date, or phone number on a *different* line
@@ -337,6 +344,7 @@ export default function MembershipPortal({
   const [pmesCertFile, setPmesCertFile] = useState(null);
   const [pmesCertPreview, setPmesCertPreview] = useState('');
   const [submittingPmesCert, setSubmittingPmesCert] = useState(false);
+  const [scanningPmesCert, setScanningPmesCert] = useState(false);
 
   // Attached files (Valid ID, GCash receipt, PMES certificate) mirrored here
   // as base64 so the draft-save/restore effects below can persist and bring
@@ -588,6 +596,50 @@ export default function MembershipPortal({
     setFeeReceiptPreview('');
     setReceiptDigitRuns(null);
     setPersistedFiles((prev) => { const next = { ...prev }; delete next.feeReceipt; return next; });
+  };
+
+  // Shared by both places a PMES certificate gets attached (the Review step,
+  // and the Check Application Status panel). PDFs can't be OCR'd client-side
+  // without a heavier PDF-to-image step, so they're trusted structurally and
+  // skip the content scan; images get the same keyword sanity check the
+  // GCash receipt already gets, so an unrelated photo gets rejected instead
+  // of silently accepted as "the certificate."
+  const handlePmesCertUpload = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+
+    if (file.type === 'application/pdf') {
+      setPmesCertFile(file);
+      setPmesCertPreview('');
+      rememberFileForDraft('pmesCert', file);
+      onToast(`Certificate "${file.name}" attached.`, 'success');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      onToast('Please upload an image (JPG, PNG, or WebP) or PDF of your PMES certificate.', 'error');
+      return;
+    }
+
+    setScanningPmesCert(true);
+    try {
+      const { default: Tesseract } = await import('tesseract.js');
+      const { data: { text } } = await Tesseract.recognize(file, 'eng');
+      const normalized = text.toLowerCase();
+      const matchCount = PMES_CERT_OCR_KEYWORDS.filter((kw) => normalized.includes(kw)).length;
+      if (matchCount < 2) {
+        onToast("This doesn't look like a BOCOFAC PMES certificate. Please attach the actual certificate emailed to you.", 'error');
+        return;
+      }
+      setPmesCertFile(file);
+      setPmesCertPreview(URL.createObjectURL(file));
+      rememberFileForDraft('pmesCert', file);
+      onToast(`Certificate "${file.name}" looks valid and is attached.`, 'success');
+    } catch (err) {
+      onToast('Could not scan that image - please try a clearer photo/screenshot of the certificate.', 'error');
+    } finally {
+      setScanningPmesCert(false);
+    }
   };
 
   const resetWizard = () => {
@@ -1725,23 +1777,26 @@ export default function MembershipPortal({
                       {pmesCertPreview && (
                         <img src={pmesCertPreview} alt="PMES certificate preview" className="h-16 rounded-lg shadow-md border object-contain" />
                       )}
-                      <div className="relative overflow-hidden inline-block">
-                        <button type="button" className="px-3 py-1.5 rounded-lg border text-xs bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 cursor-pointer">
-                          {pmesCertFile ? 'Replace File' : 'Attach PMES Certificate'}
-                        </button>
-                        <input
-                          type="file"
-                          accept="image/*,application/pdf"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            setPmesCertFile(file);
-                            setPmesCertPreview(file && file.type !== 'application/pdf' ? URL.createObjectURL(file) : '');
-                            if (file) rememberFileForDraft('pmesCert', file);
-                          }}
-                          className="absolute inset-0 opacity-0 w-full cursor-pointer"
-                        />
-                      </div>
-                      {pmesCertFile && (
+                      {!scanningPmesCert && (
+                        <div className="relative overflow-hidden inline-block">
+                          <button type="button" className="px-3 py-1.5 rounded-lg border text-xs bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 cursor-pointer">
+                            {pmesCertFile ? 'Replace File' : 'Attach PMES Certificate'}
+                          </button>
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            onChange={handlePmesCertUpload}
+                            className="absolute inset-0 opacity-0 w-full cursor-pointer"
+                          />
+                        </div>
+                      )}
+                      {scanningPmesCert && (
+                        <div className="flex items-center gap-2 px-3 py-1.5">
+                          <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                          <p className="text-[11px] font-medium text-slate-500">Scanning certificate…</p>
+                        </div>
+                      )}
+                      {pmesCertFile && !scanningPmesCert && (
                         <button
                           type="button"
                           onClick={() => {
@@ -2042,26 +2097,29 @@ export default function MembershipPortal({
                         </div>
                       )}
                       <div className="flex items-center gap-2">
-                        <div className="relative overflow-hidden inline-block">
-                          <button type="button" className="px-3 py-1.5 rounded-lg border text-xs bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 cursor-pointer">
-                            {pmesCertFile ? 'Replace File' : 'Attach PMES Certificate'}
-                          </button>
-                          <input
-                            type="file"
-                            accept="image/*,application/pdf"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0] || null;
-                              setPmesCertFile(file);
-                              setPmesCertPreview(file && file.type !== 'application/pdf' ? URL.createObjectURL(file) : '');
+                        {!scanningPmesCert && (
+                          <div className="relative overflow-hidden inline-block">
+                            <button type="button" className="px-3 py-1.5 rounded-lg border text-xs bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 cursor-pointer">
+                              {pmesCertFile ? 'Replace File' : 'Attach PMES Certificate'}
+                            </button>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
                               // Only staged locally until "Submit" below is clicked -
                               // remembering it here just means a refresh/back doesn't
                               // silently lose the pick; it never auto-uploads on its own.
-                              if (file) rememberFileForDraft('pmesCert', file);
-                            }}
-                            className="absolute inset-0 opacity-0 w-full cursor-pointer"
-                          />
-                        </div>
-                        {pmesCertFile && (
+                              onChange={handlePmesCertUpload}
+                              className="absolute inset-0 opacity-0 w-full cursor-pointer"
+                            />
+                          </div>
+                        )}
+                        {scanningPmesCert && (
+                          <div className="flex items-center gap-2 px-3 py-1.5">
+                            <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                            <p className="text-[11px] font-medium text-slate-500">Scanning certificate…</p>
+                          </div>
+                        )}
+                        {pmesCertFile && !scanningPmesCert && (
                           <button
                             type="button"
                             disabled={submittingPmesCert}
