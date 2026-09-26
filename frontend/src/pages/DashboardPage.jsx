@@ -338,8 +338,12 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
   // applicantId+email (same as MembershipPortal's own flow), and anyone with
   // neither yet (hasn't applied at all) self-registers by their own account.
   const [registeringSessionId, setRegisteringSessionId] = useState(null);
+  // Full sessions stay visible (with a disabled "Full" button) rather than
+  // vanishing from the list, so a member can see a session exists without
+  // wondering where it went - the backend independently rejects any
+  // over-capacity registration attempt regardless of this UI state.
   const upcomingPmesSessions = pmesSessions.filter(
-    s => getPmesDisplayStatus(s) === 'Upcoming' && s.registeredCount < s.capacity
+    s => getPmesDisplayStatus(s) === 'Upcoming'
   );
   const handleReservePmesSlot = async (session) => {
     // Signed-in on this page by definition, so there's always an account to
@@ -778,7 +782,9 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                 </p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {upcomingPmesSessions.map(session => (
+                  {upcomingPmesSessions.map(session => {
+                    const isFull = session.registeredCount >= session.capacity;
+                    return (
                     <div key={session.id} style={{ border: '1.5px solid var(--border)', borderRadius: 12, padding: '16px' }}>
                       <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>{session.title}</p>
                       <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>
@@ -790,18 +796,19 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                       <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
                         Facilitator: {session.speaker}
                       </p>
-                      <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
-                        {session.registeredCount}/{session.capacity} registered · {Math.max(session.capacity - session.registeredCount, 0)} slot(s) left
+                      <p style={{ fontSize: 12, color: isFull ? '#e24b4a' : 'var(--text-muted)', marginBottom: 14, fontWeight: isFull ? 700 : 400 }}>
+                        {session.registeredCount}/{session.capacity} registered · {isFull ? 'Full' : `${session.capacity - session.registeredCount} slot(s) left`}
                       </p>
                       <GreenBtn
                         small
                         onClick={() => handleReservePmesSlot(session)}
-                        disabled={registeringSessionId === session.id}
+                        disabled={isFull || registeringSessionId === session.id}
                       >
-                        {registeringSessionId === session.id ? 'Reserving…' : 'Reserve Slot'}
+                        {isFull ? 'Full' : registeringSessionId === session.id ? 'Reserving…' : 'Reserve Slot'}
                       </GreenBtn>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
