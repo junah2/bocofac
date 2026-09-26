@@ -835,16 +835,20 @@ export default function MembershipPortal({
   };
   const pmesConfirmed = !!(activeSearchedApplicant?.pmesAttended || pmesAttendanceConfirmed);
 
-  // Which session (if any) this email already reserved a slot for - shown
-  // persistently (gate modal, banner, schedule list) so "did I already
-  // reserve?" doesn't depend on remembering a one-time confirmation popup.
-  const [myPmesRegistration, setMyPmesRegistration] = useState(null);
+  // Every session (not just one) this email already reserved a slot for -
+  // shown persistently (gate modal, banner, schedule list) so "did I already
+  // reserve?" doesn't depend on remembering a one-time confirmation popup,
+  // and doesn't wrongly suggest a second registered session is reservable.
+  const [myPmesRegistrations, setMyPmesRegistrations] = useState([]);
+  // The gate modal/banner talk about "a" seminar in general, not a specific
+  // card, so they just show the most recent registration.
+  const myPmesRegistration = myPmesRegistrations[0] || null;
   const checkMyPmesRegistration = async (emailValue) => {
     if (!emailValue || !isValidEmail(emailValue)) return;
     try {
       const res = await fetch(`${API_BASE}/pmes-sessions/my-registration/${encodeURIComponent(emailValue.trim())}`);
-      const data = res.ok ? await res.json() : { registered: false };
-      setMyPmesRegistration(data.registered ? data : null);
+      const data = res.ok ? await res.json() : { registrations: [] };
+      setMyPmesRegistrations(data.registrations || []);
     } catch {
       // Best-effort - just means the persistent reminder won't show.
     }
@@ -2032,7 +2036,8 @@ export default function MembershipPortal({
                 <div className="space-y-3">
                   {upcomingSessions.map(session => {
                     const isFull = session.registeredCount >= session.capacity;
-                    const isMine = myPmesRegistration?.session.id === session.id;
+                    const mine = myPmesRegistrations.find(r => r.session.id === session.id);
+                    const isMine = !!mine;
                     return (
                     <div key={session.id} className={`border rounded-xl p-3 space-y-2 ${isMine ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800' : 'bg-slate-50/50 dark:bg-slate-950/20'}`}>
                       <div className="space-y-1">
@@ -2052,7 +2057,7 @@ export default function MembershipPortal({
                         </p>
                       </div>
                       <div className="flex items-center justify-end gap-3 pt-1 border-t">
-                        {isMine && !myPmesRegistration.attended && (
+                        {isMine && !mine.attended && (
                           <button
                             type="button"
                             onClick={() => setCancelConfirmSession(session)}
@@ -2207,7 +2212,8 @@ export default function MembershipPortal({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                           {upcomingSessions.map(session => {
                             const isFull = session.registeredCount >= session.capacity;
-                            const isMine = myPmesRegistration?.session.id === session.id;
+                            const mine = myPmesRegistrations.find(r => r.session.id === session.id);
+                            const isMine = !!mine;
                             return (
                             <div key={session.id} className={`border rounded-xl p-3 space-y-2 ${isMine ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800' : 'bg-white dark:bg-slate-900'}`}>
                               <div className="space-y-1">
@@ -2227,7 +2233,7 @@ export default function MembershipPortal({
                                 </p>
                               </div>
                               <div className="flex items-center justify-end gap-3 pt-1 border-t">
-                                {isMine && !myPmesRegistration.attended && (
+                                {isMine && !mine.attended && (
                                   <button
                                     type="button"
                                     onClick={() => setCancelConfirmSession(session)}

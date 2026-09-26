@@ -61,6 +61,10 @@ router.get('/attendance-check/:email', applicantLookupLimiter, asyncHandler(asyn
 // right after clicking Reserve Slot - covers all three ways a registration
 // can be linked (applicant, member, or a walk-in/self-registered account
 // email), same matching logic /:id/register itself uses to attach one.
+// Returns every session this email is registered for (not just the latest) -
+// nothing stops someone from reserving more than one, and showing only one
+// as "Registered" made the others look reservable when they'd actually be
+// rejected as a duplicate.
 router.get('/my-registration/:email', applicantLookupLimiter, asyncHandler(async (req, res) => {
   const email = req.params.email.trim().toLowerCase();
   const { rows } = await pool.query(
@@ -70,16 +74,15 @@ router.get('/my-registration/:email', applicantLookupLimiter, asyncHandler(async
      LEFT JOIN applicants a ON a.id = r.applicant_id
      LEFT JOIN members m ON m.id = r.member_id
      WHERE lower(COALESCE(a.email, m.email, r.walk_in_email)) = $1
-     ORDER BY r.registered_at DESC
-     LIMIT 1`,
+     ORDER BY r.registered_at DESC`,
     [email]
   );
-  if (!rows[0]) return res.json({ registered: false });
-  const row = rows[0];
   res.json({
-    registered: true,
-    attended: row.attended,
-    session: { id: row.id, title: row.title, date: row.date, time: row.time, venue: row.venue, speaker: row.speaker },
+    registered: rows.length > 0,
+    registrations: rows.map(row => ({
+      attended: row.attended,
+      session: { id: row.id, title: row.title, date: row.date, time: row.time, venue: row.venue, speaker: row.speaker },
+    })),
   });
 }));
 

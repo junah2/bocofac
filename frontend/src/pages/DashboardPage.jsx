@@ -338,16 +338,17 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
   // applicantId+email (same as MembershipPortal's own flow), and anyone with
   // neither yet (hasn't applied at all) self-registers by their own account.
   const [registeringSessionId, setRegisteringSessionId] = useState(null);
-  // Which session (if any) this account already reserved a slot for - shown
-  // persistently on the matching card so "did I already reserve?" doesn't
-  // depend on remembering a one-time confirmation toast.
-  const [myPmesRegistration, setMyPmesRegistration] = useState(null);
+  // Every session (not just one) this account already reserved a slot for -
+  // shown persistently on each matching card so "did I already reserve?"
+  // doesn't depend on remembering a one-time confirmation toast, and doesn't
+  // wrongly suggest a second registered session is still reservable.
+  const [myPmesRegistrations, setMyPmesRegistrations] = useState([]);
   const checkMyPmesRegistration = async () => {
     if (!user?.email) return;
     try {
       const res = await fetch(`${API_BASE}/pmes-sessions/my-registration/${encodeURIComponent(user.email)}`);
-      const data = res.ok ? await res.json() : { registered: false };
-      setMyPmesRegistration(data.registered ? data : null);
+      const data = res.ok ? await res.json() : { registrations: [] };
+      setMyPmesRegistrations(data.registrations || []);
     } catch {
       // Best-effort - just means the persistent reminder won't show.
     }
@@ -840,7 +841,8 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {upcomingPmesSessions.map(session => {
                     const isFull = session.registeredCount >= session.capacity;
-                    const isMine = myPmesRegistration?.session.id === session.id;
+                    const mine = myPmesRegistrations.find(r => r.session.id === session.id);
+                    const isMine = !!mine;
                     return (
                     <div key={session.id} style={{ border: isMine ? '1.5px solid #16a34a' : '1.5px solid var(--border)', borderRadius: 12, padding: '16px', background: isMine ? 'rgba(22, 163, 74, 0.06)' : undefined }}>
                       {isMine && (
@@ -864,7 +866,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                       {isMine ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                           <GreenBtn small disabled>Registered</GreenBtn>
-                          {!myPmesRegistration?.attended && (
+                          {!mine?.attended && (
                             <button
                               type="button"
                               onClick={() => handleCancelPmesSlot(session)}
