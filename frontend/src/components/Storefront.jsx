@@ -18,6 +18,7 @@ import {
   FOCUS_PROVINCES, OTHER_PROVINCE_OPTION, HOME_PROVINCE, HOME_CITY,
   CITIES_BY_PROVINCE, BARANGAYS_BY_CITY, detectShippingZone,
 } from '../data/phAddress';
+import { isValidPhone11, isValidGcashRef13, digitsOnly, validationBorderClass } from '../utils/validators';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
@@ -415,6 +416,10 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
         onToast('Please fill out the transaction reference field.', 'error');
         return;
       }
+      if (!isValidGcashRef13(referenceNumber)) {
+        onToast('Transaction reference number must be exactly 13 digits.', 'error');
+        return;
+      }
       if (!receiptFile) {
         onToast('A digital payment screenshot (GCash receipt) is strictly required for manual verification.', 'error');
         return;
@@ -738,10 +743,12 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                     <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Mobile number</label>
                     <input
                       type="tel"
+                      inputMode="numeric"
+                      maxLength={11}
                       value={recipientPhone}
-                      onChange={(e) => setRecipientPhone(e.target.value)}
+                      onChange={(e) => setRecipientPhone(digitsOnly(e.target.value, 11))}
                       placeholder="09171234567"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white"
+                      className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 text-slate-900 dark:text-white ${validationBorderClass(recipientPhone, isValidPhone11(recipientPhone))}`}
                     />
                   </div>
                   <div>
@@ -904,10 +911,12 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                           <input
                             type="text"
                             required
+                            inputMode="numeric"
+                            maxLength={13}
                             value={referenceNumber}
-                            onChange={(e) => setReferenceNumber(e.target.value)}
-                            placeholder="E.g., Instapay Ref 9918237..."
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white"
+                            onChange={(e) => setReferenceNumber(digitsOnly(e.target.value, 13))}
+                            placeholder="13-digit GCash reference number"
+                            className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 text-slate-900 dark:text-white ${validationBorderClass(referenceNumber, isValidGcashRef13(referenceNumber))}`}
                           />
                           <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-medium">
                             Warning: The reference number you entered must match the one shown in your receipt screenshot. Payment will not be accepted if they don't match.

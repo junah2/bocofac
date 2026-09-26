@@ -9,6 +9,7 @@ import { printStatementOfAccount, printOfficialReceipt } from '../utils/printDoc
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import { getPmesDisplayStatus } from '../utils/pmesStatus';
 import { displayApplicantStatus } from '../utils/applicantStatus';
+import { isValidPhone11, isValidGcashRef13, digitsOnly } from '../utils/validators';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
@@ -382,6 +383,10 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
       onToast?.('Please enter a valid payment amount.', 'error');
       return;
     }
+    if (paymentForm.referenceId && !isValidGcashRef13(paymentForm.referenceId)) {
+      onToast?.('Reference number must be exactly 13 digits.', 'error');
+      return;
+    }
     setSubmittingPayment(true);
     try {
       const res = await fetch(`${API_BASE}/ledger/mine`, {
@@ -438,6 +443,10 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
   const handleSaveProfile = async () => {
     if (!profileDraft.name || !profileDraft.email) {
       onToast?.('Name and email are required.', 'error');
+      return;
+    }
+    if (profileDraft.phone && !isValidPhone11(profileDraft.phone)) {
+      onToast?.('Contact number must be 11 digits starting with 09.', 'error');
       return;
     }
     setSavingProfile(true);
@@ -1090,8 +1099,11 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                 <FormInput
                   label="Contact Number"
                   placeholder="09XX XXX XXXX"
+                  inputMode="numeric"
+                  maxLength={11}
                   value={profileDraft.phone}
-                  onChange={e => setProfileDraft(f => ({ ...f, phone: e.target.value }))}
+                  onChange={e => setProfileDraft(f => ({ ...f, phone: digitsOnly(e.target.value, 11) }))}
+                  valid={profileDraft.phone ? isValidPhone11(profileDraft.phone) : undefined}
                 />
                 <GreenBtn onClick={handleSaveProfile} disabled={savingProfile}>
                   {savingProfile ? 'Saving…' : 'Save Changes'}
@@ -1398,9 +1410,11 @@ function MembershipContributionPanel({
             <FormInput
               label="Reference Number"
               placeholder="e.g. GCash reference no."
+              inputMode="numeric"
               value={paymentForm.referenceId}
-              onChange={e => setPaymentForm(f => ({ ...f, referenceId: e.target.value.slice(0, 13) }))}
+              onChange={e => setPaymentForm(f => ({ ...f, referenceId: digitsOnly(e.target.value, 13) }))}
               maxLength={13}
+              valid={paymentForm.referenceId ? isValidGcashRef13(paymentForm.referenceId) : undefined}
             />
             <GreenBtn type="submit" disabled={submittingPayment}>
               {submittingPayment ? 'Submitting…' : 'Submit Payment'}

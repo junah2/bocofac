@@ -18,6 +18,7 @@ import {
 import { downloadFile } from '../utils/downloadFile';
 import { formatDate } from '../utils/formatDate';
 import { getPmesDisplayStatus } from '../utils/pmesStatus';
+import { isValidGcashRef13, validationBorderClass } from '../utils/validators';
 import { displayApplicantStatus } from '../utils/applicantStatus';
 import { Field, Section } from './ProfileField';
 
@@ -1054,7 +1055,7 @@ export default function MembershipPortal({
                       value={phone}
                       onChange={onDigits(setPhone, 11)}
                       placeholder="09171234567"
-                      className={inputClass}
+                      className={`${inputClass} ${validationBorderClass(phone, isValidPhone(phone))}`}
                      autoComplete="off"/>
                     {phone && !isValidPhone(phone) && (
                       <p className="text-[11px] text-red-600 dark:text-red-400 mt-1">Must be 11 digits starting with 09 (e.g., 09171234567).</p>
@@ -1192,7 +1193,7 @@ export default function MembershipPortal({
                   </div>
                   <div>
                     <label className={labelClass}>CP #s</label>
-                    <input type="tel" inputMode="numeric" maxLength={11} value={spouseCpNumber} onChange={onDigits(setSpouseCpNumber, 11)} placeholder="09171234567" className={inputClass}  autoComplete="off"/>
+                    <input type="tel" inputMode="numeric" maxLength={11} value={spouseCpNumber} onChange={onDigits(setSpouseCpNumber, 11)} placeholder="09171234567" className={`${inputClass} ${validationBorderClass(spouseCpNumber, isValidPhone(spouseCpNumber))}`}  autoComplete="off"/>
                     {spouseCpNumber && !isValidPhone(spouseCpNumber) && (
                       <p className="text-[11px] text-red-600 dark:text-red-400 mt-1">Must be 11 digits starting with 09.</p>
                     )}
@@ -1550,7 +1551,7 @@ export default function MembershipPortal({
                       placeholder="Enter 13-digit payment Ref Number"
                       value={refNum}
                       onChange={onDigits(setRefNum, 13)}
-                      className="w-full px-4 text-sm py-2 rounded-lg border bg-white dark:bg-slate-950"
+                      className={`w-full px-4 text-sm py-2 rounded-lg border bg-white dark:bg-slate-950 ${validationBorderClass(refNum, isValidGcashRef13(refNum))}`}
                      autoComplete="off"/>
                     <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-medium">
                       Warning: The reference number you entered must match the one shown in your receipt screenshot. Payment will not be accepted if they don't match.

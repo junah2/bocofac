@@ -46,8 +46,11 @@ export function GreenBtn({ children, onClick, type = 'button', full, outline, sm
 /* ─────────────────────────────────────────
    FormInput — labeled input with optional icon
 ───────────────────────────────────────── */
-export function FormInput({ label, placeholder, type = 'text', icon, value, onChange, onBlur, required, name, autoComplete, inputMode, maxLength, error }) {
-  const restColor = error ? '#e24b4a' : 'var(--border)';
+export function FormInput({ label, placeholder, type = 'text', icon, value, onChange, onBlur, required, name, autoComplete, inputMode, maxLength, error, valid }) {
+  // `valid` gives live typing feedback (green once the value fully matches
+  // the expected format, red while it doesn't) independent of `error`, which
+  // stays reserved for the existing blur/submit-time message underneath.
+  const restColor = (error || valid === false) ? '#e24b4a' : valid === true ? '#16a34a' : 'var(--border)';
   return (
     <div style={{ marginBottom: 18 }}>
       {label && (
@@ -86,7 +89,7 @@ export function FormInput({ label, placeholder, type = 'text', icon, value, onCh
             outline: 'none',
             transition: 'border-color 0.15s',
           }}
-          onFocus={e => (e.target.style.borderColor = error ? '#e24b4a' : 'var(--green)')}
+          onFocus={e => (e.target.style.borderColor = (error || valid === false) ? '#e24b4a' : valid === true ? '#16a34a' : 'var(--green)')}
         />
       </div>
       {error && (

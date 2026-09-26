@@ -20,6 +20,7 @@ import { formatDate } from '../utils/formatDate';
 import { downloadFile } from '../utils/downloadFile';
 import { printOfficialReceipt } from '../utils/printDocument';
 import MobileScrollHint from './MobileScrollHint';
+import { isValidPhone11, isValidGcashRef13, digitsOnly, validationBorderClass } from '../utils/validators';
 
 // Required share capital targets are set between these two amounts (see
 // MIN/MAX_REQUIRED_SHARE_CAPITAL in backend/src/utils/shareCapital.js, which
@@ -198,9 +199,15 @@ export default function ShareCapitalLedger({
       onToast('Payment amount must be greater than zero.', 'error');
       return;
     }
-    if (paymentMethod !== 'Over-the-Counter' && !txnRef) {
-      onToast('A payment reference code or deposit ID is strictly required.', 'error');
-      return;
+    if (paymentMethod !== 'Over-the-Counter') {
+      if (!txnRef) {
+        onToast('A payment reference code or deposit ID is strictly required.', 'error');
+        return;
+      }
+      if (!isValidGcashRef13(txnRef)) {
+        onToast('Reference number must be exactly 13 digits.', 'error');
+        return;
+      }
     }
 
     setSubmittingPayment(true);
@@ -491,10 +498,12 @@ export default function ShareCapitalLedger({
                     <input
                       type="text"
                       required
+                      inputMode="numeric"
+                      maxLength={13}
                       value={txnRef}
-                      onChange={(e) => setTxnRef(e.target.value)}
-                      placeholder="e.g. GCash Ref 88291..."
-                      className="w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-slate-950"
+                      onChange={(e) => setTxnRef(digitsOnly(e.target.value, 13))}
+                      placeholder="13-digit GCash reference number"
+                      className={`w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-slate-950 ${validationBorderClass(txnRef, isValidGcashRef13(txnRef))}`}
                     />
                   </div>
                 )}
@@ -945,7 +954,7 @@ export default function ShareCapitalLedger({
                         </div>
                         <div>
                           <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Mobile Number</label>
-                          <input type="text" value={sheetForm.mobileNumber} onChange={(e) => setSheetForm(f => ({ ...f, mobileNumber: e.target.value }))} placeholder="09171234567" className="w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-slate-950" />
+                          <input type="tel" inputMode="numeric" maxLength={11} value={sheetForm.mobileNumber} onChange={(e) => setSheetForm(f => ({ ...f, mobileNumber: digitsOnly(e.target.value, 11) }))} placeholder="09171234567" className={`w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-slate-950 ${validationBorderClass(sheetForm.mobileNumber, isValidPhone11(sheetForm.mobileNumber))}`} />
                         </div>
                         <div>
                           <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">NCFRS ID No.</label>

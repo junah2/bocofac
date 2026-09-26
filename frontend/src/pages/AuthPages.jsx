@@ -24,6 +24,24 @@ function passwordError(value) {
   return '';
 }
 
+/* Chrome shows its "Saved passwords" dropdown on login-shaped forms even
+   when autoComplete="off" is set - it ignores that attribute for fields it
+   thinks are a username/password pair. The reliable fix is these hidden
+   decoy fields: placed first in the DOM, they match Chrome's heuristic for
+   "the" username/password inputs, so Chrome anchors its autofill targeting
+   to them instead of the real, visible fields below. They're never
+   reachable by the user (tabIndex=-1, zero size, aria-hidden) and aren't
+   wired to any state. */
+function AutofillDecoy() {
+  const hiddenStyle = { position: 'absolute', width: 0, height: 0, padding: 0, margin: 0, border: 0, opacity: 0, overflow: 'hidden', pointerEvents: 'none' };
+  return (
+    <div style={hiddenStyle} aria-hidden="true">
+      <input type="text" name="username" autoComplete="username" tabIndex={-1} readOnly />
+      <input type="password" name="password" autoComplete="current-password" tabIndex={-1} readOnly />
+    </div>
+  );
+}
+
 /* Shared branded backdrop for the Forgot Password flow only - Sign In and
    Create Account instead share AuthSplitLayout below, which keeps the same
    left-side photo panel under both, swapping only the form on the right. */
@@ -232,12 +250,14 @@ export function SignupPage({ setPage, onToast }) {
             below (see SigninPage), so no separate staff link is needed
             here. */}
 
+        <AutofillDecoy />
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5">
-          <FormInput label="Full Name" name="name" autoComplete="name" placeholder="Juan Dela Cruz" value={form.name} onChange={set('name')} onBlur={handleBlur('name')} error={errors.name} required />
-          <FormInput label="Email Address" name="email" type="email" autoComplete="email" placeholder="youremail@example.com" value={form.email} onChange={set('email')} onBlur={handleBlur('email')} error={errors.email} required />
+          <FormInput label="Full Name" name="name" autoComplete="off" placeholder="Juan Dela Cruz" value={form.name} onChange={set('name')} onBlur={handleBlur('name')} error={errors.name} required />
+          <FormInput label="Email Address" name="signup-email" type="email" autoComplete="off" placeholder="youremail@example.com" value={form.email} onChange={set('email')} onBlur={handleBlur('email')} error={errors.email} required />
         </div>
         <div style={{ maxWidth: 220 }}>
-          <FormInput label="Contact Number" name="phone" type="tel" inputMode="numeric" maxLength={11} autoComplete="tel" placeholder="09171234567" value={form.phone} onChange={set('phone')} onBlur={handleBlur('phone')} error={errors.phone} />
+          <FormInput label="Contact Number" name="phone" type="tel" inputMode="numeric" maxLength={11} autoComplete="tel" placeholder="09171234567" value={form.phone} onChange={set('phone')} onBlur={handleBlur('phone')} error={errors.phone} valid={form.phone ? isValidPhone(form.phone) : undefined} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5">
           <FormInput label="Password" name="new-password" type="password" autoComplete="new-password" placeholder="8+ characters, with a letter, number & symbol" value={form.pass} onChange={set('pass')} onBlur={handleBlur('pass')} error={errors.pass} required />
@@ -282,16 +302,12 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
   const [form, setForm] = useState({ email: '', pass: '' });  //dito nai-store yung data sa email and pass
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const [noAutofillId] = useState(() => Math.random().toString(36).slice(2));
   const noAutofillProps = {
     'data-lpignore': 'true', // LastPass
     'data-1p-ignore': '', // 1Password
     'data-bwignore': 'true', // Bitwarden
     'data-form-type': 'other', // Dashlane and other generic password managers
   };
-  
-  const [autofillGuardOn, setAutofillGuardOn] = useState(true);
-  const dropAutofillGuard = () => setAutofillGuardOn(false);
 
   const set = key => e => {
     const value = e.target.value;
@@ -362,16 +378,16 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
           <p className="text-slate-700 dark:text-slate-300 text-sm mt-1">Enter your credentials to continue</p>
         </div>
 
+        <AutofillDecoy />
+
         <div className="mb-4">
           <label className="block text-sm font-bold text-slate-800 dark:text-slate-200 mb-2">Email Address</label>
           <div className="relative">
             <Mail className="w-4.5 h-4.5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
             <input
               type="email"
-              name={`signin-email-${noAutofillId}`}
+              name="signin-email"
               autoComplete="off"
-              readOnly={autofillGuardOn}
-              onFocus={dropAutofillGuard}
               {...noAutofillProps}
               value={form.email}
               onChange={set('email')}
@@ -389,10 +405,8 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
             <Lock className="w-4.5 h-4.5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
             <input
               type="password"
-              name={`signin-password-${noAutofillId}`}
-              autoComplete="off"
-              readOnly={autofillGuardOn}
-              onFocus={dropAutofillGuard}
+              name="signin-password"
+              autoComplete="new-password"
               {...noAutofillProps}
               value={form.pass}
               onChange={set('pass')}
