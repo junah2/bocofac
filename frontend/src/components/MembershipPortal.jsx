@@ -64,6 +64,22 @@ const PMES_CERT_OCR_KEYWORDS = [
   'coconut', 'cooperative', 'pre-membership', 'education',
 ];
 
+// Re-derives receiptDigitRuns for a receipt restored from a saved draft -
+// the persisted data is just a dataURL/File, not the OCR result itself, so
+// without this the reference-number cross-check silently goes inert (treats
+// everything as unverified) after every page reload. Runs quietly in the
+// background with no toasts, since this fires automatically on mount rather
+// than in response to the applicant picking a file.
+async function scanReceiptDigits(file) {
+  try {
+    const { default: Tesseract } = await import('tesseract.js');
+    const { data: { text } } = await Tesseract.recognize(file, 'eng');
+    return extractDigitRuns(text);
+  } catch {
+    return null;
+  }
+}
+
 function dataURLToFile(dataURL, filename) {
   const [header, base64] = dataURL.split(',');
   const mimeMatch = header.match(/data:(.*?);base64/);
@@ -420,6 +436,7 @@ export default function MembershipPortal({
             setRegFeePaid(true);
             setFeeReceiptFile(file);
             setFeeReceiptPreview(files.feeReceipt.dataUrl);
+            scanReceiptDigits(file).then((runs) => { if (runs) setReceiptDigitRuns(runs); });
             restoredFileCount++;
           }
           if (files.pmesCert?.dataUrl) {
