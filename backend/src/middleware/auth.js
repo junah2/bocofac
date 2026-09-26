@@ -4,7 +4,9 @@ const crypto = require('crypto');
 const pool = require('../db/pool');
 
 // auto logout 30 mins
-const COOKIE_NAME = 'bocofac_token';
+// Must be exactly "__session": Firebase Hosting strips every other cookie
+// before forwarding a request to a Cloud Function.
+const COOKIE_NAME = '__session';
 const ABSOLUTE_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 

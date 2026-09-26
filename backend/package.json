@@ -2,7 +2,7 @@
   "name": "bocofac-backend",
   "version": "1.0.0",
   "private": true,
-  "main": "src/server.js",
+  "main": "index.js",
   "engines": {
     "node": ">=22"
   },
@@ -13,6 +13,7 @@
     "seed": "node src/db/seed.js"
   },
   "dependencies": {
+    "@google-cloud/cloud-sql-connector": "^1.12.0",
     "bcrypt": "^5.1.1",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
@@ -20,6 +21,8 @@
     "express": "^4.19.2",
     "express-rate-limit": "^8.6.1",
     "file-type": "^22.0.1",
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.4.0",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
