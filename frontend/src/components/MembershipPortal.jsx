@@ -13,6 +13,7 @@ import {
   Landmark,
   AlertTriangle,
   X,
+  Save,
 } from 'lucide-react';
 
 import { downloadFile } from '../utils/downloadFile';
@@ -640,6 +641,15 @@ export default function MembershipPortal({
     }
   };
 
+  // Everything typed (and every file attached) already auto-saves in the
+  // background on every change (see the effects above) - this button does
+  // nothing extra to the data itself. It exists purely to give the applicant
+  // an explicit, visible confirmation that their progress is safe, since
+  // "it just saves quietly with no feedback" isn't reassuring on its own.
+  const handleSaveDraft = () => {
+    onToast('Draft saved! You can leave and come back anytime to continue - nothing will be lost.', 'success');
+  };
+
   const resetWizard = () => {
     setWizardStep(1);
     setFirstName(''); setMiddleName(''); setLastName(''); setSuffix('');
@@ -1069,7 +1079,16 @@ export default function MembershipPortal({
                 <UserCheck className="w-5 h-5 text-emerald-800 dark:text-emerald-400" />
                 Cooperative Registrar Portal
               </h3>
-              <p className="text-xs text-slate-400 font-mono">STEP {wizardStep} of 7</p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSaveDraft}
+                  className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <Save className="w-3.5 h-3.5" /> Save as Draft
+                </button>
+                <p className="text-xs text-slate-400 font-mono">STEP {wizardStep} of 7</p>
+              </div>
             </div>
 
             {/* Step Indicators */}
