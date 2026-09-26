@@ -66,7 +66,9 @@ function fromAddress() {
 // scanners/proxies rewriting or pre-fetching it, nothing for a mail client
 // to flag) and the customer just types it back into the same page.
 async function sendPasswordResetCodeEmail(to, code) {
+  console.log('[mailer] getting transporter...');
   const transporter = await getTransporter();
+  console.log('[mailer] transporter ready, calling sendMail...');
   await transporter.sendMail({
     from: fromAddress(),
     to,
