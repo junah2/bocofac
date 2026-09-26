@@ -1619,7 +1619,7 @@ export default function MembershipPortal({
                       onChange={onDigits(setRefNum, 13)}
                       className={`w-full px-4 text-sm py-2 rounded-lg border bg-white dark:bg-slate-950 ${validationBorderClass(refNum, isValidGcashRef13(refNum) && refNumberMatchesReceipt(receiptDigitRuns, refNum) !== false)}`}
                      autoComplete="off"/>
-                    {refNum && isValidGcashRef13(refNum) && refNumberMatchesReceipt(receiptDigitRuns, refNum) === false ? (
+                    {refNum && refNumberMatchesReceipt(receiptDigitRuns, refNum) === false ? (
                       <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-bold">
                         This doesn't match the reference number on your attached receipt. Please double-check and correct it.
                       </p>

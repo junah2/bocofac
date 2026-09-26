@@ -928,7 +928,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                             placeholder="13-digit GCash reference number"
                             className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 text-slate-900 dark:text-white ${validationBorderClass(referenceNumber, isValidGcashRef13(referenceNumber) && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) !== false)}`}
                           />
-                          {referenceNumber && isValidGcashRef13(referenceNumber) && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) === false ? (
+                          {referenceNumber && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) === false ? (
                             <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-bold">
                               This doesn't match the reference number on your attached receipt. Please double-check and correct it.
                             </p>
