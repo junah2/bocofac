@@ -58,10 +58,14 @@ const RECEIPT_OCR_KEYWORDS = [
 ];
 
 // Pulls every digit run out of OCR'd receipt text, joining runs only split by
-// whitespace (receipts commonly print "1234 5678 9012 3") so a reference
-// number isn't missed just because the receipt grouped its digits.
+// spaces WITHIN the same line (receipts commonly print "1234 5678 9012 3") -
+// scoped per line so an amount, date, or phone number on a *different* line
+// never gets concatenated with the reference number into one long blob that
+// could coincidentally contain whatever a user happens to type.
 function extractDigitRuns(ocrText) {
-  return (ocrText.replace(/\s+/g, '').match(/\d+/g)) || [];
+  return ocrText
+    .split(/\r?\n/)
+    .flatMap((line) => line.replace(/[ \t]+/g, '').match(/\d+/g) || []);
 }
 
 // True once a receipt has been scanned AND the typed reference number
