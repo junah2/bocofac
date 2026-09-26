@@ -13,7 +13,8 @@
     "seed": "node src/db/seed.js",
     "sync-products": "node src/db/syncProducts.js",
     "import-sql": "node src/db/importSqlFile.js",
-    "set-password": "node src/db/setPassword.js"
+    "set-password": "node src/db/setPassword.js",
+    "set-email": "node src/db/setEmail.js"
   },
   "dependencies": {
     "@google-cloud/cloud-sql-connector": "^1.12.0",

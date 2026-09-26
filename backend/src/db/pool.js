@@ -8,11 +8,14 @@ const { Pool } = require('pg');
 // open internet. The connector's setup is async, hence the lazily-created
 // pool behind the same query/connect/end interface every route already uses.
 let poolPromise = null;
+// Kept so end() can stop its background certificate-refresh timer - without
+// that, one-off scripts (migrate, seed, import) never exit on their own.
+let connector = null;
 
 async function createPool() {
   if (process.env.INSTANCE_CONNECTION_NAME) {
     const { Connector, IpAddressTypes } = require('@google-cloud/cloud-sql-connector');
-    const connector = new Connector();
+    connector = new Connector();
     const clientOpts = await connector.getOptions({
       instanceConnectionName: process.env.INSTANCE_CONNECTION_NAME,
       ipType: IpAddressTypes.PUBLIC,
@@ -41,5 +44,9 @@ function getPool() {
 module.exports = {
   query: (...args) => getPool().then((pool) => pool.query(...args)),
   connect: () => getPool().then((pool) => pool.connect()),
-  end: () => getPool().then((pool) => pool.end()),
+  end: async () => {
+    const pool = await getPool();
+    await pool.end();
+    if (connector) connector.close();
+  },
 };
