@@ -1079,17 +1079,16 @@ export default function MembershipPortal({
                 <UserCheck className="w-5 h-5 text-emerald-800 dark:text-emerald-400" />
                 Cooperative Registrar Portal
               </h3>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleSaveDraft}
-                  className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer flex items-center gap-1"
-                >
-                  <Save className="w-3.5 h-3.5" /> Save as Draft
-                </button>
-                <p className="text-xs text-slate-400 font-mono">STEP {wizardStep} of 7</p>
-              </div>
+              <p className="text-xs text-slate-400 font-mono">STEP {wizardStep} of 7</p>
             </div>
+
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-emerald-600 dark:border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-bold text-sm hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition cursor-pointer"
+            >
+              <Save className="w-4 h-4" /> Save as Draft
+            </button>
 
             {/* Step Indicators */}
             <div className="grid grid-cols-2 sm:grid-cols-7 gap-2 text-center text-[10px] font-bold">
