@@ -213,6 +213,7 @@ export default function MembershipPortal({
   onUpdateApplicantStatus,
   onToast,
   onGoToDashboard,
+  onGoHome,
 }) {
   // Only 'Upcoming' seminars are ever worth showing here - a Completed/
   // Cancelled session or one whose date has already passed isn't something
@@ -1725,10 +1726,10 @@ export default function MembershipPortal({
 
                 <div className="flex items-center justify-between pt-2">
                   <button
-                    onClick={() => setWizardStep(6)}
+                    onClick={() => onGoHome?.()}
                     className="px-4 py-2 text-xs rounded-xl border hover:bg-slate-100 dark:hover:bg-slate-950 cursor-pointer"
                   >
-                    Back to Payment
+                    Back to Home
                   </button>
                   <button
                     onClick={submitApplication}

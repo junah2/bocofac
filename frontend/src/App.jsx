@@ -956,6 +956,7 @@ export default function App() {
             onUpdateApplicantStatus={handleUpdateApplicantStatus}
             onToast={addToast}
             onGoToDashboard={() => navigate('dashboard')}
+            onGoHome={() => navigate('home')}
           />
         </div>
       )}
