@@ -22,6 +22,14 @@
 .auth-dark-panel input::placeholder {
   color: #94a3b8;
 }
+/* Browsers ship their own password-reveal icon (Edge's especially), but it
+   shows/hides inconsistently across states (e.g. after a failed sign-in
+   attempt) since it's outside our control. Fields with our own Eye/EyeOff
+   toggle button hide the native one so there's exactly one, reliable toggle. */
+.has-password-toggle::-ms-reveal,
+.has-password-toggle::-ms-clear {
+  display: none;
+}
 .gold-gradient {
   background: linear-gradient(135deg, #fbbf24 0%, #b45309 100%);
 }

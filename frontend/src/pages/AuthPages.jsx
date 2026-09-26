@@ -1,6 +1,6 @@
 // src/pages/AuthPages.jsx
 import React, { useState } from 'react';
-import { Mail, Lock, UserCircle, ShieldCheck, ArrowLeft, UserPlus, Sprout, ShoppingBag, Handshake } from 'lucide-react';
+import { Mail, Lock, UserCircle, ShieldCheck, ArrowLeft, UserPlus, Sprout, ShoppingBag, Handshake, Eye, EyeOff } from 'lucide-react';
 import { GreenBtn, FormInput } from '../components/UI';
 import coconutHero from '../assets/coconut-palms-hero.jpg';
 import bocofacLogo from '../assets/bocofac-logo.jpg';
@@ -302,6 +302,7 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
   const [form, setForm] = useState({ email: '', pass: '' });  //dito nai-store yung data sa email and pass
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const noAutofillProps = {
     'data-lpignore': 'true', // LastPass
     'data-1p-ignore': '', // 1Password
@@ -404,7 +405,7 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
           <div className="relative">
             <Lock className="w-4.5 h-4.5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               name="signin-password"
               autoComplete="new-password"
               {...noAutofillProps}
@@ -412,8 +413,17 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
               onChange={set('pass')}
               onBlur={handleBlur('pass')}
               placeholder="Enter your password"
-              className={`w-full pl-11 pr-4 py-2.5 rounded-xl border dark:bg-slate-950 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 ${errors.pass ? 'border-red-500 focus:ring-red-500' : 'border-slate-300 dark:border-slate-700 focus:ring-emerald-500'}`}
+              className={`has-password-toggle w-full pl-11 pr-11 py-2.5 rounded-xl border dark:bg-slate-950 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 ${errors.pass ? 'border-red-500 focus:ring-red-500' : 'border-slate-300 dark:border-slate-700 focus:ring-emerald-500'}`}
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(v => !v)}
+              tabIndex={-1}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+            >
+              {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+            </button>
           </div>
           {errors.pass && <p className="mt-1.5 text-xs font-medium text-red-600 dark:text-red-400">{errors.pass}</p>}
           <button
