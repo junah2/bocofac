@@ -18,7 +18,7 @@ import {
   FOCUS_PROVINCES, OTHER_PROVINCE_OPTION, HOME_PROVINCE, HOME_CITY,
   CITIES_BY_PROVINCE, BARANGAYS_BY_CITY, detectShippingZone,
 } from '../data/phAddress';
-import { isValidPhone11, isValidGcashRef13, digitsOnly, validationBorderClass } from '../utils/validators';
+import { isValidPhone11, isValidGcashRef13, digitsOnly, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt } from '../utils/validators';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
@@ -236,6 +236,10 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptPreview, setReceiptPreview] = useState('');
   const [scanningReceipt, setScanningReceipt] = useState(false);
+  // Digit runs OCR'd off the receipt itself (see handleReceiptUpload) - lets
+  // the typed reference number be cross-checked against what the receipt
+  // actually shows, not just its own 13-digit format.
+  const [receiptDigitRuns, setReceiptDigitRuns] = useState(null);
 
   // Backend only stores/expects a single shippingAddress string - compose it
   // from the structured picks instead of changing its shape server-side.
@@ -394,6 +398,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
         onToast("This doesn't look like a payment receipt screenshot. Please attach the actual GCash/bank transfer confirmation.", 'error');
         return;
       }
+      setReceiptDigitRuns(extractDigitRuns(text));
       setReceiptFile(file);
       setReceiptPreview(URL.createObjectURL(file));
       onToast(`Receipt "${file.name}" looks valid and is attached. Ready for board audit.`, 'success');
@@ -418,6 +423,10 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
       }
       if (!isValidGcashRef13(referenceNumber)) {
         onToast('Transaction reference number must be exactly 13 digits.', 'error');
+        return;
+      }
+      if (refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) === false) {
+        onToast("The reference number you entered doesn't match your attached receipt. Please double-check it.", 'error');
         return;
       }
       if (!receiptFile) {
@@ -469,6 +478,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
       setCheckoutStep(1);
       setReceiptFile(null);
       setReceiptPreview('');
+      setReceiptDigitRuns(null);
       setReferenceNumber('');
       onToast(`Order ${newOrder.id} placed! We're verifying your payment now — please allow about a week for your order to be processed and delivered.`, 'success');
     } catch (err) {
@@ -916,11 +926,17 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                             value={referenceNumber}
                             onChange={(e) => setReferenceNumber(digitsOnly(e.target.value, 13))}
                             placeholder="13-digit GCash reference number"
-                            className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 text-slate-900 dark:text-white ${validationBorderClass(referenceNumber, isValidGcashRef13(referenceNumber))}`}
+                            className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 text-slate-900 dark:text-white ${validationBorderClass(referenceNumber, isValidGcashRef13(referenceNumber) && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) !== false)}`}
                           />
-                          <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-medium">
-                            Warning: The reference number you entered must match the one shown in your receipt screenshot. Payment will not be accepted if they don't match.
-                          </p>
+                          {referenceNumber && isValidGcashRef13(referenceNumber) && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) === false ? (
+                            <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-bold">
+                              This doesn't match the reference number on your attached receipt. Please double-check and correct it.
+                            </p>
+                          ) : (
+                            <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-medium">
+                              Warning: The reference number you entered must match the one shown in your receipt screenshot. Payment will not be accepted if they don't match.
+                            </p>
+                          )}
                         </div>
 
                         {/* Screenshot Interactive Drag-and-Drop Area */}
@@ -990,7 +1006,8 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                     </button>
                     <button
                       type="submit"
-                      disabled={submittingOrder || scanningReceipt}
+                      disabled={submittingOrder || scanningReceipt || (paymentMethod === 'GCash' && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) === false)}
+                      title={paymentMethod === 'GCash' && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) === false ? "Your reference number doesn't match the attached receipt" : undefined}
                       className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition shadow-lg hover:shadow-emerald-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {submittingOrder ? 'Submitting…' : scanningReceipt ? 'Scanning receipt…' : `Confirm and Submit Order (₱${cartTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })})`}

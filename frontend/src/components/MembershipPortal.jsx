@@ -18,7 +18,7 @@ import {
 import { downloadFile } from '../utils/downloadFile';
 import { formatDate } from '../utils/formatDate';
 import { getPmesDisplayStatus } from '../utils/pmesStatus';
-import { isValidGcashRef13, validationBorderClass } from '../utils/validators';
+import { isValidGcashRef13, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt } from '../utils/validators';
 import { displayApplicantStatus } from '../utils/applicantStatus';
 import { Field, Section } from './ProfileField';
 
@@ -63,25 +63,6 @@ const PMES_CERT_OCR_KEYWORDS = [
   'bocofac', 'pmes', 'certificate', 'seminar', 'attendance', 'membership',
   'coconut', 'cooperative', 'pre-membership', 'education',
 ];
-
-// Pulls every digit run out of OCR'd receipt text, joining runs only split by
-// spaces WITHIN the same line (receipts commonly print "1234 5678 9012 3") -
-// scoped per line so an amount, date, or phone number on a *different* line
-// never gets concatenated with the reference number into one long blob that
-// could coincidentally contain whatever a user happens to type.
-function extractDigitRuns(ocrText) {
-  return ocrText
-    .split(/\r?\n/)
-    .flatMap((line) => line.replace(/[ \t]+/g, '').match(/\d+/g) || []);
-}
-
-// True once a receipt has been scanned AND the typed reference number
-// actually appears among its digit runs - a 13-digit value that's simply
-// well-formed but absent from the receipt itself shouldn't pass as "correct".
-function refNumberMatchesReceipt(digitRuns, ref) {
-  if (!digitRuns || !ref) return null;
-  return digitRuns.some((run) => run.includes(ref));
-}
 
 function dataURLToFile(dataURL, filename) {
   const [header, base64] = dataURL.split(',');
@@ -1659,7 +1640,8 @@ export default function MembershipPortal({
                   </button>
                   <button
                     onClick={() => setWizardStep(7)}
-                    disabled={scanningFeeReceipt}
+                    disabled={scanningFeeReceipt || refNumberMatchesReceipt(receiptDigitRuns, refNum) === false}
+                    title={refNumberMatchesReceipt(receiptDigitRuns, refNum) === false ? "Your reference number doesn't match the attached receipt" : undefined}
                     className="px-6 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-xs flex items-center gap-1 transition shadow-lg hover:shadow-emerald-900/10 cursor-pointer"
                   >
                     Review Application <ChevronRight className="w-3.5 h-3.5" />
