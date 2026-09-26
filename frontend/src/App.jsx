@@ -17,6 +17,7 @@ import BoardDashboardPage from './pages/BoardDashboardPage';
 import { SignupPage, SigninPage, ForgotPasswordPage } from './pages/AuthPages';
 import useIdleTimeout from './hooks/useIdleTimeout';
 import { registerUnauthorizedHandler } from './utils/apiInterceptor';
+import { AlertTriangle, LogIn, UserPlus, X } from 'lucide-react';
 import {
   INITIAL_PRODUCTS,
   INITIAL_MEMBERS,
@@ -33,6 +34,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [admin, setAdmin] = useState(null);
   const [bod, setBod] = useState(null);
+  const [membershipAuthPromptOpen, setMembershipAuthPromptOpen] = useState(false);
 
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -805,6 +807,10 @@ export default function App() {
   const hideNav = ['signup', 'signin', 'admin-dashboard', 'bod-dashboard'].includes(page);
 
   const navigate = (target) => {
+    if (target === 'membership' && !user) {
+      setMembershipAuthPromptOpen(true);
+      return;
+    }
     if (target === 'dashboard' && !user) {
       setPage('signin');
       return;
@@ -873,6 +879,48 @@ export default function App() {
         />
       )}
 
+      {membershipAuthPromptOpen && !user && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4" role="dialog" aria-modal="true" aria-labelledby="membership-auth-title">
+          <div className="relative w-full max-w-md rounded-2xl bg-white p-7 shadow-2xl dark:bg-slate-900">
+            <button
+              type="button"
+              onClick={() => setMembershipAuthPromptOpen(false)}
+              aria-label="Close"
+              className="absolute right-4 top-4 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <h2 id="membership-auth-title" className="mb-2 text-xl font-bold text-slate-900 dark:text-white">
+              Create an account to apply
+            </h2>
+            <p className="mb-6 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              Please sign up or sign in first before opening the BOCOFAC membership application.
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => { setMembershipAuthPromptOpen(false); navigate('signin'); }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <LogIn className="h-4 w-4" />
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMembershipAuthPromptOpen(false); navigate('signup'); }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900"
+              >
+                <UserPlus className="h-4 w-4" />
+                Create Account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1" style={pagesWithFooter.includes(page) ? { paddingBottom: 'var(--footer-h, 0px)' } : undefined}>
 
       {page === 'home' && (
@@ -897,7 +945,7 @@ export default function App() {
         />
       )}
       {page === 'about' && <PublicAbout onApplyMembership={() => navigate('membership')} />}
-      {page === 'membership' && (
+      {page === 'membership' && user && (
         <div className="max-w-[1680px] mx-auto w-full p-4 sm:p-8">
           <MembershipPortal
             user={user}
@@ -916,6 +964,7 @@ export default function App() {
           setUser={setUser}
           setPage={navigate}
           pmesSessions={pmesSessions}
+          onPmesSessionsRefresh={fetchPmesSessions}
           focusTab={dashboardTab}
           onFocusTabConsumed={() => setDashboardTab(null)}
           onToast={addToast}

@@ -168,7 +168,7 @@ function ApplicationStatusPanel({ applicantStatus, setPage }) {
   );
 }
 
-export default function DashboardPage({ user, setUser, setPage, pmesSessions = [], focusTab, onFocusTabConsumed, onToast }) {
+export default function DashboardPage({ user, setUser, setPage, pmesSessions = [], onPmesSessionsRefresh, focusTab, onFocusTabConsumed, onToast }) {
   const [activeTab, setActiveTab] = useState('membership');
   // Branded stand-in for window.confirm() (see AdminDashboardPage.jsx for
   // the same pattern) - a native confirm() dialog is titled by the raw host
@@ -366,6 +366,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to reserve a slot for this session.');
       }
+      await onPmesSessionsRefresh?.();
       onToast?.(`Slot reserved! See you on ${new Date(session.date).toLocaleDateString()} at ${session.venue || 'the announced venue'}.`, 'success');
     } catch (err) {
       onToast?.(err.message || 'Could not reserve a slot for this session.', 'error');
