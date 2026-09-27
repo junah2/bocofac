@@ -16,7 +16,7 @@ import AdminDashboardPage from './pages/AdminDashboardPage';
 import BoardDashboardPage from './pages/BoardDashboardPage';
 import { SignupPage, SigninPage, ForgotPasswordPage } from './pages/AuthPages';
 import useIdleTimeout from './hooks/useIdleTimeout';
-import { registerUnauthorizedHandler } from './utils/apiInterceptor';
+import { registerUnauthorizedHandler, registerForbiddenHandler } from './utils/apiInterceptor';
 import { AlertTriangle, LogIn, UserPlus, X } from 'lucide-react';
 import {
   INITIAL_PRODUCTS,
@@ -428,6 +428,51 @@ export default function App() {
       }
     });
   }, [user, admin, bod]);
+
+  // The login cookie is shared by every tab, so signing in as another account
+  // in one tab (e.g. Board) silently switches the account behind the others
+  // (e.g. an Admin tab), whose requests then fail with "You do not have
+  // permission". When this tab regains focus, or any request comes back 403,
+  // ask the server who is actually signed in; if it's someone else, reload so
+  // this tab shows that account's dashboard, and say why.
+  useEffect(() => {
+    if (!authChecked) return undefined;
+    const currentId = (admin || bod || user)?.id ?? null;
+    let checking = false;
+    const checkAccount = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const res = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' });
+        const me = res.ok ? await res.json() : null;
+        if ((me?.id ?? null) !== currentId) {
+          if (me) sessionStorage.setItem('bocofac_account_switched', me.email || me.name || 'another account');
+          window.location.reload();
+        }
+      } catch {
+        // Network hiccup - leave the tab as it is.
+      } finally {
+        checking = false;
+      }
+    };
+    const onVisible = () => { if (document.visibilityState === 'visible') checkAccount(); };
+    window.addEventListener('focus', checkAccount);
+    document.addEventListener('visibilitychange', onVisible);
+    const unregister = registerForbiddenHandler(checkAccount);
+    return () => {
+      window.removeEventListener('focus', checkAccount);
+      document.removeEventListener('visibilitychange', onVisible);
+      unregister();
+    };
+  }, [authChecked, user, admin, bod]);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    const switchedTo = sessionStorage.getItem('bocofac_account_switched');
+    if (!switchedTo) return;
+    sessionStorage.removeItem('bocofac_account_switched');
+    addToast(`This tab switched to ${switchedTo}, because that account was signed in from another tab. Use a separate browser or an InPrivate window to stay signed in as two accounts at once.`, 'info');
+  }, [authChecked]);
 
   // E-Commerce Order Handler - the backend already deducted stock
   // transactionally when it created this order, so re-fetch the real

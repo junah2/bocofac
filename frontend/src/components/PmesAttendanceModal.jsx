@@ -340,6 +340,10 @@ export default function PmesAttendanceModal({ session, role, onClose, onToast })
                 {addingWalkIn ? 'Adding…' : 'Add'}
               </button>
             </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+              Use the email they&apos;ll sign up with. Their attendance is linked to their BOCOFAC account by this
+              email, so they must create their account (and apply for membership) using this same address.
+            </p>
           </form>
         )}
       </div>
