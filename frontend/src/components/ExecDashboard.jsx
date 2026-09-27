@@ -118,6 +118,9 @@ export default function ExecDashboard({
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [applyingPromoId, setApplyingPromoId] = useState(null);
+  // The receipt auditor lists every order ever placed - collapsed to the
+  // newest few by default so it doesn't swallow the whole Analytics page.
+  const [showAllAuditOrders, setShowAllAuditOrders] = useState(false);
 
   const palette = CHART_PALETTE[isDarkMode ? 'dark' : 'light'];
   const categoryColors = CATEGORY_COLORS[isDarkMode ? 'dark' : 'light'];
@@ -284,6 +287,9 @@ export default function ExecDashboard({
         return d.getFullYear() === selectedMonth.year && d.getMonth() === selectedMonth.month;
       })
     : orders;
+
+  const AUDIT_PREVIEW_COUNT = 3;
+  const visibleAuditOrders = showAllAuditOrders ? auditOrders : auditOrders.slice(0, AUDIT_PREVIEW_COUNT);
 
   const toggleMonth = (point) => {
     setSelectedMonth(prev => (prev && prev.label === point.label && prev.year === point.year ? null : point));
@@ -881,7 +887,7 @@ export default function ExecDashboard({
       </div>
 
       {/* 5. Manual Order Verification & Receipt Screen Audit Box */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 text-left space-y-6">
+      <div data-audit-box className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 text-left space-y-6">
         <div>
           <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
             <ClipboardCheck className="w-4.5 h-4.5 text-emerald-800 dark:text-emerald-400" />
@@ -902,7 +908,7 @@ export default function ExecDashboard({
           <p className="text-xs text-slate-400 text-center py-4">{selectedMonth ? 'No orders in this month.' : 'No order logs received.'}</p>
         ) : (
           <div className="space-y-4">
-            {auditOrders.map(order => (
+            {visibleAuditOrders.map(order => (
               <div key={order.id} className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-[#fdfbf6]/20 dark:bg-slate-950/20 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                 
                 {/* Info summary */}
@@ -961,6 +967,21 @@ export default function ExecDashboard({
 
               </div>
             ))}
+            {auditOrders.length > AUDIT_PREVIEW_COUNT && (
+              <div className="flex justify-center pt-1">
+                <button
+                  onClick={(e) => {
+                    // Collapsing from the bottom of a long list would leave the
+                    // admin far below the section - bring its top back into view.
+                    if (showAllAuditOrders) e.currentTarget.closest('[data-audit-box]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setShowAllAuditOrders(v => !v);
+                  }}
+                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer transition-colors"
+                >
+                  {showAllAuditOrders ? 'Hide' : `View all (${auditOrders.length})`}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
