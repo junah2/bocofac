@@ -18,7 +18,7 @@ import {
   FOCUS_PROVINCES, OTHER_PROVINCE_OPTION, HOME_PROVINCE, HOME_CITY,
   CITIES_BY_PROVINCE, BARANGAYS_BY_CITY, detectShippingZone,
 } from '../data/phAddress';
-import { isValidPhone11, isValidGcashRef13, digitsOnly, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt } from '../utils/validators';
+import { isValidPhone11, isValidGcashRef13, digitsOnly, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt, looksLikePaymentReceipt } from '../utils/validators';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
@@ -363,16 +363,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
   const shippingFee = SHIPPING_ZONES[shippingZone] ?? 0;
   const cartTotal = cartSubtotal - memberDiscount + shippingFee;
 
-  // A valid GCash/bank transfer confirmation always carries some subset of
-  // these words - a random unrelated photo won't, so requiring at least two
-  // matches (not just one, which a lot of ordinary photos could accidentally
-  // contain) is a decent filter for "does this actually look like a receipt"
-  // without needing a real ML image classifier.
-  const RECEIPT_OCR_KEYWORDS = [
-    'gcash', 'reference', 'ref no', 'amount', 'transaction', 'payment',
-    'sent', 'transfer', 'total', 'php', 'bank', 'received',
-  ];
-
   // Screenshot upload - OCR'd client-side (tesseract.js, loaded on demand so
   // it doesn't bloat the initial bundle for shoppers who never reach
   // checkout) to reject obviously-unrelated images before they're even
@@ -393,9 +383,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
     try {
       const { default: Tesseract } = await import('tesseract.js');
       const { data: { text } } = await Tesseract.recognize(file, 'eng');
-      const normalized = text.toLowerCase();
-      const matchCount = RECEIPT_OCR_KEYWORDS.filter((kw) => normalized.includes(kw)).length;
-      if (matchCount < 2) {
+      if (!looksLikePaymentReceipt(text)) {
         onToast("This doesn't look like a payment receipt screenshot. Please attach the actual GCash/bank transfer confirmation.", 'error');
         return;
       }

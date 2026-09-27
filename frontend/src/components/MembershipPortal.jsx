@@ -19,7 +19,7 @@ import {
 import { downloadFile } from '../utils/downloadFile';
 import { formatDate } from '../utils/formatDate';
 import { getPmesDisplayStatus } from '../utils/pmesStatus';
-import { isValidGcashRef13, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt } from '../utils/validators';
+import { isValidGcashRef13, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt, looksLikePaymentReceipt } from '../utils/validators';
 import { displayApplicantStatus } from '../utils/applicantStatus';
 import { Field, Section } from './ProfileField';
 
@@ -48,15 +48,6 @@ function readFileAsDataURL(file) {
     reader.readAsDataURL(file);
   });
 }
-
-// A valid GCash/bank transfer confirmation always carries some subset of
-// these words - mirrors Storefront.jsx's RECEIPT_OCR_KEYWORDS so the
-// membership fee receipt gets the same content sanity check as an order
-// payment receipt.
-const RECEIPT_OCR_KEYWORDS = [
-  'gcash', 'reference', 'ref no', 'amount', 'transaction', 'payment',
-  'sent', 'transfer', 'total', 'php', 'bank', 'received',
-];
 
 // A real BOCOFAC PMES certificate always carries some subset of these words,
 // so an unrelated photo can't be attached in its place.
@@ -570,9 +561,7 @@ export default function MembershipPortal({
     try {
       const { default: Tesseract } = await import('tesseract.js');
       const { data: { text } } = await Tesseract.recognize(file, 'eng');
-      const normalized = text.toLowerCase();
-      const matchCount = RECEIPT_OCR_KEYWORDS.filter((kw) => normalized.includes(kw)).length;
-      if (matchCount < 2) {
+      if (!looksLikePaymentReceipt(text)) {
         onToast("This doesn't look like a payment receipt screenshot. Please attach the actual GCash/bank transfer confirmation.", 'error');
         return;
       }
