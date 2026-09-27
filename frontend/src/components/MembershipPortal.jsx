@@ -21,6 +21,7 @@ import { formatDate } from '../utils/formatDate';
 import { getPmesDisplayStatus } from '../utils/pmesStatus';
 import { isValidGcashRef13, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt, looksLikePaymentReceipt } from '../utils/validators';
 import { recognizeReceiptText } from '../utils/receiptOcr';
+import RefMatchHint from './RefMatchHint';
 import { displayApplicantStatus } from '../utils/applicantStatus';
 import { Field, Section } from './ProfileField';
 
@@ -1768,17 +1769,9 @@ export default function MembershipPortal({
                       placeholder="Enter 13-digit payment Ref Number"
                       value={refNum}
                       onChange={onDigits(setRefNum, 13)}
-                      className={`w-full px-4 text-sm py-2 rounded-lg border bg-white dark:bg-slate-950 ${validationBorderClass(refNum, isValidGcashRef13(refNum) && refNumberMatchesReceipt(receiptDigitRuns, refNum) !== false)}`}
+                      className={`w-full px-4 text-sm py-2 rounded-lg border bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 ${validationBorderClass(refNum, isValidGcashRef13(refNum) && refNumberMatchesReceipt(receiptDigitRuns, refNum) !== false)}`}
                      autoComplete="off"/>
-                    {refNum && refNumberMatchesReceipt(receiptDigitRuns, refNum) === false ? (
-                      <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-bold">
-                        This doesn't match the reference number on your attached receipt. Please double-check and correct it.
-                      </p>
-                    ) : (
-                      <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-medium">
-                        Warning: The reference number you entered must match the one shown in your receipt screenshot. Payment will not be accepted if they don't match.
-                      </p>
-                    )}
+                    <RefMatchHint value={refNum} receiptDigitRuns={receiptDigitRuns} hasReceipt={!!feeReceiptFile} />
                   </div>
                 </div>
 
@@ -1791,8 +1784,8 @@ export default function MembershipPortal({
                   </button>
                   <button
                     onClick={() => setWizardStep(7)}
-                    disabled={scanningFeeReceipt || refNumberMatchesReceipt(receiptDigitRuns, refNum) === false}
-                    title={refNumberMatchesReceipt(receiptDigitRuns, refNum) === false ? "Your reference number doesn't match the attached receipt" : undefined}
+                    disabled={scanningFeeReceipt || (!!refNum && !isValidGcashRef13(refNum)) || refNumberMatchesReceipt(receiptDigitRuns, refNum) === false}
+                    title={refNumberMatchesReceipt(receiptDigitRuns, refNum) === false ? "Your reference number doesn't match the attached receipt" : refNum && !isValidGcashRef13(refNum) ? 'Enter all 13 digits of the reference number' : undefined}
                     className="px-6 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-xs flex items-center gap-1 transition shadow-lg hover:shadow-emerald-900/10 cursor-pointer"
                   >
                     Review Application <ChevronRight className="w-3.5 h-3.5" />

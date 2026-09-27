@@ -9,7 +9,9 @@ import { printStatementOfAccount, printOfficialReceipt } from '../utils/printDoc
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import { getPmesDisplayStatus } from '../utils/pmesStatus';
 import { displayApplicantStatus } from '../utils/applicantStatus';
-import { isValidPhone11, isValidGcashRef13, digitsOnly } from '../utils/validators';
+import { isValidPhone11, isValidGcashRef13, digitsOnly, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt, looksLikePaymentReceipt } from '../utils/validators';
+import { recognizeReceiptText } from '../utils/receiptOcr';
+import RefMatchHint from '../components/RefMatchHint';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
@@ -200,6 +202,11 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ amount: '', paymentMethod: 'GCash', referenceId: '' });
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  // GCash screenshot for a share capital payment. Only used here in the
+  // browser: OCR reads its digits so the typed reference can be checked
+  // against it live, the same way checkout and the membership fee do.
+  const [payReceipt, setPayReceipt] = useState(null); // { name, preview, digitRuns }
+  const [scanningPayReceipt, setScanningPayReceipt] = useState(false);
 
   // Accrued 10% monthly earnings + the member's own withdrawal request history.
   const [withdrawalData, setWithdrawalData] = useState({ availableBalance: 0, requests: [] });
@@ -437,6 +444,30 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
     });
   };
 
+  const handlePayReceiptUpload = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      onToast?.('Please upload an image (JPG, PNG, or WebP) of your GCash receipt.', 'error');
+      return;
+    }
+    setScanningPayReceipt(true);
+    try {
+      const text = await recognizeReceiptText(file);
+      if (!looksLikePaymentReceipt(text)) {
+        onToast?.("This doesn't look like a payment receipt screenshot. Please attach the actual GCash confirmation.", 'error');
+        return;
+      }
+      setPayReceipt({ name: file.name, preview: URL.createObjectURL(file), digitRuns: extractDigitRuns(text) });
+      onToast?.(`Receipt "${file.name}" looks valid and is attached.`, 'success');
+    } catch {
+      onToast?.('Could not scan that image - please try a clearer screenshot of the receipt.', 'error');
+    } finally {
+      setScanningPayReceipt(false);
+    }
+  };
+
   const handleSubmitPayment = async (e) => {
     e.preventDefault();
     const amount = Number(paymentForm.amount);
@@ -444,8 +475,16 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
       onToast?.('Please enter a valid payment amount.', 'error');
       return;
     }
-    if (paymentForm.referenceId && !isValidGcashRef13(paymentForm.referenceId)) {
+    if (!isValidGcashRef13(paymentForm.referenceId)) {
       onToast?.('Reference number must be exactly 13 digits.', 'error');
+      return;
+    }
+    if (!payReceipt) {
+      onToast?.('Please attach a screenshot of your GCash receipt.', 'error');
+      return;
+    }
+    if (refNumberMatchesReceipt(payReceipt.digitRuns, paymentForm.referenceId) === false) {
+      onToast?.("The reference number you entered doesn't match your attached receipt. Please double-check it.", 'error');
       return;
     }
     setSubmittingPayment(true);
@@ -464,6 +503,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
       if (!res.ok) throw new Error(data.error || 'Failed to submit payment.');
       setShowPaymentForm(false);
       setPaymentForm({ amount: '', paymentMethod: 'GCash', referenceId: '' });
+      setPayReceipt(null);
       await loadMembershipData();
       onToast?.('Payment submitted! It will be added to your share capital contribution once the cooperative confirms your reference number.', 'success');
     } catch (err) {
@@ -813,6 +853,9 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                   setPaymentForm={setPaymentForm}
                   submittingPayment={submittingPayment}
                   onSubmitPayment={handleSubmitPayment}
+                  payReceipt={payReceipt}
+                  scanningPayReceipt={scanningPayReceipt}
+                  onPayReceiptUpload={handlePayReceiptUpload}
                   withdrawalData={withdrawalData}
                   showWithdrawForm={showWithdrawForm}
                   setShowWithdrawForm={setShowWithdrawForm}
@@ -1321,6 +1364,9 @@ function MembershipContributionPanel({
   setPaymentForm,
   submittingPayment,
   onSubmitPayment,
+  payReceipt,
+  scanningPayReceipt,
+  onPayReceiptUpload,
   withdrawalData,
   showWithdrawForm,
   setShowWithdrawForm,
@@ -1494,16 +1540,53 @@ function MembershipContributionPanel({
               <p style={{ fontSize: 18, fontWeight: 800, fontFamily: 'monospace', color: 'var(--text)' }}>0917-889-4402</p>
               <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Account: BOCOFAC Coop Central Inc.</p>
             </div>
-            <FormInput
-              label="Reference Number"
-              placeholder="e.g. GCash reference no."
-              inputMode="numeric"
-              value={paymentForm.referenceId}
-              onChange={e => setPaymentForm(f => ({ ...f, referenceId: digitsOnly(e.target.value, 13) }))}
-              maxLength={13}
-              valid={paymentForm.referenceId ? isValidGcashRef13(paymentForm.referenceId) : undefined}
-            />
-            <GreenBtn type="submit" disabled={submittingPayment}>
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)' }}>
+                GCash Receipt Screenshot<span style={{ color: '#e24b4a' }}> *</span>
+              </label>
+              <div className="relative flex items-center gap-3 p-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700">
+                {scanningPayReceipt ? (
+                  <div className="flex items-center gap-2 py-2">
+                    <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-xs font-medium text-slate-500">Scanning receipt…</p>
+                  </div>
+                ) : payReceipt ? (
+                  <>
+                    <img src={payReceipt.preview} alt="Receipt preview" className="h-16 rounded-lg shadow border object-contain" />
+                    <div className="min-w-0">
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold truncate">Attached: {payReceipt.name}</p>
+                      <a href={payReceipt.preview} target="_blank" rel="noopener noreferrer" className="relative z-10 text-[11px] text-slate-400 hover:text-emerald-600 underline">View full size</a>
+                      <p className="text-[11px] text-slate-400">Click to replace</p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-500 py-2">Click to attach the screenshot of your GCash payment</p>
+                )}
+                {!scanningPayReceipt && (
+                  <input type="file" accept="image/*" onChange={onPayReceiptUpload} className="absolute inset-0 opacity-0 w-full cursor-pointer" />
+                )}
+              </div>
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)' }}>
+                Reference Number<span style={{ color: '#e24b4a' }}> *</span>
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={13}
+                autoComplete="off"
+                placeholder="13-digit GCash reference number"
+                value={paymentForm.referenceId}
+                onChange={e => setPaymentForm(f => ({ ...f, referenceId: digitsOnly(e.target.value, 13) }))}
+                className={`w-full px-4 py-2.5 rounded-xl border-2 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 text-slate-900 dark:text-white ${validationBorderClass(paymentForm.referenceId, isValidGcashRef13(paymentForm.referenceId) && refNumberMatchesReceipt(payReceipt?.digitRuns, paymentForm.referenceId) !== false)}`}
+              />
+              <RefMatchHint value={paymentForm.referenceId} receiptDigitRuns={payReceipt?.digitRuns} hasReceipt={!!payReceipt} />
+            </div>
+            <GreenBtn
+              type="submit"
+              disabled={submittingPayment || scanningPayReceipt || !payReceipt || !isValidGcashRef13(paymentForm.referenceId) || refNumberMatchesReceipt(payReceipt?.digitRuns, paymentForm.referenceId) === false}
+            >
               {submittingPayment ? 'Submitting…' : 'Submit Payment'}
             </GreenBtn>
           </form>

@@ -20,6 +20,7 @@ import {
 } from '../data/phAddress';
 import { isValidPhone11, isValidGcashRef13, digitsOnly, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt, looksLikePaymentReceipt } from '../utils/validators';
 import { recognizeReceiptText } from '../utils/receiptOcr';
+import RefMatchHint from './RefMatchHint';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
@@ -917,15 +918,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                             placeholder="13-digit GCash reference number"
                             className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 text-slate-900 dark:text-white ${validationBorderClass(referenceNumber, isValidGcashRef13(referenceNumber) && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) !== false)}`}
                           />
-                          {referenceNumber && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) === false ? (
-                            <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-bold">
-                              This doesn't match the reference number on your attached receipt. Please double-check and correct it.
-                            </p>
-                          ) : (
-                            <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-medium">
-                              Warning: The reference number you entered must match the one shown in your receipt screenshot. Payment will not be accepted if they don't match.
-                            </p>
-                          )}
+                          <RefMatchHint value={referenceNumber} receiptDigitRuns={receiptDigitRuns} hasReceipt={!!receiptFile} />
                         </div>
 
                         {/* Screenshot Interactive Drag-and-Drop Area */}
@@ -1002,8 +995,8 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                     </button>
                     <button
                       type="submit"
-                      disabled={submittingOrder || scanningReceipt || (paymentMethod === 'GCash' && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) === false)}
-                      title={paymentMethod === 'GCash' && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) === false ? "Your reference number doesn't match the attached receipt" : undefined}
+                      disabled={submittingOrder || scanningReceipt || (paymentMethod === 'GCash' && (!isValidGcashRef13(referenceNumber) || refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) === false))}
+                      title={paymentMethod === 'GCash' && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) === false ? "Your reference number doesn't match the attached receipt" : paymentMethod === 'GCash' && !isValidGcashRef13(referenceNumber) ? 'Enter all 13 digits of the reference number' : undefined}
                       className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition shadow-lg hover:shadow-emerald-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {submittingOrder ? 'Submitting…' : scanningReceipt ? 'Scanning receipt…' : `Confirm and Submit Order (₱${cartTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })})`}
