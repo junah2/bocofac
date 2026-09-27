@@ -887,8 +887,9 @@ export default function ExecDashboard({
       </div>
 
       {/* 5. Manual Order Verification & Receipt Screen Audit Box */}
-      <div data-audit-box className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 text-left space-y-6">
-        <div>
+      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 text-left space-y-6">
+        <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
             <ClipboardCheck className="w-4.5 h-4.5 text-emerald-800 dark:text-emerald-400" />
             Digital Wallet Receipt auditor
@@ -900,6 +901,15 @@ export default function ExecDashboard({
               className="mt-2 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-950/60"
             >
               Filtered to {selectedMonth.label} {selectedMonth.year} <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+          {auditOrders.length > AUDIT_PREVIEW_COUNT && (
+            <button
+              onClick={() => setShowAllAuditOrders(v => !v)}
+              className="shrink-0 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer transition-colors whitespace-nowrap"
+            >
+              {showAllAuditOrders ? 'Hide' : `View all (${auditOrders.length})`}
             </button>
           )}
         </div>
@@ -967,21 +977,6 @@ export default function ExecDashboard({
 
               </div>
             ))}
-            {auditOrders.length > AUDIT_PREVIEW_COUNT && (
-              <div className="flex justify-center pt-1">
-                <button
-                  onClick={(e) => {
-                    // Collapsing from the bottom of a long list would leave the
-                    // admin far below the section - bring its top back into view.
-                    if (showAllAuditOrders) e.currentTarget.closest('[data-audit-box]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    setShowAllAuditOrders(v => !v);
-                  }}
-                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer transition-colors"
-                >
-                  {showAllAuditOrders ? 'Hide' : `View all (${auditOrders.length})`}
-                </button>
-              </div>
-            )}
           </div>
         )}
       </div>
