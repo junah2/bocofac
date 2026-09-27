@@ -1,7 +1,6 @@
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
 let handlers = [];
-let forbiddenHandlers = [];
 let patched = false;
 
 // Deliberate scope-minimizing tradeoff: there are ~56 raw fetch() call sites
@@ -23,9 +22,6 @@ function patchFetchOnce() {
     if (response.status === 401 && url && url.startsWith(API_BASE)) {
       handlers.forEach((handler) => handler());
     }
-    if (response.status === 403 && url && url.startsWith(API_BASE)) {
-      forbiddenHandlers.forEach((handler) => handler());
-    }
     return response;
   };
 }
@@ -37,17 +33,5 @@ export function registerUnauthorizedHandler(handler) {
   handlers.push(handler);
   return () => {
     handlers = handlers.filter((h) => h !== handler);
-  };
-}
-
-// Same, for 403. A 403 usually means a genuine permission denial, but it's
-// also what a tab sees when another tab signed in as a different account
-// (the login cookie is shared by every tab), so callers use it as a cue to
-// re-check who's actually signed in.
-export function registerForbiddenHandler(handler) {
-  patchFetchOnce();
-  forbiddenHandlers.push(handler);
-  return () => {
-    forbiddenHandlers = forbiddenHandlers.filter((h) => h !== handler);
   };
 }
