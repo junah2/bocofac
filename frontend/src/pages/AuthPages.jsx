@@ -73,12 +73,12 @@ function AuthBrandPanel() {
       />
 
       <div className="relative z-10 flex flex-col h-full">
-        <div className="inline-flex items-center gap-2 mb-8 text-emerald-50 text-xs font-semibold uppercase tracking-wider w-fit px-3 py-1 rounded-full bg-black/25 border border-white/20 backdrop-blur-sm">
+        <div className="inline-flex items-center gap-2 mb-8 mx-auto text-emerald-50 text-xs font-semibold uppercase tracking-wider w-fit px-3 py-1 rounded-full bg-black/25 border border-white/20 backdrop-blur-sm">
           <Sprout className="w-3.5 h-3.5" /> BOCOFAC Coconut Farmers Cooperative
         </div>
 
-        <h1 className="font-serif text-white text-3xl font-extrabold leading-tight mb-3">Welcome to BOCOFAC!</h1>
-        <p className="text-emerald-100/80 text-sm leading-relaxed max-w-sm">
+        <h1 className="font-serif text-white text-3xl font-extrabold leading-tight mb-3 text-center">Welcome to BOCOFAC!</h1>
+        <p className="text-emerald-100/80 text-sm leading-relaxed max-w-sm mx-auto text-center">
           Sign in to manage your membership, track your share capital, and shop the marketplace — all in one place.
         </p>
 

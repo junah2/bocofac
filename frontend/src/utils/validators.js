@@ -52,12 +52,44 @@ export function looksLikePaymentReceipt(ocrText) {
   return hasReferenceNumber && (keywordHits >= 1 || hasMobileNumber || hasMoneyAmount);
 }
 
-// True once a receipt has been scanned AND the typed reference number
-// actually appears among its digit runs - a 13-digit value that's simply
-// well-formed but absent from the receipt itself shouldn't pass as "correct".
-// Returns null (neither true nor false) when there's no receipt yet to check
-// against, so callers can tell "not checked" apart from "checked and wrong."
+function editDistance(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+// Whether the typed reference number matches the receipt's own digits.
+//   true  - it appears on the receipt (allowing an OCR misread or two)
+//   false - the receipt clearly shows a different reference-like number
+//   null  - nothing to check against: no receipt yet, or OCR couldn't read
+//           any reference-like number off it (e.g. a blurry photo of a phone
+//           screen) - so it can't be verified and shouldn't block anyone;
+//           the admin still compares it against the screenshot by hand.
+// OCR on camera photos regularly misreads a digit or two ("8" for "6",
+// dropped digits), so an exact-only match wrongly blocked real receipts.
+// Longer input gets more slack: exact while short, 1 edit from 6 digits,
+// 2 edits once the full 13 are typed.
 export function refNumberMatchesReceipt(digitRuns, ref) {
   if (!digitRuns || !ref) return null;
-  return digitRuns.some((run) => run.includes(ref));
+  if (digitRuns.some((run) => run.includes(ref))) return true;
+  // Reference-like runs only: a mobile number (09xxxxxxxxx / 639xxxxxxxxx)
+  // on the receipt says nothing about whether the reference was misread.
+  const candidates = digitRuns.filter((run) => run.length >= 12 && !/^(09\d{9}|639\d{9})$/.test(run));
+  if (candidates.length === 0) return null;
+  const tolerance = ref.length >= 12 ? 2 : ref.length >= 6 ? 1 : 0;
+  if (tolerance === 0) return false;
+  return candidates.some((run) => {
+    for (let len = ref.length - tolerance; len <= ref.length + tolerance; len++) {
+      for (let i = 0; i + len <= run.length; i++) {
+        if (editDistance(run.slice(i, i + len), ref) <= tolerance) return true;
+      }
+    }
+    return false;
+  });
 }
