@@ -52,44 +52,39 @@ export function looksLikePaymentReceipt(ocrText) {
   return hasReferenceNumber && (keywordHits >= 1 || hasMobileNumber || hasMoneyAmount);
 }
 
-function editDistance(a, b) {
-  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
-  for (let i = 1; i <= a.length; i++) {
+// Fewest edits needed to turn ref into some substring of run (Sellers'
+// variant of Levenshtein: free to start and end anywhere in run), so an OCR
+// that dropped, added or misread a digit still lines up with what was typed.
+function substringEditDistance(run, ref) {
+  let prev = new Array(run.length + 1).fill(0);
+  for (let i = 1; i <= ref.length; i++) {
     const cur = [i];
-    for (let j = 1; j <= b.length; j++) {
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    for (let j = 1; j <= run.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ref[i - 1] === run[j - 1] ? 0 : 1));
     }
     prev = cur;
   }
-  return prev[b.length];
+  return Math.min(...prev);
 }
 
 // Whether the typed reference number matches the receipt's own digits.
-//   true  - it appears on the receipt (allowing an OCR misread or two)
+//   true  - it appears on the receipt (allowing a few OCR misreads)
 //   false - the receipt clearly shows a different reference-like number
-//   null  - nothing to check against: no receipt yet, or OCR couldn't read
-//           any reference-like number off it (e.g. a blurry photo of a phone
-//           screen) - so it can't be verified and shouldn't block anyone;
-//           the admin still compares it against the screenshot by hand.
-// OCR on camera photos regularly misreads a digit or two ("8" for "6",
-// dropped digits), so an exact-only match wrongly blocked real receipts.
-// Longer input gets more slack: exact while short, 1 edit from 6 digits,
-// 2 edits once the full 13 are typed.
+//   null  - can't judge yet: no receipt, fewer than 5 digits typed, or OCR
+//           couldn't read any reference-like number off it (e.g. a blurry
+//           photo of a phone screen) - so it shouldn't block anyone; the
+//           admin still compares it against the screenshot by hand.
+// OCR on small screenshots and camera photos regularly misreads digits ("9"
+// for "3", a dropped leading digit), so allowed edits grow with the typed
+// length - about 3 per 13 digits - which still rejects a different number.
 export function refNumberMatchesReceipt(digitRuns, ref) {
   if (!digitRuns || !ref) return null;
   if (digitRuns.some((run) => run.includes(ref))) return true;
+  if (ref.length < 5) return null;
   // Reference-like runs only: a mobile number (09xxxxxxxxx / 639xxxxxxxxx)
   // on the receipt says nothing about whether the reference was misread.
   const candidates = digitRuns.filter((run) => run.length >= 12 && !/^(09\d{9}|639\d{9})$/.test(run));
   if (candidates.length === 0) return null;
-  const tolerance = ref.length >= 12 ? 2 : ref.length >= 6 ? 1 : 0;
-  if (tolerance === 0) return false;
-  return candidates.some((run) => {
-    for (let len = ref.length - tolerance; len <= ref.length + tolerance; len++) {
-      for (let i = 0; i + len <= run.length; i++) {
-        if (editDistance(run.slice(i, i + len), ref) <= tolerance) return true;
-      }
-    }
-    return false;
-  });
+  const tolerance = Math.max(1, Math.round((ref.length * 3) / 13));
+  return candidates.some((run) => substringEditDistance(run, ref) <= tolerance);
 }

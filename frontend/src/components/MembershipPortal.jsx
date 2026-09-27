@@ -20,6 +20,7 @@ import { downloadFile } from '../utils/downloadFile';
 import { formatDate } from '../utils/formatDate';
 import { getPmesDisplayStatus } from '../utils/pmesStatus';
 import { isValidGcashRef13, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt, looksLikePaymentReceipt } from '../utils/validators';
+import { recognizeReceiptText } from '../utils/receiptOcr';
 import { displayApplicantStatus } from '../utils/applicantStatus';
 import { Field, Section } from './ProfileField';
 
@@ -64,8 +65,7 @@ const PMES_CERT_OCR_KEYWORDS = [
 // than in response to the applicant picking a file.
 async function scanReceiptDigits(file) {
   try {
-    const { default: Tesseract } = await import('tesseract.js');
-    const { data: { text } } = await Tesseract.recognize(file, 'eng');
+    const text = await recognizeReceiptText(file);
     return extractDigitRuns(text);
   } catch {
     return null;
@@ -559,8 +559,7 @@ export default function MembershipPortal({
 
     setScanningFeeReceipt(true);
     try {
-      const { default: Tesseract } = await import('tesseract.js');
-      const { data: { text } } = await Tesseract.recognize(file, 'eng');
+      const text = await recognizeReceiptText(file);
       if (!looksLikePaymentReceipt(text)) {
         onToast("This doesn't look like a payment receipt screenshot. Please attach the actual GCash/bank transfer confirmation.", 'error');
         return;

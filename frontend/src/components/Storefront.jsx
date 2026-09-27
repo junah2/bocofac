@@ -19,6 +19,7 @@ import {
   CITIES_BY_PROVINCE, BARANGAYS_BY_CITY, detectShippingZone,
 } from '../data/phAddress';
 import { isValidPhone11, isValidGcashRef13, digitsOnly, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt, looksLikePaymentReceipt } from '../utils/validators';
+import { recognizeReceiptText } from '../utils/receiptOcr';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
@@ -381,8 +382,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
 
     setScanningReceipt(true);
     try {
-      const { default: Tesseract } = await import('tesseract.js');
-      const { data: { text } } = await Tesseract.recognize(file, 'eng');
+      const text = await recognizeReceiptText(file);
       if (!looksLikePaymentReceipt(text)) {
         onToast("This doesn't look like a payment receipt screenshot. Please attach the actual GCash/bank transfer confirmation.", 'error');
         return;
