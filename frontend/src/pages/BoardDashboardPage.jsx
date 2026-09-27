@@ -39,6 +39,7 @@ import PmesAttendanceModal from '../components/PmesAttendanceModal';
 import ApplicantDetailModal from '../components/ApplicantDetailModal';
 import MobileScrollHint from '../components/MobileScrollHint';
 import Footer from '../components/Footer';
+import CoopInsights from '../components/CoopInsights';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import bocofacLogo from '../assets/bocofac-logo.jpg';
 
@@ -397,6 +398,15 @@ export default function BoardDashboardPage({
                   )}
                 </div>
               </div>
+
+              <CoopInsights
+                members={members}
+                ledger={ledger}
+                withdrawals={withdrawals}
+                orders={orders}
+                applicants={applicants}
+                isDarkMode={isDarkMode}
+              />
             </>
           )}
 

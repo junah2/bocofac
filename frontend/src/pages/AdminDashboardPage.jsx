@@ -35,6 +35,7 @@ import MemberDetailModal from '../components/MemberDetailModal';
 import MobileScrollHint from '../components/MobileScrollHint';
 import bocofacLogo from '../assets/bocofac-logo.jpg';
 import ExecDashboard from '../components/ExecDashboard';
+import CoopInsights from '../components/CoopInsights';
 import ShareCapitalLedger from '../components/ShareCapitalLedger';
 import PmesAttendanceModal from '../components/PmesAttendanceModal';
 import Footer from '../components/Footer';
@@ -1511,6 +1512,17 @@ export default function AdminDashboardPage({
               onUpdateProductStock={onUpdateProductStock}
               onApplyPromo={onApplyPromo}
               onToast={onToast}
+              isDarkMode={isDarkMode}
+            />
+          )}
+
+          {adminTab === 'analytics' && (
+            <CoopInsights
+              members={members}
+              ledger={ledger}
+              withdrawals={withdrawals}
+              orders={orders}
+              applicants={applicants}
               isDarkMode={isDarkMode}
             />
           )}
