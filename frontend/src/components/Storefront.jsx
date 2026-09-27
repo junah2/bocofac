@@ -916,7 +916,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                             value={referenceNumber}
                             onChange={(e) => setReferenceNumber(digitsOnly(e.target.value, 13))}
                             placeholder="13-digit GCash reference number"
-                            className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 text-slate-900 dark:text-white ${validationBorderClass(referenceNumber, isValidGcashRef13(referenceNumber) && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) !== false)}`}
+                            className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 text-slate-900 dark:text-white ${validationBorderClass(referenceNumber, refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) === true || (isValidGcashRef13(referenceNumber) && refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) !== false))}`}
                           />
                           <RefMatchHint value={referenceNumber} receiptDigitRuns={receiptDigitRuns} hasReceipt={!!receiptFile} />
                         </div>

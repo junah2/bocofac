@@ -52,34 +52,37 @@ export function looksLikePaymentReceipt(ocrText) {
   return hasReferenceNumber && (keywordHits >= 1 || hasMobileNumber || hasMoneyAmount);
 }
 
-// Whether the typed reference number matches the receipt's own digits.
-//   true  - it appears on the receipt exactly (or as far as it's typed)
-//   false - the receipt shows a different reference-like number
-//   null  - can't judge yet: no receipt, fewer than 5 digits typed, or OCR
-//           couldn't read any reference-like number off it (e.g. a blurry
-//           photo of a phone screen) - so it shouldn't block anyone; the
-//           admin still compares it against the screenshot by hand.
+// Whether the typed reference number matches the receipt's own digits,
+// checked from the very first digit typed: what's typed so far must be the
+// start of the reference number OCR read off the receipt.
+//   true  - matches so far (or fully, once all 13 digits are in)
+//   false - the receipt shows a different reference number
+//   null  - nothing to check against: no receipt, or OCR couldn't read any
+//           reference-like number off it (e.g. a blurry photo of a phone
+//           screen) - so it shouldn't block anyone; the admin still
+//           compares it against the screenshot by hand.
 // Deliberately exact: fuzzy matching let wrong references through
 // (9044493480657 "matched" a receipt showing 9044493480965). Receipts are
 // upscaled before OCR (see receiptOcr.js), which reads them exactly. The one
 // allowance is a receipt run of exactly 12 digits - OCR visibly dropped a
-// digit - where the typed reference minus one digit must equal it.
+// digit - where the typed digits may skip one digit of it.
 export function refNumberMatchesReceipt(digitRuns, ref) {
   if (!digitRuns || !ref) return null;
-  if (digitRuns.some((run) => run.includes(ref))) return true;
-  if (ref.length < 5) return null;
   // Reference-like runs only: a mobile number (09xxxxxxxxx / 639xxxxxxxxx)
-  // on the receipt says nothing about whether the reference was misread.
+  // on the receipt says nothing about the reference.
   const candidates = digitRuns.filter((run) => run.length >= 12 && !/^(09\d{9}|639\d{9})$/.test(run));
   if (candidates.length === 0) return null;
   return candidates.some((run) => {
     if (run.length === 12) {
-      if (ref.length === 13) {
-        for (let i = 0; i < 13; i++) if (ref.slice(0, i) + ref.slice(i + 1) === run) return true;
-        return false;
-      }
-      // Still typing: allow the one dropped digit anywhere in what's typed.
-      for (let i = 0; i < ref.length; i++) if (run.includes(ref.slice(0, i) + ref.slice(i + 1))) return true;
+      if (run.startsWith(ref)) return true;
+      // Never the first digit, so a wrong first digit is caught immediately.
+      for (let i = 1; i < ref.length; i++) if (run.startsWith(ref.slice(0, i) + ref.slice(i + 1))) return true;
+      return false;
+    }
+    // A run longer than 13 has other digits from the same line joined on
+    // (e.g. a date), so the reference can start anywhere a full 13 fit.
+    for (let i = 0; i + 13 <= run.length; i++) {
+      if (run.startsWith(ref, i)) return true;
     }
     return false;
   });

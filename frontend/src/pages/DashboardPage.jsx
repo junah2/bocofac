@@ -1579,7 +1579,7 @@ function MembershipContributionPanel({
                 placeholder="13-digit GCash reference number"
                 value={paymentForm.referenceId}
                 onChange={e => setPaymentForm(f => ({ ...f, referenceId: digitsOnly(e.target.value, 13) }))}
-                className={`w-full px-4 py-2.5 rounded-xl border-2 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 text-slate-900 dark:text-white ${validationBorderClass(paymentForm.referenceId, isValidGcashRef13(paymentForm.referenceId) && refNumberMatchesReceipt(payReceipt?.digitRuns, paymentForm.referenceId) !== false)}`}
+                className={`w-full px-4 py-2.5 rounded-xl border-2 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 text-slate-900 dark:text-white ${validationBorderClass(paymentForm.referenceId, refNumberMatchesReceipt(payReceipt?.digitRuns, paymentForm.referenceId) === true || (isValidGcashRef13(paymentForm.referenceId) && refNumberMatchesReceipt(payReceipt?.digitRuns, paymentForm.referenceId) !== false))}`}
               />
               <RefMatchHint value={paymentForm.referenceId} receiptDigitRuns={payReceipt?.digitRuns} hasReceipt={!!payReceipt} />
             </div>

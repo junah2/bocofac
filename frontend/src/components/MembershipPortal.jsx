@@ -1769,7 +1769,7 @@ export default function MembershipPortal({
                       placeholder="Enter 13-digit payment Ref Number"
                       value={refNum}
                       onChange={onDigits(setRefNum, 13)}
-                      className={`w-full px-4 text-sm py-2 rounded-lg border bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 ${validationBorderClass(refNum, isValidGcashRef13(refNum) && refNumberMatchesReceipt(receiptDigitRuns, refNum) !== false)}`}
+                      className={`w-full px-4 text-sm py-2 rounded-lg border bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 ${validationBorderClass(refNum, refNumberMatchesReceipt(receiptDigitRuns, refNum) === true || (isValidGcashRef13(refNum) && refNumberMatchesReceipt(receiptDigitRuns, refNum) !== false))}`}
                      autoComplete="off"/>
                     <RefMatchHint value={refNum} receiptDigitRuns={receiptDigitRuns} hasReceipt={!!feeReceiptFile} />
                   </div>

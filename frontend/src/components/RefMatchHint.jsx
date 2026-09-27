@@ -14,6 +14,9 @@ export default function RefMatchHint({ value, receiptDigitRuns, hasReceipt }) {
   if (value && match === false) {
     tone = 'text-red-600 dark:text-red-400 font-bold';
     text = "This doesn't match the reference number on your attached receipt. Please double-check and correct it.";
+  } else if (value && !complete && match === true) {
+    tone = 'text-emerald-600 dark:text-emerald-400 font-bold';
+    text = `So far so good - ${value.length}/13 digits match your receipt.`;
   } else if (value && !complete) {
     tone = 'text-slate-500 dark:text-slate-400 font-medium';
     text = `${value.length}/13 digits - keep typing the reference number from your receipt.`;
