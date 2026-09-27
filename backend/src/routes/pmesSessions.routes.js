@@ -282,13 +282,17 @@ router.patch('/:sessionId/registrations/:regId/send-certificate', requireRole('b
   // generic "BOCOFAC Board of Directors" line.
   const { rows: signatoryRows } = await pool.query('SELECT name FROM users WHERE id = $1', [req.user.sub]);
   const signatoryName = signatoryRows[0] && signatoryRows[0].name;
+  // The seminar's own speaker/facilitator signs the certificate; the board
+  // member sending it is only the fallback for a session with no speaker set.
+  const { rows: sessionRows } = await pool.query('SELECT speaker FROM pmes_sessions WHERE id = $1', [req.params.sessionId]);
+  const speakerName = sessionRows[0] && sessionRows[0].speaker;
 
   let emailSent = false;
   let emailError = null;
   let emailPreviewUrl = null;
   let emailIsTest = false;
   try {
-    const pdfBuffer = await generatePmesCertificatePdf({ applicantName: name, dateAttended, signatoryName });
+    const pdfBuffer = await generatePmesCertificatePdf({ applicantName: name, dateAttended, signatoryName, speakerName });
     const result = await sendPmesCertificateEmail(email, name, pdfBuffer);
     emailSent = true;
     emailPreviewUrl = result.previewUrl;

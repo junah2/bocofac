@@ -32,6 +32,19 @@ function drawCorners(doc, x, y, w, h, len) {
   doc.restore();
 }
 
+// Session facilitators are often stored as "Name (Organization)" - split the
+// organization out so the signature line shows just the name.
+function splitSpeaker(raw) {
+  const text = (raw || '').trim();
+  const match = text.match(/^(.*?)\s*\((.+)\)\s*$/);
+  return match ? { name: match[1].trim(), org: match[2].trim() } : { name: text, org: '' };
+}
+
+function surname(name) {
+  const words = (name || '').toLowerCase().replace(/[^a-z\s-]/g, ' ').trim().split(/\s+/);
+  return words[words.length - 1] || '';
+}
+
 function signatureBlock(doc, centerX, y, name, title) {
   const half = 115;
   doc.moveTo(centerX - half, y).lineTo(centerX + half, y).lineWidth(1).strokeColor(INK).stroke();
@@ -43,7 +56,7 @@ function signatureBlock(doc, centerX, y, name, title) {
 
 // Renders the PMES certificate straight into a Buffer (no disk write) so it
 // can go directly into an email attachment.
-function generatePmesCertificatePdf({ applicantName, dateAttended, signatoryName }) {
+function generatePmesCertificatePdf({ applicantName, dateAttended, signatoryName, speakerName }) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 0 });
     const chunks = [];
@@ -113,17 +126,25 @@ function generatePmesCertificatePdf({ applicantName, dateAttended, signatoryName
     doc.font('Times-Italic').fontSize(13.5).fillColor(MUTED)
       .text(`Given this ${ordinal(day)} day of ${month} ${year} at ${COOP_PLACE}.`, 0, 392, { align: 'center' });
 
-    // Signatures: the board member who confirmed the attendance, and the
-    // chairperson (set via CHAIRPERSON_NAME, so a change after a board
-    // election needs no code change). Falls back to one centered block if the
-    // chairperson isn't configured.
+    // Signatures: the seminar's resource speaker, and the chairperson (set
+    // via CHAIRPERSON_NAME, so a change after a board election needs no code
+    // change). With no speaker on the session, the board member who sent the
+    // certificate signs instead. If the speaker IS the chairperson, one
+    // centered block covers both roles rather than printing her twice.
     const sigY = height - 118;
-    const confirmer = signatoryName || 'BOCOFAC Board of Directors';
-    if (chairpersonName) {
-      signatureBlock(doc, width / 2 - 190, sigY, confirmer, 'Board of Directors');
+    const speaker = splitSpeaker(speakerName);
+    const left = speaker.name
+      ? { name: speaker.name, title: speaker.org ? `Resource Speaker, ${speaker.org}` : 'Resource Speaker' }
+      : { name: signatoryName || 'BOCOFAC Board of Directors', title: 'Board of Directors' };
+    const speakerIsChair = chairpersonName && speaker.name && surname(speaker.name) === surname(chairpersonName);
+
+    if (speakerIsChair) {
+      signatureBlock(doc, width / 2, sigY, chairpersonName, 'Chairperson, Board of Directors & Resource Speaker');
+    } else if (chairpersonName) {
+      signatureBlock(doc, width / 2 - 190, sigY, left.name, left.title);
       signatureBlock(doc, width / 2 + 190, sigY, chairpersonName, 'Chairperson, Board of Directors');
     } else {
-      signatureBlock(doc, width / 2, sigY, confirmer, 'Board of Directors');
+      signatureBlock(doc, width / 2, sigY, left.name, left.title);
     }
 
     doc.end();
