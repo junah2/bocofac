@@ -52,31 +52,18 @@ export function looksLikePaymentReceipt(ocrText) {
   return hasReferenceNumber && (keywordHits >= 1 || hasMobileNumber || hasMoneyAmount);
 }
 
-// Fewest edits needed to turn ref into some substring of run (Sellers'
-// variant of Levenshtein: free to start and end anywhere in run), so an OCR
-// that dropped, added or misread a digit still lines up with what was typed.
-function substringEditDistance(run, ref) {
-  let prev = new Array(run.length + 1).fill(0);
-  for (let i = 1; i <= ref.length; i++) {
-    const cur = [i];
-    for (let j = 1; j <= run.length; j++) {
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ref[i - 1] === run[j - 1] ? 0 : 1));
-    }
-    prev = cur;
-  }
-  return Math.min(...prev);
-}
-
 // Whether the typed reference number matches the receipt's own digits.
-//   true  - it appears on the receipt (allowing a few OCR misreads)
-//   false - the receipt clearly shows a different reference-like number
+//   true  - it appears on the receipt exactly (or as far as it's typed)
+//   false - the receipt shows a different reference-like number
 //   null  - can't judge yet: no receipt, fewer than 5 digits typed, or OCR
 //           couldn't read any reference-like number off it (e.g. a blurry
 //           photo of a phone screen) - so it shouldn't block anyone; the
 //           admin still compares it against the screenshot by hand.
-// OCR on small screenshots and camera photos regularly misreads digits ("9"
-// for "3", a dropped leading digit), so allowed edits grow with the typed
-// length - about 3 per 13 digits - which still rejects a different number.
+// Deliberately exact: fuzzy matching let wrong references through
+// (9044493480657 "matched" a receipt showing 9044493480965). Receipts are
+// upscaled before OCR (see receiptOcr.js), which reads them exactly. The one
+// allowance is a receipt run of exactly 12 digits - OCR visibly dropped a
+// digit - where the typed reference minus one digit must equal it.
 export function refNumberMatchesReceipt(digitRuns, ref) {
   if (!digitRuns || !ref) return null;
   if (digitRuns.some((run) => run.includes(ref))) return true;
@@ -85,6 +72,15 @@ export function refNumberMatchesReceipt(digitRuns, ref) {
   // on the receipt says nothing about whether the reference was misread.
   const candidates = digitRuns.filter((run) => run.length >= 12 && !/^(09\d{9}|639\d{9})$/.test(run));
   if (candidates.length === 0) return null;
-  const tolerance = Math.max(1, Math.round((ref.length * 3) / 13));
-  return candidates.some((run) => substringEditDistance(run, ref) <= tolerance);
+  return candidates.some((run) => {
+    if (run.length === 12) {
+      if (ref.length === 13) {
+        for (let i = 0; i < 13; i++) if (ref.slice(0, i) + ref.slice(i + 1) === run) return true;
+        return false;
+      }
+      // Still typing: allow the one dropped digit anywhere in what's typed.
+      for (let i = 0; i < ref.length; i++) if (run.includes(ref.slice(0, i) + ref.slice(i + 1))) return true;
+    }
+    return false;
+  });
 }
