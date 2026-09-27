@@ -121,6 +121,7 @@ export default function ExecDashboard({
   // The receipt auditor lists every order ever placed - collapsed to the
   // newest few by default so it doesn't swallow the whole Analytics page.
   const [showAllAuditOrders, setShowAllAuditOrders] = useState(false);
+  const [showAllShareCapital, setShowAllShareCapital] = useState(false);
 
   const palette = CHART_PALETTE[isDarkMode ? 'dark' : 'light'];
   const categoryColors = CATEGORY_COLORS[isDarkMode ? 'dark' : 'light'];
@@ -329,6 +330,9 @@ export default function ExecDashboard({
       .reduce((sum, l) => sum + l.amount, 0);
     return { ...m, contributed, remaining: Math.max(m.requiredShareCapital - contributed, 0) };
   });
+
+  const SHARE_CAPITAL_PREVIEW_COUNT = 8;
+  const maxShareCapital = Math.max(...shareCapitalByMember.map(m => m.contributed + m.remaining), 1);
 
   const handleApplyPromo = async (productId, discountPercent) => {
     setApplyingPromoId(productId);
@@ -753,46 +757,10 @@ export default function ExecDashboard({
         )}
       </div>
 
-      {/* 3b. Share Capital Analytics - populated live from the ledger, no manual admin step required */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 space-y-4">
-          <div className="border-b pb-3">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-emerald-800 dark:text-emerald-400" />
-              Share Capital Contributions
-            </h3>
-            <p className="text-[10px] text-slate-400 mt-1">Live from the GAAP ledger - every submitted payment records here automatically.</p>
-          </div>
-
-          {shareCapitalByMember.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-6">No registered shareholders yet.</p>
-          ) : (
-            <div className="space-y-3 pt-2">
-              {shareCapitalByMember.map(m => {
-                const maxVal = Math.max(...shareCapitalByMember.map(itm => itm.contributed + itm.remaining), 1);
-                const contributedPercent = (m.contributed / maxVal) * 100;
-                const remainingPercent = (m.remaining / maxVal) * 100;
-                return (
-                  <div key={m.id} className="space-y-1 text-xs">
-                    <div className="flex justify-between font-medium">
-                      <span className="text-slate-700 dark:text-slate-200 font-semibold">{m.name}</span>
-                      <div className="flex gap-4 font-mono text-[10px]">
-                        <span className="text-emerald-700 dark:text-emerald-400">Paid: ₱{m.contributed.toLocaleString()}</span>
-                        <span className="text-amber-700 dark:text-amber-400">Remaining: ₱{m.remaining.toLocaleString()}</span>
-                      </div>
-                    </div>
-                    <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-900 rounded-full flex overflow-hidden">
-                      <div className="bg-emerald-600 transition-all duration-500" style={{ width: `${contributedPercent}%` }} />
-                      <div className="bg-amber-500 transition-all duration-500" style={{ width: `${remainingPercent}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="lg:col-span-4 space-y-4">
+      {/* 3b. Share Capital Analytics - populated live from the ledger, no manual admin step required.
+          Totals sit on top; the per-member breakdown gets the full width below. */}
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
               <PhilippinePeso className="w-3.5 h-3.5 text-emerald-800" /> Total Contributed
@@ -809,6 +777,52 @@ export default function ExecDashboard({
               ₱{outstandingShareCapital.toLocaleString()}
             </p>
           </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 space-y-4">
+          <div className="border-b pb-3 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-emerald-800 dark:text-emerald-400" />
+                Share Capital Contributions
+              </h3>
+              <p className="text-[10px] text-slate-400 mt-1">Live from the GAAP ledger - every submitted payment records here automatically.</p>
+            </div>
+            {shareCapitalByMember.length > SHARE_CAPITAL_PREVIEW_COUNT && (
+              <button
+                onClick={() => setShowAllShareCapital(v => !v)}
+                className="shrink-0 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer transition-colors whitespace-nowrap"
+              >
+                {showAllShareCapital ? 'Hide' : `View all (${shareCapitalByMember.length})`}
+              </button>
+            )}
+          </div>
+
+          {shareCapitalByMember.length === 0 ? (
+            <p className="text-xs text-slate-400 text-center py-6">No registered shareholders yet.</p>
+          ) : (
+            <div className="space-y-3 pt-2">
+              {(showAllShareCapital ? shareCapitalByMember : shareCapitalByMember.slice(0, SHARE_CAPITAL_PREVIEW_COUNT)).map(m => {
+                const contributedPercent = (m.contributed / maxShareCapital) * 100;
+                const remainingPercent = (m.remaining / maxShareCapital) * 100;
+                return (
+                  <div key={m.id} className="space-y-1 text-xs">
+                    <div className="flex flex-wrap justify-between gap-x-4 gap-y-0.5 font-medium">
+                      <span className="text-slate-700 dark:text-slate-200 font-semibold">{m.name}</span>
+                      <div className="flex gap-4 font-mono text-[10px]">
+                        <span className="text-emerald-700 dark:text-emerald-400">Paid: ₱{m.contributed.toLocaleString()}</span>
+                        <span className="text-amber-700 dark:text-amber-400">Remaining: ₱{m.remaining.toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-900 rounded-full flex overflow-hidden">
+                      <div className="bg-emerald-600 transition-all duration-500" style={{ width: `${contributedPercent}%` }} />
+                      <div className="bg-amber-500 transition-all duration-500" style={{ width: `${remainingPercent}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
