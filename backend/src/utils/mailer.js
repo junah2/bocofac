@@ -10,7 +10,7 @@ let usingEtherealTestInbox = false;
 // SMTP_USER/SMTP_PASS remain a fallback for local dev where SMTP still works,
 // and the Ethereal test inbox is the last resort when neither is configured.
 function usingBrevoApi() {
-  return !!process.env.BREVO_API_KEY;
+  return !!(process.env.BREVO_API_KEY || '').trim();
 }
 
 function senderEmail() {
@@ -21,7 +21,7 @@ async function sendViaBrevoApi({ to, subject, html, attachments }) {
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
-      'api-key': process.env.BREVO_API_KEY,
+      'api-key': process.env.BREVO_API_KEY.trim(),
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
