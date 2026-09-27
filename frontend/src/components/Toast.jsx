@@ -26,17 +26,17 @@ export default function Toast({ toast, onClose }) {
 
   return (
     <div
-      className={`flex items-start gap-2 sm:gap-3 px-3 py-2.5 sm:p-4 rounded-xl border shadow-lg ${colors} animate-in fade-in slide-in-from-top duration-300 w-full backdrop-blur-md`}
+      className={`flex items-start gap-2 px-3 py-2 rounded-lg border shadow-md ${colors} animate-in fade-in slide-in-from-top duration-300 w-full backdrop-blur-md`}
       role="alert"
     >
-      <Icon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 mt-0.5" />
-      <div className="flex-1 text-xs sm:text-sm font-medium leading-snug pr-1 sm:pr-2">{toast.message}</div>
+      <Icon className="w-4 h-4 shrink-0 mt-px" />
+      <div className="flex-1 text-xs sm:text-[13px] font-medium leading-snug">{toast.message}</div>
       <button
         onClick={() => onClose(toast.id)}
         aria-label="Dismiss"
         className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors shrink-0"
       >
-        <X className="w-4 h-4" />
+        <X className="w-3.5 h-3.5" />
       </button>
     </div>
   );
