@@ -561,7 +561,7 @@ export default function AdminDashboardPage({
                 )}
               </button>
               {notifMenuOpen && (
-                <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-lg overflow-hidden z-50">
+                <div className="fixed top-[5.25rem] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm sm:absolute sm:top-auto sm:left-auto sm:translate-x-0 sm:right-0 sm:mt-2 sm:w-72 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-lg overflow-hidden z-50">
                   <p className="px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-400 border-b border-slate-100 dark:border-slate-800">
                     Notifications
                   </p>
