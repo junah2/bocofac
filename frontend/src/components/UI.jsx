@@ -107,7 +107,7 @@ export function FormInput({ label, placeholder, type = 'text', icon, value, onCh
               background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex',
             }}
           >
-            {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         )}
       </div>

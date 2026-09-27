@@ -422,7 +422,7 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
               aria-label={showPassword ? 'Hide password' : 'Show password'}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
             >
-              {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
           {errors.pass && <p className="mt-1.5 text-xs font-medium text-red-600 dark:text-red-400">{errors.pass}</p>}
