@@ -2076,7 +2076,7 @@ export default function MembershipPortal({
       )}
 
       {activePortalTab === 'status' && (
-        <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 sm:p-8 space-y-6 max-w-2xl mx-auto">
+        <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-4 sm:p-8 space-y-6 max-w-2xl mx-auto">
           <div className="space-y-1 text-center">
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">Filing Lookup & Audit Console</h3>
             <p className="text-xs text-slate-500">Provide your registered email address to check the live verification status of your membership credentials.</p>
@@ -2090,11 +2090,11 @@ export default function MembershipPortal({
               onChange={(e) => setLookupEmail(e.target.value)}
               autoComplete="off"
               placeholder="e.g., estela.custodio@outlook.com"
-              className="flex-1 px-4 py-2 text-sm rounded-xl border bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+              className="flex-1 min-w-0 px-3 sm:px-4 py-2 text-sm rounded-xl border bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
             />
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-emerald-800 text-white font-semibold text-xs cursor-pointer"
+              className="shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 rounded-xl bg-emerald-800 text-white font-semibold text-xs cursor-pointer"
             >
               Verify Profile
             </button>

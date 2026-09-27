@@ -26,14 +26,15 @@ export default function Toast({ toast, onClose }) {
 
   return (
     <div
-      className={`flex items-start gap-3 p-4 rounded-xl border shadow-lg ${colors} animate-in fade-in slide-in-from-bottom duration-300 max-w-sm w-full backdrop-blur-md`}
+      className={`flex items-start gap-2 sm:gap-3 px-3 py-2.5 sm:p-4 rounded-xl border shadow-lg ${colors} animate-in fade-in slide-in-from-top duration-300 w-full backdrop-blur-md`}
       role="alert"
     >
-      <Icon className="w-5 h-5 shrink-0 mt-0.5" />
-      <div className="flex-1 text-sm font-medium pr-2">{toast.message}</div>
+      <Icon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 mt-0.5" />
+      <div className="flex-1 text-xs sm:text-sm font-medium leading-snug pr-1 sm:pr-2">{toast.message}</div>
       <button
         onClick={() => onClose(toast.id)}
-        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+        aria-label="Dismiss"
+        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors shrink-0"
       >
         <X className="w-4 h-4" />
       </button>

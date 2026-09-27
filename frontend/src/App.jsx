@@ -1104,8 +1104,9 @@ export default function App() {
         />
       )}
 
-      {/* Toast notifications */}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none w-80">
+      {/* Toast notifications - top-center for every role: clear of the
+          chat bubble and footer bar at the bottom, and above open modals. */}
+      <div className="fixed top-3 sm:top-4 left-1/2 -translate-x-1/2 z-[80] space-y-2 pointer-events-none w-[calc(100%-1.5rem)] max-w-sm">
         {toasts.map(toast => (
           <div key={toast.id} className="pointer-events-auto">
             <Toast toast={toast} onClose={removeToast} />
