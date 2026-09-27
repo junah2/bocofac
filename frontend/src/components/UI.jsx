@@ -1,5 +1,6 @@
 // src/components/UI.jsx
-import React from 'react';
+import React, { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 
 /* ─────────────────────────────────────────
    GreenButton — primary / outline variants
@@ -51,6 +52,8 @@ export function FormInput({ label, placeholder, type = 'text', icon, value, onCh
   // the expected format, red while it doesn't) independent of `error`, which
   // stays reserved for the existing blur/submit-time message underneath.
   const restColor = (error || valid === false) ? '#e24b4a' : valid === true ? '#16a34a' : 'var(--border)';
+  const isPassword = type === 'password';
+  const [showPassword, setShowPassword] = useState(false);
   return (
     <div style={{ marginBottom: 18 }}>
       {label && (
@@ -69,7 +72,8 @@ export function FormInput({ label, placeholder, type = 'text', icon, value, onCh
           </span>
         )}
         <input
-          type={type}
+          type={isPassword && showPassword ? 'text' : type}
+          className={isPassword ? 'has-password-toggle' : undefined}
           name={name}
           autoComplete={autoComplete}
           inputMode={inputMode}
@@ -80,7 +84,7 @@ export function FormInput({ label, placeholder, type = 'text', icon, value, onCh
           onBlur={e => { e.target.style.borderColor = restColor; onBlur && onBlur(e); }}
           style={{
             width: '100%',
-            padding: icon ? '11px 14px 11px 40px' : '11px 14px',
+            padding: `11px ${isPassword ? 42 : 14}px 11px ${icon ? 40 : 14}px`,
             border: `1.5px solid ${restColor}`,
             borderRadius: 10,
             fontSize: 14,
@@ -91,6 +95,21 @@ export function FormInput({ label, placeholder, type = 'text', icon, value, onCh
           }}
           onFocus={e => (e.target.style.borderColor = (error || valid === false) ? '#e24b4a' : valid === true ? '#16a34a' : 'var(--green)')}
         />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPassword(v => !v)}
+            tabIndex={-1}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            style={{
+              position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex',
+            }}
+          >
+            {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+          </button>
+        )}
       </div>
       {error && (
         <p style={{ color: '#e24b4a', fontSize: 11, fontWeight: 500, marginTop: 5 }}>{error}</p>
