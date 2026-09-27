@@ -134,15 +134,15 @@ function generatePmesCertificatePdf({ applicantName, dateAttended, signatoryName
     const sigY = height - 118;
     const speaker = splitSpeaker(speakerName);
     const left = speaker.name
-      ? { name: speaker.name, title: speaker.org ? `Resource Speaker, ${speaker.org}` : 'Resource Speaker' }
+      ? { name: speaker.name, title: 'Resource Speaker' }
       : { name: signatoryName || 'BOCOFAC Board of Directors', title: 'Board of Directors' };
     const speakerIsChair = chairpersonName && speaker.name && surname(speaker.name) === surname(chairpersonName);
 
     if (speakerIsChair) {
-      signatureBlock(doc, width / 2, sigY, chairpersonName, 'Chairperson, Board of Directors & Resource Speaker');
+      signatureBlock(doc, width / 2, sigY, chairpersonName, 'Chairperson & Resource Speaker');
     } else if (chairpersonName) {
       signatureBlock(doc, width / 2 - 190, sigY, left.name, left.title);
-      signatureBlock(doc, width / 2 + 190, sigY, chairpersonName, 'Chairperson, Board of Directors');
+      signatureBlock(doc, width / 2 + 190, sigY, chairpersonName, 'Chairperson');
     } else {
       signatureBlock(doc, width / 2, sigY, left.name, left.title);
     }
