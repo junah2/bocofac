@@ -25,8 +25,6 @@ function toClient(row) {
   };
 }
 
-// Admin-only per the cooperative's decision to keep this view narrower than
-// the other admin/board-shared management endpoints (members, ledger verify).
 router.get('/', requireRole('admin'), asyncHandler(async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt(req.query.pageSize, 10) || 50));

@@ -1,9 +1,6 @@
 import React from 'react';
 import { isValidGcashRef13, refNumberMatchesReceipt } from '../utils/validators';
 
-// Live message under a GCash reference field, updated on every keystroke by
-// comparing the typed number with the digits OCR read off the attached
-// receipt. Shared by every GCash payment form so they all say the same thing.
 export default function RefMatchHint({ value, receiptDigitRuns, hasReceipt }) {
   const match = refNumberMatchesReceipt(receiptDigitRuns, value);
   const complete = isValidGcashRef13(value);

@@ -1,6 +1,3 @@
-// src/components/ProfileField.jsx
-// Small read-only layout primitives shared by the applicant/member profile
-// modals (ApplicantDetailModal, MemberDetailModal) so both look consistent.
 import React from 'react';
 
 export function Field({ label, value }) {

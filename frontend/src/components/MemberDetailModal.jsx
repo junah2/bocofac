@@ -1,12 +1,3 @@
-// src/components/MemberDetailModal.jsx
-// Read-only shareholder profile for the Admin Membership tab - the fuller
-// editable version (plus ledger/withdrawal history) lives in
-// ShareCapitalLedger.jsx's own "viewedMember" drawer; this covers the same
-// Member's Information Sheet fields for a quick look without leaving the
-// Membership tab. Delinquent members additionally get two escalating
-// actions here: nudge them first (Send Reminder), and only fall back to
-// Remove Membership if that goes unheeded - both need a final confirmation
-// since the account only surfaces this modal for someone already flagged.
 import React, { useState } from 'react';
 import { X, AlertTriangle, Bell, UserX } from 'lucide-react';
 import { Field, Section } from './ProfileField';

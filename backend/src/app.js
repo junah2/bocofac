@@ -26,39 +26,21 @@ const auditLogRoutes = require('./routes/auditLog.routes');
 
 const app = express();
 
-// The hosting platform (like most PaaS hosts) sits in front of this app as a reverse
-// proxy, adding an X-Forwarded-For header with the real client IP. Trusting
-// exactly one hop tells Express/express-rate-limit to key rate limits off
-// that real IP instead of either erroring on the unexpected header (see
-// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR) or, if trusted too broadly, letting a
-// client spoof its own X-Forwarded-For to dodge rate limiting.
 app.set('trust proxy', 1);
 
-// Only these origins may make credentialed (cookie-carrying) requests.
-// FRONTEND_ORIGIN can hold a comma-separated list for local dev (e.g. a LAN
-// IP or a forwarded/tunneled dev URL alongside plain localhost) - it must
-// never fall back to reflecting an arbitrary origin, since that combined
-// with credentials:true would let any website ride a visitor's auth cookie.
 const allowedOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:3000')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
 
 app.use(morgan('dev'));
-// crossOriginResourcePolicy relaxed to 'cross-origin' so the frontend (a
-// different origin/port in dev, per FRONTEND_ORIGIN) can still load images
-// from the /uploads/products static mount below. CSP left off: this is an
-// API-only server that never serves the frontend's HTML/JS itself, so
-// helmet's default (page-oriented) CSP has nothing correct to apply here.
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: false,
 }));
+// [SECURITY] Ang frontend lang natin (FRONTEND_ORIGIN) ang pwedeng tumawag sa API
 app.use(cors({
   origin: (origin, callback) => {
-    // No Origin header means a same-origin/non-browser request (curl,
-    // server-to-server, mobile app) - nothing to check against a browser
-    // origin allowlist for those.
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
     const err = new Error('Origin not allowed by CORS.');
     err.status = 403;
@@ -68,15 +50,13 @@ app.use(cors({
 }));
 app.use(cookieParser());
 app.use(express.json());
+// [AUTH] Binabasa ang login cookie sa bawat request para malaman kung sino ang user
 app.use(attachUser);
 
-// Product photos and profile avatars are the only uploads meant to be
-// publicly viewable (the storefront/navbar show them to anyone) - applicant
-// docs and order receipts stay private behind their own authenticated
-// sendFile routes.
 app.use('/uploads/products', express.static(path.join(UPLOADS_ROOT, 'products')));
 app.use('/uploads/avatars', express.static(path.join(UPLOADS_ROOT, 'avatars')));
 
+// [API ROUTES] Lahat ng endpoints ng system (auth, products, members, ledger, orders, atbp.)
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/members', membersRoutes);

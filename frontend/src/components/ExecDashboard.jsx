@@ -32,21 +32,6 @@ import {
 } from 'lucide-react';
 import MobileScrollHint from './MobileScrollHint';
 
-// Chart colors, pulled straight from this app's own brand palette
-// (tailwind.config.js `theme.colors.emerald` + `brand-*`/`coconut-*`) rather
-// than a generic dashboard palette, so the charts read as part of BOCOFAC
-// instead of a bolted-on analytics widget. Kept as literal hex (not Tailwind
-// classes) because recharts needs real values for fill/stroke props; the
-// light/dark step for each role mirrors how the rest of the app already
-// swaps shades in dark mode (`emerald-600`→`emerald-400`, `amber-500`→
-// `amber-400` are the dominant light/dark pairing across the codebase).
-//
-// This palette is intentionally muted/earthy (the cooperative's sage-and-
-// terracotta brand board), which reads as desaturated to the dataviz
-// skill's categorical validator - a bar chart with only 4 fixed categories
-// that are always directly labeled on the axis doesn't lean on hue alone
-// for identity, so brand fidelity wins over the generic default palette
-// here; see CATEGORY_COLORS below for the identity-to-color mapping.
 const CHART_PALETTE = {
   light: {
     grid: '#e2e8f0',
@@ -54,11 +39,11 @@ const CHART_PALETTE = {
     tooltipBg: '#ffffff',
     tooltipBorder: '#e2e8f0',
     tooltipText: '#0f172a',
-    revenue: '#6b7c52', // brand-green (emerald-600)
+    revenue: '#6b7c52',
     stock: '#6b7c52',
-    sold: '#f59e0b', // amber-500
-    views: '#6366f1', // indigo-500 (matches the AOV tile's accent below)
-    highlight: '#d97706', // brand-amber
+    sold: '#f59e0b',
+    views: '#6366f1',
+    highlight: '#d97706',
   },
   dark: {
     grid: '#334155',
@@ -66,32 +51,27 @@ const CHART_PALETTE = {
     tooltipBg: '#0f172a',
     tooltipBorder: '#334155',
     tooltipText: '#f1f5f9',
-    revenue: '#a8b587', // palm-leaf (emerald-400)
+    revenue: '#a8b587',
     stock: '#a8b587',
-    sold: '#fbbf24', // amber-400
-    views: '#818cf8', // indigo-400
+    sold: '#fbbf24',
+    views: '#818cf8',
     highlight: '#fbbf24',
   },
 };
 
-// Sales-by-category color, assigned by category identity (never by sort
-// rank - a re-sorted bar must keep its color, per the "color follows the
-// entity" rule) and chosen to actually mean something for this catalog:
-// charcoal is dark, fertilizer is the brand green, coir is fibre-brown,
-// handicraft is the warm brand amber.
 const CATEGORY_COLORS = {
   light: {
-    Charcoal: '#2b2b2b', // earthy-black
-    Fertilizer: '#6b7c52', // brand-green
-    'Fibre & Coir': '#6f4e37', // coconut-brown
-    Handicraft: '#d97706', // brand-amber
+    Charcoal: '#2b2b2b',
+    Fertilizer: '#6b7c52',
+    'Fibre & Coir': '#6f4e37',
+    Handicraft: '#d97706',
     Other: '#94a3b8',
   },
   dark: {
-    Charcoal: '#a8a29e', // stone-400, legible on a dark surface
-    Fertilizer: '#a8b587', // palm-leaf
-    'Fibre & Coir': '#b08968', // lightened coconut-brown
-    Handicraft: '#fbbf24', // amber-400
+    Charcoal: '#a8a29e',
+    Fertilizer: '#a8b587',
+    'Fibre & Coir': '#b08968',
+    Handicraft: '#fbbf24',
     Other: '#64748b',
   },
 };
@@ -110,72 +90,56 @@ export default function ExecDashboard({
   const [editingProductId, setEditingProductId] = useState(null);
   const [restockValue, setRestockValue] = useState(0);
   const [selectedChartType, setSelectedChartType] = useState('sales');
-  // Cross-filter state driving the interactive charts below: clicking a bar
-  // or a line point sets these instead of navigating anywhere, so the
-  // Product Performance chart, the leaderboard, and the order audit list can
-  // all react to the same click.
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [applyingPromoId, setApplyingPromoId] = useState(null);
-  // The receipt auditor lists every order ever placed - collapsed to the
-  // newest few by default so it doesn't swallow the whole Analytics page.
   const [showAllAuditOrders, setShowAllAuditOrders] = useState(false);
   const [showAllShareCapital, setShowAllShareCapital] = useState(false);
 
   const palette = CHART_PALETTE[isDarkMode ? 'dark' : 'light'];
   const categoryColors = CATEGORY_COLORS[isDarkMode ? 'dark' : 'light'];
 
-  // 1. Math Analytics Calculations
   const FULFILLMENT_STATUSES = ['Completed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered'];
   const verifiedOrders = orders.filter(o => FULFILLMENT_STATUSES.includes(o.status));
+  // [ANALYTICS] Total Revenue: verified orders lang (hindi kasama pending/rejected/cancelled)
   const totalRevenue = orders.reduce((sum, o) => {
-    // Only count verified (Processing/Shipped/Out for Delivery/Delivered) for secure GAAP calculations
     return o.status !== 'Pending Verification' && o.status !== 'Rejected' && o.status !== 'Cancelled' ? sum + o.totalAmount : sum;
   }, 0);
 
-  // Real month-over-month growth: current calendar month's realized revenue
-  // vs. the previous month's, both bucketed from actual order data (same
-  // utility the admin dashboard's monthly sales chart uses).
   const [previousMonthRevenue, currentMonthRevenue] = bucketOrderRevenue(
     verifiedOrders, lastNMonths(2), 'Monthly'
   ).map(b => b.amount);
+  // [ANALYTICS] Sales Growth = (Current - Previous) / Previous x 100
   const salesGrowthRate = previousMonthRevenue > 0
     ? ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) * 100
     : 0;
 
   const totalTransactions = orders.length;
-  const averageOrderValue = totalTransactions > 0 
-    ? totalRevenue / totalTransactions 
+  // [ANALYTICS] Average Order Value = Total Revenue / Number of Orders
+  const averageOrderValue = totalTransactions > 0
+    ? totalRevenue / totalTransactions
     : 0;
 
-  // View-to-Order Conversion Rate: Number of Orders / Number of Product Views * 100
   const overallProductViews = products.reduce((sum, p) => sum + p.views, 0);
   const overallProductOrders = products.reduce((sum, p) => sum + p.ordersCount, 0);
-  const conversionRate = overallProductViews > 0 
-    ? (overallProductOrders / overallProductViews) * 100 
+  // [ANALYTICS] Conversion Rate = Orders / Product Views x 100
+  const conversionRate = overallProductViews > 0
+    ? (overallProductOrders / overallProductViews) * 100
     : 0;
 
-  // Inventory Turnover Rate: Total Units Sold / Average Inventory
   const totalUnitsSold = products.reduce((sum, p) => sum + p.ordersCount, 0);
   const totalCurrentStockCount = products.reduce((sum, p) => sum + p.stock, 0);
   const averageInventory = (totalUnitsSold + totalCurrentStockCount) / 2 || 1;
+  // [ANALYTICS] Inventory Turnover = Units Sold / Average Inventory
   const inventoryTurnover = totalUnitsSold / averageInventory;
 
-  // Top selling products leaderboard
+  // [RANKING] Top 5 best-selling products (sorted ayon sa dami ng nabenta)
   const topSellingProducts = [...products]
     .sort((a, b) => b.ordersCount - a.ordersCount)
     .slice(0, 5);
 
-  // Promo & Discount Suggestions - flags products worth putting on sale,
-  // scored purely from signals already on hand (stock, views, ordersCount,
-  // recent order history). Three independent triggers, each contributing to
-  // a 0-100 score: overstocked (low sell-through relative to stock on
-  // hand), high-interest-low-conversion (browsed a lot, rarely bought), and
-  // slowing momentum (last-30-days units sold well below the 30 days
-  // before). This is a recommendation surface for the admin only - nothing
-  // here writes a discount anywhere; ProductPromotions/pricing stays a
-  // manual admin decision.
+  // [METRICS] Promo score (0-100): overstock + low conversion + bumabagal na benta
   const promoSuggestions = useMemo(() => {
     const now = new Date();
     const cutoffRecent = new Date(now);
@@ -201,14 +165,12 @@ export default function ExecDashboard({
         const reasons = [];
         let score = 0;
 
-        // Overstocked: meaningful stock sitting on shelves relative to lifetime sales.
         const sellThrough = p.ordersCount / (p.ordersCount + p.stock || 1);
         if (p.stock > 5 && sellThrough < 0.25) {
           score += (1 - sellThrough) * 40;
           reasons.push('Overstocked');
         }
 
-        // High interest, low conversion: gets browsed but rarely bought.
         if (p.views >= 10) {
           const productConversion = p.ordersCount / p.views;
           const overallConversion = conversionRate / 100;
@@ -218,7 +180,6 @@ export default function ExecDashboard({
           }
         }
 
-        // Slowing momentum: fewer units sold in the last 30 days than the 30 days before.
         const recentUnits = recentUnitsById.get(p.id) || 0;
         const priorUnits = priorUnitsById.get(p.id) || 0;
         if (priorUnits >= 2) {
@@ -229,30 +190,23 @@ export default function ExecDashboard({
           }
         }
 
+        // [METRICS] Suggested discount: 5% hanggang 25%, naka-round sa 5%
         const suggestedDiscount = score > 0 ? Math.min(25, Math.max(5, Math.round(score / 5) * 5)) : 0;
         return { ...p, reasons, score, suggestedDiscount };
       })
-      // Products already running a promo don't need another suggestion -
-      // they show up in "Active Promotions" below instead.
       .filter(p => p.score >= 25 && !(p.discountPercent > 0))
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
   }, [products, verifiedOrders, conversionRate]);
 
-  // Products the admin has already put on promo, for a quick at-a-glance
-  // list next to the suggestions (with a one-click way to turn it back off).
   const activePromos = products.filter(p => p.discountPercent > 0);
 
-  // Monthly revenue trend (line chart) - clicking a point below filters the
-  // order audit list at the bottom of this page to that month.
   const monthBuckets = useMemo(() => lastNMonths(6), []);
   const monthlyRevenueData = useMemo(() => {
     const revenues = bucketOrderRevenue(verifiedOrders, monthBuckets, 'Monthly');
     return monthBuckets.map((b, i) => ({ ...b, amount: revenues[i].amount }));
   }, [verifiedOrders, monthBuckets]);
 
-  // Customer purchase patterns: realized revenue grouped by product category.
-  // Clicking a category bar cross-filters the Product Performance chart below.
   const categoryRevenue = useMemo(() => {
     const categoryById = new Map(products.map(p => [p.id, p.category]));
     const totals = {};
@@ -267,9 +221,6 @@ export default function ExecDashboard({
       .sort((a, b) => b.revenue - a.revenue);
   }, [products, verifiedOrders]);
 
-  // Product performance chart data - respects the category cross-filter,
-  // ranked by whichever metric is currently toggled, capped to keep the
-  // chart legible (the full catalog stays browsable in the table below).
   const PRODUCT_CHART_LIMIT = 8;
   const productMetricKey = selectedChartType === 'sales' ? 'ordersCount' : 'views';
   const productChartSource = selectedCategory
@@ -280,8 +231,6 @@ export default function ExecDashboard({
     .slice(0, PRODUCT_CHART_LIMIT);
   const hiddenProductCount = Math.max(productChartSource.length - PRODUCT_CHART_LIMIT, 0);
 
-  // Orders shown in the audit list at the bottom, filtered to the month
-  // selected on the revenue trend chart (if any).
   const auditOrders = selectedMonth
     ? orders.filter(o => {
         const d = new Date(o.orderedAt);
@@ -317,12 +266,11 @@ export default function ExecDashboard({
     );
   };
 
-  // Share Capital analytics - every ledger entry lands here as Verified the
-  // moment a member submits it, so these totals are always live/up-to-date.
   const totalShareCapitalContributed = ledger
     .filter(l => l.status === 'Verified')
     .reduce((sum, l) => sum + l.amount, 0);
   const totalRequiredShareCapital = members.reduce((sum, m) => sum + m.requiredShareCapital, 0);
+  // [SHARE CAPITAL] Outstanding = Total Required - Total Contributed (lahat ng members)
   const outstandingShareCapital = Math.max(totalRequiredShareCapital - totalShareCapitalContributed, 0);
   const shareCapitalByMember = members.map(m => {
     const contributed = ledger
@@ -355,8 +303,7 @@ export default function ExecDashboard({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      
-      {/* Upper banner info */}
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-2">
         <div className="space-y-1 text-left">
           <p className="text-xs font-mono uppercase tracking-widest text-[#d97706] font-bold">E-COMMERCE ANALYTICS</p>
@@ -369,10 +316,8 @@ export default function ExecDashboard({
         </div>
       </div>
 
-      {/* 2. Bento Grid of Mathematical Widgets */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 select-none">
-        
-        {/* Sales Performance Widget - White Crisp */}
+
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col justify-between relative overflow-hidden group hover:border-[#313826]/40 transition-all duration-300">
           <div className="space-y-2 text-left">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -393,7 +338,6 @@ export default function ExecDashboard({
           </div>
         </div>
 
-        {/* View to Order Conversion Rate - Warm Cream Preset */}
         <div className="bg-[#FDFCF7] dark:bg-emerald-950/25 border border-emerald-100 dark:border-slate-800 rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden group hover:border-[#D97706]/40 transition-all duration-300">
           <div className="space-y-2 text-left">
             <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest flex items-center gap-1.5">
@@ -414,7 +358,6 @@ export default function ExecDashboard({
           </div>
         </div>
 
-        {/* Inventory Turnover Rate - Forest Solid Palette */}
         <div className="bg-[#313826] text-white rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden group hover:bg-[#1e2318] transition-all duration-300">
           <div className="space-y-2 text-left">
             <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-300 flex items-center gap-1.5">
@@ -430,7 +373,6 @@ export default function ExecDashboard({
           </div>
         </div>
 
-        {/* Average Order Value (AOV) - White Crisp */}
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col justify-between relative overflow-hidden group hover:border-[#313826]/40 transition-all duration-300">
           <div className="space-y-2 text-left">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -450,10 +392,6 @@ export default function ExecDashboard({
 
       </div>
 
-      {/* 3. Interactive Analytics Charts */}
-
-      {/* Monthly Revenue Trend - line graph. Click a point to filter the
-          order audit list further down this page to that month. */}
       <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 space-y-4">
         <div className="flex flex-wrap justify-between items-center gap-3 border-b pb-3">
           <h3 className="font-bold text-slate-900 dark:text-white">
@@ -512,9 +450,6 @@ export default function ExecDashboard({
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-        {/* Product Performance - bar graph, clickable bars select a product
-            (highlighted in the leaderboard) and respect the category filter
-            set by clicking a bar in Sales by Category. */}
         <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 space-y-4">
           <div className="flex flex-wrap justify-between items-center gap-3 border-b pb-3">
             <h3 className="font-bold text-slate-900 dark:text-white">
@@ -608,8 +543,6 @@ export default function ExecDashboard({
 
         <div className="lg:col-span-5 space-y-6">
 
-          {/* Sales by Category - customer purchase patterns. Click a bar to
-              cross-filter the Product Performance chart above. */}
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 space-y-3 text-left">
             <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Tag className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
@@ -641,7 +574,6 @@ export default function ExecDashboard({
             )}
           </div>
 
-          {/* Top Product Leaderboard */}
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 text-left space-y-4">
             <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
@@ -679,9 +611,6 @@ export default function ExecDashboard({
 
       </div>
 
-      {/* 3a. Promo & Discount Suggestions - data-driven candidates for a sale,
-          computed from stock, views and recent sales momentum. Admin decides
-          whether to act; nothing here auto-applies a discount. */}
       <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 text-left space-y-4">
         <div className="border-b pb-3">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
@@ -757,8 +686,6 @@ export default function ExecDashboard({
         )}
       </div>
 
-      {/* 3b. Share Capital Analytics - populated live from the ledger, no manual admin step required.
-          One card: the totals sit right under its header, the per-member breakdown below. */}
       <div className="space-y-6">
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 space-y-4">
           <div className="border-b pb-3 flex items-start justify-between gap-4">
@@ -826,14 +753,13 @@ export default function ExecDashboard({
         </div>
       </div>
 
-      {/* 4. Live Inventory Management Cabinet (Edit Stock directly!) */}
       <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 space-y-4 text-left">
         <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
           <Package className="w-4.5 h-4.5 text-emerald-800 dark:text-emerald-400" />
           Cooperative Warehouse Inventory Cabinet (Dynamic Deductions)
         </h3>
         <p className="text-xs text-slate-500">
-          The physical catalog operates on strict state deductions. 
+          The physical catalog operates on strict state deductions.
           Formula: <span className="p-1 px-1.5 rounded font-mono bg-slate-100 dark:bg-slate-950 text-emerald-700 dark:text-emerald-400 font-semibold">Remaining Stock = Current Stock - Quantity Sold</span>
         </p>
 
@@ -867,13 +793,13 @@ export default function ExecDashboard({
                     <td className="p-3 text-center">
                       {isEditing ? (
                         <form onSubmit={(e) => handleRestockSubmit(e, product.id)} className="flex items-center justify-center gap-2">
-                          <input 
-                            type="number" 
+                          <input
+                            type="number"
                             value={restockValue}
                             onChange={(e) => setRestockValue(Number(e.target.value))}
-                            className="w-16 px-2 py-1 rounded border text-center dark:bg-slate-950" 
+                            className="w-16 px-2 py-1 rounded border text-center dark:bg-slate-950"
                           />
-                          <button 
+                          <button
                             type="submit"
                             className="bg-emerald-800 text-white p-1 rounded-lg hover:bg-emerald-700 cursor-pointer"
                           >
@@ -881,7 +807,7 @@ export default function ExecDashboard({
                           </button>
                         </form>
                       ) : (
-                        <button 
+                        <button
                           onClick={() => {
                             setEditingProductId(product.id);
                             setRestockValue(product.stock);
@@ -900,7 +826,6 @@ export default function ExecDashboard({
         </div>
       </div>
 
-      {/* 5. Manual Order Verification & Receipt Screen Audit Box */}
       <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 text-left space-y-6">
         <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -934,8 +859,7 @@ export default function ExecDashboard({
           <div className="space-y-4">
             {visibleAuditOrders.map(order => (
               <div key={order.id} className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-[#fdfbf6]/20 dark:bg-slate-950/20 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                
-                {/* Info summary */}
+
                 <div className="md:col-span-4 space-y-1.5 text-xs text-left">
                   <div className="flex gap-2 items-center">
                     <span className="font-bold text-slate-900 dark:text-white">{order.id}</span>
@@ -953,7 +877,6 @@ export default function ExecDashboard({
                   <p className="text-[10px] text-slate-400">Filed time: {new Date(order.orderedAt).toLocaleString()}</p>
                 </div>
 
-                {/* Shopping items list */}
                 <div className="md:col-span-4 space-y-1 text-xs">
                   <p className="font-bold text-slate-600 uppercase text-[10px]">Purchase detail:</p>
                   {order.items.map((itm, i) => (
@@ -968,16 +891,15 @@ export default function ExecDashboard({
                   </div>
                 </div>
 
-                {/* Receipt Screenshot verification panel */}
                 <div className="md:col-span-4 space-y-2 text-xs text-right flex flex-col items-end">
                   <p className="font-bold text-slate-600 uppercase text-[10px] text-right">Audit Credentials:</p>
                   <div className="flex items-center gap-2 p-1.5 rounded-lg bg-amber-500/5 border border-amber-500/20 text-slate-700 dark:text-slate-300 font-mono text-[10px]">
                     <Upload className="w-3.5 h-3.5 text-amber-600" /> screenshot_receipt_gcash.jpg
                   </div>
                   <p className="text-slate-400 text-[10px] font-mono">Ref RefID: {order.referenceNumber}</p>
-                  
+
                   {order.status === 'Pending Verification' && (
-                    <button 
+                    <button
                       onClick={() => {
                         onVerifyOrder(order.id);
                         onToast(`Order ${order.id} verification completed. Receipt verified by admin!`, 'success');

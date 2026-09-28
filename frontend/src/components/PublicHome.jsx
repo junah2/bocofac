@@ -44,8 +44,6 @@ export default function PublicHome({ products, memberCount, onShopNow, onApplyMe
   return (
     <div className="animate-in fade-in duration-500">
 
-      {/* Hero - full-bleed farm photo with the headline layered on top,
-          mirroring a photo-first hero instead of a flat gradient panel */}
       <section className="relative overflow-hidden">
         <img src={coconutFarmerHero} alt="" className="absolute inset-0 w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-[#1e2318]/80 via-[#1e2318]/50 to-[#1e2318]/85" />
@@ -82,7 +80,6 @@ export default function PublicHome({ products, memberCount, onShopNow, onApplyMe
         </div>
       </section>
 
-      {/* Stats strip */}
       <section className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
         <div className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
           <div>
@@ -104,8 +101,6 @@ export default function PublicHome({ products, memberCount, onShopNow, onApplyMe
         </div>
       </section>
 
-      {/* Why join - plain icon row (no card chrome), closer to a
-          brochure-style feature strip than a grid of shadowed cards */}
       <section className="relative max-w-6xl mx-auto px-6 py-16 overflow-hidden">
         <TreePalm className="hidden sm:block absolute -top-4 right-2 w-28 h-28 text-emerald-100 dark:text-emerald-950/60 -rotate-12 pointer-events-none" />
         <div className="relative text-center max-w-2xl mx-auto space-y-3 mb-12">
@@ -125,9 +120,6 @@ export default function PublicHome({ products, memberCount, onShopNow, onApplyMe
         </div>
       </section>
 
-      {/* About-style split - dark panel paired with real farm photos,
-          instead of the plain full-width CTA banner this copy used to
-          sit in on its own */}
       <section className="grid grid-cols-1 lg:grid-cols-2">
         <div className="bg-[#1e2318] text-white px-8 py-16 sm:px-14 flex flex-col justify-center gap-4 relative overflow-hidden">
           <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/5 rounded-full blur-2xl" />
@@ -152,7 +144,6 @@ export default function PublicHome({ products, memberCount, onShopNow, onApplyMe
         </div>
       </section>
 
-      {/* Featured products */}
       {featuredProducts.length > 0 && (
         <section className="bg-[#faf8f4] dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800">
           <div className="max-w-6xl mx-auto px-6 py-16 space-y-10">
@@ -199,8 +190,6 @@ export default function PublicHome({ products, memberCount, onShopNow, onApplyMe
         </section>
       )}
 
-      {/* Gallery - real cooperative + marketplace photos in an asymmetric
-          grid (one large photo, two smaller ones stacked beside it) */}
       <section className="bg-[#faf8f4] dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800">
         <div className="max-w-6xl mx-auto px-6 py-16 space-y-10">
           <h2 className="font-serif text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white text-center">Our Gallery</h2>

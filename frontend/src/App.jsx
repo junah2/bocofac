@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import './index.css';
 
@@ -38,32 +37,16 @@ export default function App() {
 
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Whether the signed-in customer already has a board-approved membership -
-  // once true, the public "Membership" (apply) nav link no longer applies to
-  // them, since contribution tracking lives on their Dashboard instead.
   const [isApprovedMember, setIsApprovedMember] = useState(false);
 
-  // Cart must survive navigating away from the Products page - Storefront
-  // used to own this as local state, which React wipes on unmount the
-  // moment `page` changes away from 'products'. Lifting it here (and
-  // persisting like the other cooperative data below) fixes that.
   const [cart, setCart] = useState(() => {
     const saved = localStorage.getItem('bocofac_cart');
     return saved ? JSON.parse(saved) : [];
   });
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  // Basket panel on the Products page starts closed - it only opens when the
-  // navbar cart icon is clicked, so browsing the catalog isn't cluttered with
-  // an always-visible cart sidebar.
   const [cartPanelOpen, setCartPanelOpen] = useState(false);
-  // True once the session-restore check below has actually run - lets the
-  // guest-cart-clearing effect further down tell "definitely signed out"
-  // apart from "still checking on page load", so it doesn't wipe a
-  // returning customer's cart during that brief window before /auth/me
-  // resolves.
   const [authChecked, setAuthChecked] = useState(false);
 
-  // Core cooperative data, persisted to localStorage
   const [products, setProducts] = useState(() => {
     const saved = localStorage.getItem('bocofac_products');
     return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
@@ -88,34 +71,14 @@ export default function App() {
     const saved = localStorage.getItem('bocofac_orders');
     return saved ? JSON.parse(saved) : INITIAL_ORDERS;
   });
-  // Earnings withdrawal requests - admin/board-only view, fetched fresh from
-  // the backend (like members/ledger below) rather than seeded/persisted
-  // locally, since this feature has no legacy localStorage demo data.
   const [withdrawals, setWithdrawals] = useState([]);
-  // Admin-only customer message threads, backing AdminMessageWidget's
-  // conversation list - fetched fresh (not localStorage-seeded) like
-  // withdrawals above, and refreshed off the shared admin SSE stream below.
   const [messageConversations, setMessageConversations] = useState([]);
 
-  // Customer-facing notification bell feed (payment/order/withdrawal/
-  // membership updates) - polled while a customer is signed in, same spirit
-  // as the admin/board SSE fetchers above but scoped to this one account.
   const [notifications, setNotifications] = useState([]);
-  // Which Dashboard sidebar tab to land on next time the Dashboard mounts/
-  // updates - set when a notification is clicked (see resolveNotificationTarget
-  // in Navbar.jsx) so it opens straight to the relevant section, the same way
-  // an admin notification jumps to its tab.
   const [dashboardTab, setDashboardTab] = useState(null);
-  // Asks CustomerMessageWidget to pop open - set when a "new message"
-  // notification is clicked (see resolveNotificationTarget in Navbar.jsx).
   const [openMessageWidget, setOpenMessageWidget] = useState(false);
 
   const [toasts, setToasts] = useState([]);
-  // Date.now() alone collides when addToast fires twice in the same
-  // millisecond (e.g. rapid "Add to Cart" clicks) - two toasts sharing a
-  // React key breaks their independent auto-dismiss timers, so they'd get
-  // stuck on screen instead of clearing themselves. A monotonic counter
-  // guarantees a unique id every call regardless of timing.
   const toastCounterRef = useRef(0);
 
   useEffect(() => {
@@ -134,9 +97,6 @@ export default function App() {
     localStorage.setItem('bocofac_pmes_sessions', JSON.stringify(pmesSessions));
   }, [pmesSessions]);
 
-  // PMES schedule is admin-managed and shared across everyone viewing the
-  // membership portal, so it comes from the backend rather than staying
-  // purely localStorage-local like the seed/demo data above.
   useEffect(() => {
     let cancelled = false;
     fetch(`${API_BASE}/pmes-sessions`)
@@ -145,22 +105,17 @@ export default function App() {
         if (data && !cancelled) setPmesSessions(data);
       })
       .catch(() => {
-        // Network hiccup - keep showing the last known/seed schedule.
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // Product catalog/stock is admin-managed and shared across every shopper,
-  // so it comes from the backend rather than staying purely localStorage-
-  // local like the seed/demo data above (same reasoning as pmesSessions).
   const loadProducts = async () => {
     try {
       const res = await fetch(`${API_BASE}/products`);
       if (res.ok) setProducts(await res.json());
     } catch {
-      // Network hiccup - keep showing the last known/seed catalog.
     }
   };
 
@@ -168,11 +123,6 @@ export default function App() {
     loadProducts();
   }, []);
 
-  // Restore the signed-in session on page load/refresh. The auth cookie
-  // (httpOnly, 7-day) survives a refresh even though this component's state
-  // doesn't - without this, reloading the page always looked logged-out
-  // regardless of role, even with a perfectly valid session server-side.
-  // Role branching mirrors SigninPage's handleSubmit (AuthPages.jsx).
   useEffect(() => {
     let cancelled = false;
     fetch(`${API_BASE}/auth/me`, { credentials: 'include' })
@@ -185,7 +135,6 @@ export default function App() {
         else setUser(data);
       })
       .catch(() => {
-        // No valid session / network hiccup - stay signed out.
       })
       .finally(() => {
         if (!cancelled) setAuthChecked(true);
@@ -195,21 +144,12 @@ export default function App() {
     };
   }, []);
 
-  // A cart only ever makes sense tied to a signed-in customer account now
-  // (Storefront blocks Add to Cart for guests) - so once we know for sure
-  // there's no customer session (not mid-restore-check), any cart items
-  // left over from before that requirement, or from a previous customer's
-  // session on this browser, get cleared rather than shown to whoever's
-  // browsing next.
   useEffect(() => {
     if (authChecked && !user && cart.length > 0) {
       setCart([]);
     }
   }, [authChecked, user]);
 
-  // Mirrors the same /members/me lookup DashboardPage uses, so the navbar
-  // can tell an approved member apart from a guest/applicant without
-  // duplicating the membership form's own by-email lookup.
   useEffect(() => {
     if (!user?.email) {
       setIsApprovedMember(false);
@@ -234,13 +174,9 @@ export default function App() {
       const res = await fetch(`${API_BASE}/notifications/mine`, { credentials: 'include' });
       if (res.ok) setNotifications(await res.json());
     } catch {
-      // Network hiccup - keep showing the last known list.
     }
   };
 
-  // Polled (not SSE) since notifications are per-account rather than a topic
-  // every connected admin/board client cares about - a plain interval avoids
-  // having to thread user identity through the shared EventSource stream.
   useEffect(() => {
     if (!user) {
       setNotifications([]);
@@ -256,7 +192,6 @@ export default function App() {
     try {
       await fetch(`${API_BASE}/notifications/${notificationId}/read`, { method: 'PATCH', credentials: 'include' });
     } catch {
-      // Best-effort - the next poll will reconcile if this silently failed.
     }
   };
 
@@ -265,7 +200,6 @@ export default function App() {
     try {
       await fetch(`${API_BASE}/notifications/read-all`, { method: 'PATCH', credentials: 'include' });
     } catch {
-      // Best-effort - the next poll will reconcile if this silently failed.
     }
   };
 
@@ -285,18 +219,11 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  // Admin/Board views must show the real applicant/member/ledger/PMES/order/
-  // product registry - a customer submitting a form, paying share capital,
-  // reserving a PMES slot, or buying stock in a different browser/session
-  // would otherwise never appear here, since local state only ever echoed
-  // the submitter's own copy. Each fetcher below reloads just its own slice
-  // so the SSE listeners further down can refresh only what actually changed.
   const fetchApplicants = async () => {
     try {
       const res = await fetch(`${API_BASE}/applicants`, { credentials: 'include' });
       if (res.ok) setApplicants(await res.json());
     } catch {
-      // Network hiccup - keep showing the last known list.
     }
   };
   const fetchMembers = async () => {
@@ -304,7 +231,6 @@ export default function App() {
       const res = await fetch(`${API_BASE}/members`, { credentials: 'include' });
       if (res.ok) setMembers(await res.json());
     } catch {
-      // Network hiccup - keep showing the last known list.
     }
   };
   const fetchLedger = async () => {
@@ -312,7 +238,6 @@ export default function App() {
       const res = await fetch(`${API_BASE}/ledger`, { credentials: 'include' });
       if (res.ok) setLedger(await res.json());
     } catch {
-      // Network hiccup - keep showing the last known list.
     }
   };
   const fetchPmesSessions = async () => {
@@ -320,7 +245,6 @@ export default function App() {
       const res = await fetch(`${API_BASE}/pmes-sessions`, { credentials: 'include' });
       if (res.ok) setPmesSessions(await res.json());
     } catch {
-      // Network hiccup - keep showing the last known list.
     }
   };
   const fetchOrders = async () => {
@@ -328,7 +252,6 @@ export default function App() {
       const res = await fetch(`${API_BASE}/orders`, { credentials: 'include' });
       if (res.ok) setOrders(await res.json());
     } catch {
-      // Network hiccup - keep showing the last known list.
     }
   };
   const fetchWithdrawals = async () => {
@@ -336,25 +259,16 @@ export default function App() {
       const res = await fetch(`${API_BASE}/withdrawals`, { credentials: 'include' });
       if (res.ok) setWithdrawals(await res.json());
     } catch {
-      // Network hiccup - keep showing the last known list.
     }
   };
-  // Admin-only (see /api/messages/conversations) - a board session must not
-  // call this, so it's fetched/listened-for only when `admin` is set below.
   const fetchMessageConversations = async () => {
     try {
       const res = await fetch(`${API_BASE}/messages/conversations`, { credentials: 'include' });
       if (res.ok) setMessageConversations(await res.json());
     } catch {
-      // Network hiccup - keep showing the last known list.
     }
   };
 
-  // Realtime feed: the backend pushes an `event: <topic>` the instant
-  // something changes server-side (new order, verified payment, approved
-  // applicant, updated stock, etc.), so the matching fetcher above reloads
-  // immediately instead of waiting on a polling timer. EventSource
-  // reconnects on its own if the connection drops.
   useEffect(() => {
     if (!admin && !bod) return;
 
@@ -391,11 +305,6 @@ export default function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // Clears whichever of the three auth states is currently set, regardless
-  // of role - shared by both the 30-minute idle timeout and the global 401
-  // interceptor below, since both cases mean "the session is no longer
-  // valid," just discovered two different ways (a client-side timer vs. the
-  // server actually rejecting a request).
   const clearSignedInState = () => {
     setUser(null);
     setAdmin(null);
@@ -415,12 +324,6 @@ export default function App() {
     onIdle: () => handleSessionExpired('Your session expired due to inactivity. Please sign in again.'),
   });
 
-  // Global fallback for the case the idle timer doesn't catch: the server
-  // rejects a request as 401 (idle-timed-out session, revoked session,
-  // expired cookie) while this tab's state still thinks someone's signed in.
-  // registerUnauthorizedHandler wires into a single wrapped window.fetch
-  // (see utils/apiInterceptor.js) rather than touching the ~56 existing
-  // fetch() call sites individually.
   useEffect(() => {
     return registerUnauthorizedHandler(() => {
       if (user || admin || bod) {
@@ -429,10 +332,6 @@ export default function App() {
     });
   }, [user, admin, bod]);
 
-  // E-Commerce Order Handler - the backend already deducted stock
-  // transactionally when it created this order, so re-fetch the real
-  // catalog rather than re-deriving stock numbers client-side (which would
-  // drift from whatever the backend actually committed).
   const handleAddOrder = (newOrder) => {
     setOrders(prev => [newOrder, ...prev]);
     loadProducts();
@@ -527,12 +426,6 @@ export default function App() {
     }
   };
 
-  // formData carries an optional image file, so these go over multipart
-  // rather than JSON (see uploadProductImage in backend/src/middleware/upload.js).
-  // Both return a plain boolean (never throw) so the Add/Edit Product form
-  // can tell success from failure and only close itself on success - it
-  // used to close either way, since the toast-and-swallow catch here meant
-  // the form's own await never saw the failure.
   const handleAddProduct = async (formData) => {
     try {
       const res = await fetch(`${API_BASE}/products`, {
@@ -590,10 +483,6 @@ export default function App() {
     setApplicants(prev => [applicant, ...prev]);
   };
 
-  // Also auto-registers approved candidates as Shareholders.
-  // Board Approve/Reject decisions must be persisted to the backend (this is
-  // what the customer's "Check Application Status" lookup actually reads),
-  // not just written to local/localStorage state.
   const handleUpdateApplicantStatus = async (applicantId, updates) => {
     if (updates.status === 'Approved' || updates.status === 'Rejected') {
       try {
@@ -613,11 +502,6 @@ export default function App() {
           prevApplicants.map(app => (app.id === applicantId ? updatedApplicant : app))
         );
 
-        // The backend already creates/links the Member record transactionally
-        // as part of approval (see applicants.routes.js) - the admin/board
-        // members poll above will pick it up on its next tick, so there's no
-        // need (and no correct way, without duplicating server logic and ID
-        // generation) to fabricate a local member here.
         addToast(`Application ${updates.status.toLowerCase()}.`, 'success');
       } catch (err) {
         addToast(err.message || 'Could not update applicant status.', 'error');
@@ -625,9 +509,6 @@ export default function App() {
       return;
     }
 
-    // Local-state-only sync (e.g. MembershipPortal already persisted the
-    // change itself, such as after a PMES certificate upload, and is just
-    // syncing this component's copy of the applicant).
     setApplicants(prevApplicants =>
       prevApplicants.map(app => (app.id === applicantId ? { ...app, ...updates } : app))
     );
@@ -679,8 +560,6 @@ export default function App() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to log contribution.');
-      // The single-row POST response has no member JOIN (unlike the list
-      // endpoint), so fill in the display name from what's already loaded.
       const member = members.find(m => m.id === memberId);
       const entryWithName = { ...data, memberName: member ? member.name : data.memberName };
       setLedger(prev => [entryWithName, ...prev]);
@@ -695,8 +574,6 @@ export default function App() {
     }
   };
 
-  // Confirms a member-submitted GCash reference actually matches a real
-  // remittance before it counts toward that member's share-capital balance.
   const handleVerifyLedgerEntry = async (entryId) => {
     try {
       const res = await fetch(`${API_BASE}/ledger/${entryId}/verify`, {
@@ -714,8 +591,6 @@ export default function App() {
     }
   };
 
-  // Admin has actually sent the money (via GCash, outside the system) and is
-  // now recording it against the member's earnings withdrawal request.
   const handleSendWithdrawal = async (withdrawalId, { sentAmount, reference }) => {
     try {
       const res = await fetch(`${API_BASE}/withdrawals/${withdrawalId}/send`, {
@@ -801,9 +676,6 @@ export default function App() {
     }
   };
 
-  // Admin/Board dashboards have their own dedicated sidebar layout, and the
-  // auth pages (sign up/in) are full-screen takeovers, so the public navbar
-  // stays hidden on all of them.
   const hideNav = ['signup', 'signin', 'admin-dashboard', 'bod-dashboard'].includes(page);
 
   const navigate = (target) => {
@@ -823,12 +695,6 @@ export default function App() {
       setPage('signin');
       return;
     }
-    // Clicking the "Products" nav link should always land on the catalog,
-    // even if the cart panel was left open from an earlier visit - without
-    // this, clicking it while already on the Products page changes nothing
-    // (React sees the same page value) and the cart panel just sits there
-    // looking unresponsive. onOpenCart re-opens it right after this call
-    // when the click was actually on the cart icon, not this link.
     if (target === 'products') {
       setCartPanelOpen(false);
     }
@@ -836,18 +702,11 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Jumps straight to a Dashboard tab - used by the notification bell (which
-  // mirrors the admin notification bell jumping straight to its tab, instead
-  // of just popping up the message text) and by the mobile Navbar's profile
-  // menu (the customer Dashboard's own sidebar is hidden on phones).
   const goToDashboardTab = (tab) => {
     setDashboardTab(tab);
     navigate('dashboard');
   };
 
-  // Shared by the mobile Navbar's profile menu - mirrors DashboardPage's own
-  // logout button, since that sidebar (and the logout button on it) is
-  // hidden on phones now.
   const handleCustomerLogout = () => {
     fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
     setUser(null);
@@ -1007,10 +866,6 @@ export default function App() {
         />
       )}
       {page === 'signup' && (
-        // Raw setPage, not the guarded `navigate` - navigate('dashboard')
-        // would read the `user` state from this render's stale closure
-        // (still null, since setUser() hasn't re-rendered yet) and bounce
-        // the freshly-authenticated customer straight back to signup.
         <SignupPage setPage={setPage} onToast={addToast} />
       )}
       {page === 'signin' && (
@@ -1059,8 +914,6 @@ export default function App() {
         />
       )}
 
-      {/* Toast notifications - top-center for every role: clear of the
-          chat bubble and footer bar at the bottom, and above open modals. */}
       <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[80] space-y-2 pointer-events-none w-[calc(100%-2rem)] max-w-xs sm:max-w-sm">
         {toasts.map(toast => (
           <div key={toast.id} className="pointer-events-auto">

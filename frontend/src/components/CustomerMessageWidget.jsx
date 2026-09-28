@@ -1,4 +1,3 @@
-// src/components/CustomerMessageWidget.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageCircle, X, Send, Package } from 'lucide-react';
 
@@ -9,10 +8,6 @@ function timeLabel(dateStr) {
   return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// Floating Messenger-style bubble for a signed-in customer to ask the co-op
-// questions - especially about an order, since an admin reply can carry an
-// order tag (message.orderId) even though the thread itself is a single
-// ongoing conversation, not one thread per order.
 export default function CustomerMessageWidget({ user, onToast, forceOpen, onForceOpenConsumed }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -20,8 +15,6 @@ export default function CustomerMessageWidget({ user, onToast, forceOpen, onForc
   const [sending, setSending] = useState(false);
   const listRef = useRef(null);
 
-  // A "new message" notification click (see Navbar.jsx) asks this bubble to
-  // pop open, from wherever on the site the customer clicked it.
   useEffect(() => {
     if (!forceOpen) return;
     setOpen(true);
@@ -38,7 +31,6 @@ export default function CustomerMessageWidget({ user, onToast, forceOpen, onForc
         setMessages(data.messages || []);
       }
     } catch {
-      // Network hiccup - keep showing the last known thread.
     }
   }, []);
 

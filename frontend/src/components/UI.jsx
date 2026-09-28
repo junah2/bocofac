@@ -1,10 +1,6 @@
-// src/components/UI.jsx
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
-/* ─────────────────────────────────────────
-   GreenButton — primary / outline variants
-───────────────────────────────────────── */
 export function GreenBtn({ children, onClick, type = 'button', full, outline, small, disabled, ...rest }) {
   const base = {
     display: 'inline-flex',
@@ -44,13 +40,7 @@ export function GreenBtn({ children, onClick, type = 'button', full, outline, sm
   );
 }
 
-/* ─────────────────────────────────────────
-   FormInput — labeled input with optional icon
-───────────────────────────────────────── */
 export function FormInput({ label, placeholder, type = 'text', icon, value, onChange, onBlur, required, name, autoComplete, inputMode, maxLength, error, valid }) {
-  // `valid` gives live typing feedback (green once the value fully matches
-  // the expected format, red while it doesn't) independent of `error`, which
-  // stays reserved for the existing blur/submit-time message underneath.
   const restColor = (error || valid === false) ? '#e24b4a' : valid === true ? '#16a34a' : 'var(--border)';
   const isPassword = type === 'password';
   const [showPassword, setShowPassword] = useState(false);

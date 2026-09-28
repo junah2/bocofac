@@ -13,26 +13,12 @@ import {
 import { Lightbulb, Wallet, ArrowDownUp, Users, CalendarDays, UserCheck } from 'lucide-react';
 import { lastNMonths } from '../utils/dateBuckets';
 
-// Decision-support analytics for the cooperative side of BOCOFAC (savings,
-// withdrawals, member payments, membership growth) - the e-commerce side is
-// covered by ExecDashboard. Everything is computed from data the dashboards
-// already load; nothing here writes anywhere.
-//
-// Money in / money out colors were run through the dataviz palette validator
-// (light on #fcfcfb, dark on #0f172a): both pairs pass, with colorblind
-// separation in the 6-8 band - so the two series also differ by position
-// (side-by-side bars), carry a legend, and are named in the tooltip.
 const PALETTE = {
   light: { grid: '#e2e8f0', axis: '#94a3b8', tooltipBg: '#ffffff', tooltipBorder: '#e2e8f0', tooltipText: '#0f172a', moneyIn: '#2f855a', moneyOut: '#d97706', single: '#2f855a', singleMuted: '#9fc5b0' },
   dark: { grid: '#334155', axis: '#64748b', tooltipBg: '#0f172a', tooltipBorder: '#334155', tooltipText: '#f1f5f9', moneyIn: '#1f9d57', moneyOut: '#dd6b20', single: '#1f9d57', singleMuted: '#1e5b3a' },
 };
 
-// Withdrawal size bands - small enough to be useful for cash planning,
-// few enough to read at a glance.
 const WITHDRAWAL_BANDS = [
-  // Labels use round numbers ("₱1,000 to ₱2,000", not "₱1,001–2,000") so
-  // they read naturally; each band holds amounts above the previous max, up
-  // to and including its own.
   { label: 'up to ₱500', short: '≤500', max: 500 },
   { label: '₱500 to ₱1,000', short: '500–1k', max: 1000 },
   { label: '₱1,000 to ₱2,000', short: '1k–2k', max: 2000 },
@@ -90,7 +76,7 @@ function Card({ icon: Icon, title, description, children }) {
 export default function CoopInsights({ members = [], ledger = [], withdrawals = [], orders = [], applicants = [], isDarkMode }) {
   const palette = PALETTE[isDarkMode ? 'dark' : 'light'];
 
-  // --- Withdrawals: how much members usually take out ---
+  // [ANALYTICS] Withdrawals: median (typical), mode (most requested), average, approval rate
   const withdrawalStats = useMemo(() => {
     const amounts = withdrawals.map(w => w.requestedAmount).filter(a => a > 0);
     const bands = WITHDRAWAL_BANDS.map(b => ({ ...b, count: 0 }));
@@ -121,7 +107,7 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
     };
   }, [withdrawals]);
 
-  // --- Money in (verified share capital) vs money out (sent withdrawals) ---
+  // [ANALYTICS] Money In vs Out bawat buwan: Net = Share Capital Collected - Withdrawals Released
   const cashFlow = useMemo(() => {
     return lastNMonths(6).map(b => {
       const moneyIn = ledger
@@ -138,14 +124,11 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
   const last3Out = last3.reduce((s, m) => s + m.moneyOut, 0);
   const avgMonthlyOut = cashFlow.reduce((s, m) => s + m.moneyOut, 0) / cashFlow.length;
 
-  // --- Share capital payment standing per member ---
+  // [METRICS] Payment standing: fully paid / nagbabayad / wala pang bayad / 90+ days / 1 year (for removal)
   const payerStatus = useMemo(() => {
     const now = Date.now();
     let fullyPaid = 0, paying = 0, noPayment = 0, inactive = 0;
     const inactiveMembers = [];
-    // Coop rule: a year with no payment toward share capital gets a member
-    // dropped. Those are counted separately as due for removal instead of
-    // being listed as merely "late".
     const dueForRemoval = [];
     members.filter(m => m.status !== 'Removed').forEach(m => {
       const payments = ledger.filter(l => l.memberId === m.id && l.status === 'Verified');
@@ -167,7 +150,7 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
     return { fullyPaid, paying, noPayment, inactive, inactiveMembers, dueForRemoval, total: fullyPaid + paying + noPayment };
   }, [members, ledger]);
 
-  // --- When customers order ---
+  // [RANKING] Busiest ordering day: bilang ng orders bawat araw ng linggo
   const ordersByWeekday = useMemo(() => {
     const counts = WEEKDAYS.map((day, i) => ({ day, name: WEEKDAY_NAMES[i], count: 0 }));
     orders
@@ -179,7 +162,6 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
   const busiestDay = ordersByWeekday.reduce((best, d) => (d.count > best.count ? d : best), ordersByWeekday[0]);
   const quietestDay = ordersByWeekday.reduce((low, d) => (d.count < low.count ? d : low), ordersByWeekday[0]);
 
-  // --- Membership pipeline ---
   const pipeline = useMemo(() => {
     const submitted = applicants.filter(a => a.status !== 'Draft');
     const approved = submitted.filter(a => a.status === 'Approved').length;
@@ -189,9 +171,8 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
     return { submitted: submitted.length, approved, rejected, waitingPmes, forReview, approvalRate: pct(approved, approved + rejected) };
   }, [applicants]);
 
-  // --- Plain-language takeaways, strongest signals first ---
-  // Short, everyday wording - each one says what's happening, then what to do.
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  // [ANALYTICS] Key takeaways: automatic na paliwanag para sa decision-making
   const takeaways = [];
   if (withdrawalStats.count > 0) {
     const basis = withdrawalStats.count < 5 ? ` (based on only ${plural(withdrawalStats.count, 'request', 'requests')} so far)` : '';
@@ -246,7 +227,6 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
         <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Savings, Withdrawals &amp; Member Behavior</h2>
       </div>
 
-      {/* Takeaways first: the decision-ready summary of everything below. */}
       <div className="bg-[#FDFCF7] dark:bg-emerald-950/25 border border-emerald-100 dark:border-slate-800 rounded-2xl p-6 text-left space-y-3">
         <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
           <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400" /> Key Takeaways for Decision-Making

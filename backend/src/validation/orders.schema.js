@@ -1,12 +1,6 @@
 const { z } = require('zod');
 const { phSchema, emailSchema } = require('./auth.schema');
 
-// POST /orders is multipart/form-data (uploadOrderReceipt.single('receipt')
-// runs first), so `items` arrives here as a raw JSON *string* the route
-// parses manually - left untouched by this schema (validated separately,
-// right after that parse, via orderItemsSchema below) and passthrough()
-// keeps paymentMethod/shippingZone/referenceNumber intact since those are
-// still checked inline against their own hardcoded allowlists in the route.
 const orderBodySchema = z.object({
   buyerName: z.string().trim().min(1, 'Buyer name is required.').max(200),
   buyerEmail: emailSchema,

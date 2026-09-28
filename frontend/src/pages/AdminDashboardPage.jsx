@@ -42,14 +42,9 @@ import Footer from '../components/Footer';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 const LOW_STOCK_THRESHOLD = 20;
-// Mirrors the CHECK constraint on products.category in backend/src/db/schema.sql.
 const PRODUCT_CATEGORIES = ['Charcoal', 'Fertilizer', 'Fibre & Coir', 'Handicraft'];
 const EMPTY_PRODUCT_FORM = { name: '', category: PRODUCT_CATEGORIES[0], description: '', price: '', stock: '', unit: '', specifications: '', imageFile: null, variantGroup: '', variantLabel: '', discountPercent: '' };
 
-// Products sharing a variantGroup (e.g. the four "Coconut Husk Pole" lengths)
-// collapse into one catalog row here too, mirroring how Storefront.jsx
-// groups them into one card - so admin manages one product with a size
-// picker instead of scanning near-duplicate rows for every length.
 function groupProductsForDisplay(products) {
   const seenGroups = new Set();
   const items = [];
@@ -68,20 +63,9 @@ function groupProductsForDisplay(products) {
   return items;
 }
 
-// The cooperative doesn't track courier hand-off in stages - once payment is
-// verified an order sits as 'Processing' until admin hands it to the
-// courier, which is the one action exposed in the UI. That action still
-// writes the backend's existing 'Shipped' value (no schema/API change) but
-// is only ever presented and labeled as "Delivered to Courier". 'Out for
-// Delivery' and 'Delivered' remain valid legacy values (orders placed before
-// this simplification) but are no longer reachable from the UI.
 const ORDER_FULFILLMENT_STATUSES = ['Processing', 'Shipped', 'Out for Delivery', 'Delivered'];
 const ORDER_STATUS_LABELS = { Shipped: 'Delivered to Courier' };
 const getOrderStatusLabel = (status) => ORDER_STATUS_LABELS[status] || status;
-// The payment decision (verify or reject) is the only thing "active" about
-// an order - once that's made, it's a settled record, not something to act
-// on, so it moves to "History" (read-only there, see the receipt modal's
-// status check below) instead of cluttering the default "Active" view.
 const ORDER_HISTORY_STATUSES = [...ORDER_FULFILLMENT_STATUSES, 'Completed', 'Rejected', 'Cancelled'];
 const ORDER_STATUS_COLORS = {
   'Pending Verification': 'text-amber-700 dark:text-amber-400',
@@ -243,23 +227,11 @@ export default function AdminDashboardPage({
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [sessionEditDraft, setSessionEditDraft] = useState({});
   const [viewingReceiptOrder, setViewingReceiptOrder] = useState(null);
-  // Read-only profile views for the Membership tab (approve/reject stays a
-  // Board-only action - see the "View-only" banner there).
   const [viewedApplicant, setViewedApplicant] = useState(null);
   const [viewedMember, setViewedMember] = useState(null);
-  // Full-size preview for the small avatar thumbnail in Settings - clicking
-  // it opens the actual photo instead of leaving it stuck at 48x48px.
   const [viewedAvatarUrl, setViewedAvatarUrl] = useState(null);
   const [rejectReasonDraft, setRejectReasonDraft] = useState('');
-  // Branded stand-in for window.confirm() on the reject/confirm-payment
-  // actions below - shape: { tone: 'danger'|'success', title, message,
-  // confirmLabel, onConfirm }.
   const [confirmPrompt, setConfirmPrompt] = useState(null);
-  // Orders tab defaults to only orders still needing action - otherwise
-  // completed/rejected orders pile up and bury the ones that actually need
-  // attention as new orders come in. History stays one click away, not
-  // deleted or moved out of the database, just filtered out of the default
-  // view.
   const [orderView, setOrderView] = useState('active');
   const [attendanceSession, setAttendanceSession] = useState(null);
   const [notifMenuOpen, setNotifMenuOpen] = useState(false);
@@ -305,8 +277,8 @@ export default function AdminDashboardPage({
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
-  // ── Real stat calculations ──
   const realizedOrders = useMemo(() => orders.filter(o => o.status !== 'Pending Verification' && o.status !== 'Rejected' && o.status !== 'Cancelled'), [orders]);
+  // [ANALYTICS] Total Sales = sum ng completed / in-progress orders
   const totalSales = useMemo(() => realizedOrders.reduce((sum, o) => sum + o.totalAmount, 0), [realizedOrders]);
   const pendingOrders = useMemo(() => orders.filter(o => o.status === 'Pending Verification').length, [orders]);
   const visibleOrders = useMemo(
@@ -316,11 +288,6 @@ export default function AdminDashboardPage({
   const pendingApplicants = useMemo(() => applicants.filter(a => a.status !== 'Approved' && a.status !== 'Rejected').length, [applicants]);
   const lowStockProducts = useMemo(() => products.filter(p => p.stock < LOW_STOCK_THRESHOLD), [products]);
 
-  // Same three underlying counts power both the sidebar's per-tab red dots
-  // and the notification bell dropdown below, so they never disagree. These
-  // are real unresolved-item counts (not a "seen/unseen" flag) - a dot only
-  // clears once the item is actually acted on (verified/rejected/approved/
-  // restocked), not just by navigating to or glancing at the tab.
   const navBadgeCounts = useMemo(() => ({
     orders: pendingOrders,
     membership: pendingApplicants,
@@ -414,10 +381,6 @@ export default function AdminDashboardPage({
         formData.append('stock', productForm.stock || '0');
         ok = await onAddProduct(formData);
       }
-      // onAddProduct/onUpdateProduct already toast the specific error - only
-      // close the form once the product actually saved, so a failed save
-      // (bad category, rejected image, session expired, ...) leaves the
-      // form open with what was typed instead of silently discarding it.
       if (ok) closeProductForm();
     } finally {
       setSavingProduct(false);
@@ -525,12 +488,10 @@ export default function AdminDashboardPage({
   return (
     <div className="h-screen flex bg-[#faf8f4] dark:bg-slate-950 text-slate-900 dark:text-slate-100">
 
-      {/* Desktop sidebar */}
       <aside className="hidden md:flex w-72 bg-gradient-to-b from-emerald-600 to-emerald-700 dark:from-emerald-800 dark:to-emerald-950 flex-col shrink-0 select-none sticky top-0 h-[calc(100vh-var(--footer-h,0px))] overflow-y-auto">
         <SidebarNav />
       </aside>
 
-      {/* Mobile drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="w-72 bg-gradient-to-b from-emerald-600 to-emerald-700 dark:from-emerald-800 dark:to-emerald-950 flex flex-col h-full">
@@ -542,7 +503,6 @@ export default function AdminDashboardPage({
 
       <div className="flex-1 min-w-0 flex flex-col">
 
-        {/* Top header */}
         <header className="h-20 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-8 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <button onClick={() => setMobileMenuOpen(true)} className="md:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100">
@@ -953,9 +913,6 @@ export default function AdminDashboardPage({
             </div>
           )}
 
-          {/* Receipt Verification Modal - shows the reference number and
-              the uploaded payment screenshot side by side so staff can
-              actually confirm the transfer before hitting Verify. */}
           {viewingReceiptOrder && (
             <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto">
@@ -1107,11 +1064,6 @@ export default function AdminDashboardPage({
             </div>
           )}
 
-          {/* Branded confirmation prompt, replacing window.confirm() for the
-              reject/confirm-payment actions above. Sits on top of the
-              receipt modal (higher z-index) rather than replacing it, so
-              cancelling just drops back to the receipt without losing the
-              in-progress rejection reason draft. */}
           {confirmPrompt && (
             <div className="fixed inset-0 z-[60] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 space-y-4">

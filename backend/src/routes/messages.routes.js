@@ -34,9 +34,6 @@ function messageToClient(row) {
   };
 }
 
-// One thread per customer (conversations.user_id is UNIQUE) - find it, or
-// create it on first message. ON CONFLICT DO NOTHING + re-select handles two
-// concurrent first-messages racing to create the same customer's conversation.
 async function getOrCreateConversationId(userId) {
   const { rows } = await pool.query('SELECT id FROM conversations WHERE user_id = $1', [userId]);
   if (rows[0]) return rows[0].id;
@@ -57,9 +54,6 @@ async function loadMessages(conversationId) {
   return rows.map(messageToClient);
 }
 
-// A message can optionally reference one of the customer's own orders (an
-// admin reply about a specific order) - never trust an arbitrary orderId
-// from the client, only accept it if it actually belongs to this customer.
 async function resolveOwnedOrderId(orderId, userId) {
   if (!orderId) return null;
   const { rows } = await pool.query('SELECT id FROM orders WHERE id = $1 AND user_id = $2', [orderId, userId]);

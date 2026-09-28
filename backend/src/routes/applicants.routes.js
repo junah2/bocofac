@@ -34,7 +34,6 @@ function toClient(row, documents, dependents) {
     referenceNumber: row.reference_number,
     createdMemberId: row.created_member_id,
     documentsUploaded: documents || undefined,
-    // Personal data sheet fields (paper "Application for Regular Membership" form)
     firstName: row.first_name,
     middleName: row.middle_name,
     lastName: row.last_name,
@@ -74,13 +73,6 @@ function toClient(row, documents, dependents) {
   };
 }
 
-// GET /by-email/:email is unauthenticated by design (guests self-check their
-// application status without an account) - but that means anyone who knows
-// or guesses the email gets whatever this returns, with zero proof they're
-// the actual applicant. Whitelist only what the "Check Application Status"
-// UI actually shows instead of reusing the full toClient() - TIN, ID number,
-// birthdate, dependents, farm profile, income, etc. have no business being
-// reachable by email-guessing alone.
 function toPublicStatusClient(row, pmesCertificateAttached) {
   return {
     id: row.id,
@@ -92,9 +84,6 @@ function toPublicStatusClient(row, pmesCertificateAttached) {
     agriculturalType: row.agricultural_type,
     farmSizeHectares: row.farm_size_hectares === null ? null : Number(row.farm_size_hectares),
     referenceNumber: row.reference_number,
-    // Just a flag, not the document itself - lets the "Check Application
-    // Status" UI stop prompting for a certificate that's already on file
-    // without needing the full (staff-only) documentsUploaded set.
     pmesCertificateAttached: !!pmesCertificateAttached,
     barangay: row.barangay,
     munCity: row.mun_city,
@@ -209,10 +198,6 @@ router.post('/', validate(applicantCreateSchema), asyncHandler(async (req, res) 
       );
     }
 
-    // A guest can attend a PMES seminar in person (walk-in check-in) before
-    // ever creating an account/application - recognize that here by email so
-    // "Apply for Membership" doesn't stay gated on attendance they already
-    // completed.
     let applicantRow = rows[0];
     const walkInMatch = await client.query(
       `SELECT id, attended_at FROM pmes_registrations
@@ -247,12 +232,6 @@ router.post('/', validate(applicantCreateSchema), asyncHandler(async (req, res) 
   }
 }));
 
-// No account is required to apply (applicants have no user_id/login), so
-// this can't be gated behind requireAuth like a normal write endpoint - the
-// applicant's own registered email is the only credential available, same
-// trust model as GET /by-email/:email above. Without this check, anyone who
-// can guess a sequential "APP-123" id could overwrite another applicant's
-// valid ID / clearance / receipt with their own files.
 router.post('/:id/documents', applicantDocsLimiter, uploadApplicantDoc.single('file'), asyncHandler(async (req, res) => {
   const { docType, email } = req.body;
   const validTypes = ['valid_id', 'registration_fee_receipt', 'pmes_certificate'];
@@ -287,10 +266,6 @@ router.post('/:id/documents', applicantDocsLimiter, uploadApplicantDoc.single('f
       [req.params.id, docType, req.file.path, req.file.originalname]
     );
 
-    // PMES attendance is now a board call (see PATCH /:id/pmes-attended), not
-    // something a self-uploaded document can flip - this upload is storage
-    // only, e.g. an applicant keeping a copy of the certificate they were
-    // emailed after the board confirmed their attendance.
     const { rows } = await client.query('SELECT * FROM applicants WHERE id = $1', [req.params.id]);
     const applicantRow = rows[0];
 
@@ -316,16 +291,7 @@ router.get('/:id/documents/:docType', requireRole('admin', 'board'), asyncHandle
   res.sendFile(path.resolve(rows[0].file_path));
 }));
 
-// PMES attendance is now confirmed at the session roster instead of here
-// (see PATCH /pmes-sessions/:sessionId/registrations/:regId/send-certificate)
-// - that flow requires an actual roll-call check-in record before a
-// certificate can go out, instead of trusting a bare board click with no
-// evidence behind it. applicants.pmes_attended is still updated from there
-// whenever the registration is linked to this applicant.
-
-// Board-only real approve/reject decision. Approval auto-creates a Member (if
-// none exists yet for that email) and links any matching customer account, all
-// inside one transaction.
+// [MEMBERSHIP] Board ang nag-a-approve / reject ng application
 router.patch('/:id/status', requireRole('board'), asyncHandler(async (req, res) => {
   const { status } = req.body;
   if (!['Approved', 'Rejected'].includes(status)) {
@@ -367,6 +333,7 @@ router.patch('/:id/status', requireRole('board'), asyncHandler(async (req, res) 
       if (existingMember.rows[0]) {
         createdMemberId = existingMember.rows[0].id;
       } else {
+        // [MEMBERSHIP] Pag approved, awtomatikong ginagawang member record
         createdMemberId = await nextMemberId(client);
         await client.query(
           `INSERT INTO members (id, name, email, required_share_capital, joined_date, status)

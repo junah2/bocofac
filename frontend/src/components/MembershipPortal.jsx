@@ -26,21 +26,9 @@ import { displayApplicantStatus } from '../utils/applicantStatus';
 import { Field, Section } from './ProfileField';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
-// Where an in-progress, not-yet-filed application is auto-saved in the
-// browser, so an applicant who leaves before finishing (e.g. no PMES
-// certificate yet) can pick up where they left off instead of retyping
-// everything.
-// Suffixed with the signed-in account's id/email at the point of use (see
-// draftStorageKey below) - never used bare, so one account's draft is never
-// read back on a different account sharing the same browser.
 const DRAFT_STORAGE_KEY_PREFIX = 'bocofac_membership_draft_v1:';
-// Attached files (Valid ID, GCash receipt, PMES certificate) are saved
-// separately from the text draft above, as base64, so a large/near-quota
-// image never blocks the always-important text fields from saving. Capped
-// per file so three attachments together can't blow past the browser's
-// localStorage limit (~5MB on most browsers).
 const DRAFT_FILES_STORAGE_KEY_PREFIX = 'bocofac_membership_draft_files_v1:';
-const MAX_PERSISTABLE_FILE_BYTES = 2 * 1024 * 1024; // 2MB
+const MAX_PERSISTABLE_FILE_BYTES = 2 * 1024 * 1024;
 
 function readFileAsDataURL(file) {
   return new Promise((resolve, reject) => {
@@ -51,19 +39,11 @@ function readFileAsDataURL(file) {
   });
 }
 
-// A real BOCOFAC PMES certificate always carries some subset of these words,
-// so an unrelated photo can't be attached in its place.
 const PMES_CERT_OCR_KEYWORDS = [
   'bocofac', 'pmes', 'certificate', 'seminar', 'attendance', 'membership',
   'coconut', 'cooperative', 'pre-membership', 'education',
 ];
 
-// Re-derives receiptDigitRuns for a receipt restored from a saved draft -
-// the persisted data is just a dataURL/File, not the OCR result itself, so
-// without this the reference-number cross-check silently goes inert (treats
-// everything as unverified) after every page reload. Runs quietly in the
-// background with no toasts, since this fires automatically on mount rather
-// than in response to the applicant picking a file.
 async function scanReceiptDigits(file) {
   try {
     const text = await recognizeReceiptText(file);
@@ -94,11 +74,7 @@ function computeAge(birthdateStr) {
 const inputClass = "w-full px-4 text-sm py-2.5 rounded-xl border bg-white dark:bg-slate-950 text-slate-900 dark:text-white";
 const labelClass = "block text-xs font-semibold text-slate-500 mb-1";
 
-// Input filters applied as-you-type so the field can never hold the wrong
-// kind of value in the first place (rather than only flagging it on submit).
 const digitsOnly = (value, maxLen) => value.replace(/\D/g, '').slice(0, maxLen);
-// Keeps real Filipino names/places typeable (hyphens, apostrophes, periods,
-// ñ) while still rejecting stray digits or symbols.
 const lettersOnly = (value) => value.replace(/[^A-Za-zÀ-ÿ\s.'-]/g, '');
 const alnumOnly = (value) => value.replace(/[^A-Za-z0-9\s-]/g, '');
 
@@ -108,16 +84,8 @@ const onAlnum = (setter) => (e) => setter(alnumOnly(e.target.value));
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const isValidEmail = (value) => EMAIL_REGEX.test(value.trim());
-// Same PH mobile rule used across the app's other forms (AuthPages, backend
-// phSchema): 11 digits starting with 09.
 const isValidPhone = (value) => /^09\d{9}$/.test(value);
 
-// Sourced from each ID's issuing agency (PSA/PhilSys, SSS, PhilHealth, BIR,
-// LTO, DFA, GSIS, PRC) - these are the only IDs on VALID_ID_TYPES with one
-// fixed, nationwide numeric format. The rest (Postal ID, IBP, OFW/OWWA, PWD,
-// Senior Citizen's, Solo Parent, Voter's ID) are issued per-agency/LGU with
-// no single official numbering scheme, so they're left format-free below
-// rather than guessing a pattern that could wrongly reject a real ID.
 const ID_FORMATS = {
   'National ID': { pattern: /^\d{4}-\d{4}-\d{4}-\d{4}$/, example: '0000-0000-0000-0000', hint: '16-digit PhilSys Card Number (PCN) printed on the PhilID.' },
   SSS: { pattern: /^\d{2}-\d{7}-\d{1}$/, example: '00-0000000-0', hint: '10-digit SSS number.' },
@@ -134,9 +102,6 @@ const isValidIdNumber = (type, value) => {
   return fmt ? fmt.pattern.test(value.trim()) : value.trim().length >= 4;
 };
 
-// Bucketed choices for the "Member's Farm Profile" paper form - farmers pick
-// a range instead of typing exact figures, matching how the paper intake is
-// actually filled out in the field.
 const TREE_COUNT_OPTIONS = ['0', '1–10', '11–25', '26–50', '51–100', '101–200', '200+'];
 const ANIMAL_COUNT_OPTIONS = ['0', '1', '2', '3', '4', '5+'];
 const SWINE_COUNT_OPTIONS = ['0', '1–2', '3–5', '6–10', '10+'];
@@ -164,12 +129,6 @@ const VALID_ID_TYPES = [
   "Senior Citizen's ID", 'Single Parent', 'SSS', 'TIN', "Voter's ID",
 ];
 
-// Custom-built instead of a plain <select> - the native options popup can't
-// be styled at all (font size, spacing, colors are entirely up to the
-// device's own OS/browser), so on mobile it renders as an oversized,
-// visually jarring list that clashes with the rest of this app's design.
-// onChange still receives a { target: { value } } shape so every existing
-// call site (written for a real <select>'s change event) keeps working.
 function SelectField({ label, value, onChange, options, placeholder = 'Select...' }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
@@ -231,27 +190,17 @@ export default function MembershipPortal({
   onGoToDashboard,
   onGoHome,
 }) {
-  // Only 'Upcoming' seminars are ever worth showing here - a Completed/
-  // Cancelled session or one whose date has already passed isn't something
-  // anyone can still reserve a slot for. A session at capacity stays in the
-  // list (each render site shows it as disabled/"Full") instead of vanishing,
-  // so it doesn't look like the session was deleted.
   const upcomingSessions = sessions.filter(
     s => getPmesDisplayStatus(s) === 'Upcoming'
   );
 
-  // Scoped to the signed-in account (id, falling back to email) so one
-  // account's in-progress draft is never read back on a different account
-  // that happens to share the same browser/device.
   const draftOwnerKey = user?.id || user?.email || 'guest';
   const draftStorageKey = `${DRAFT_STORAGE_KEY_PREFIX}${draftOwnerKey}`;
   const draftFilesStorageKey = `${DRAFT_FILES_STORAGE_KEY_PREFIX}${draftOwnerKey}`;
 
-  // Wizard state for applicant submission
   const [wizardStep, setWizardStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
-  // Step 1: Personal Data Sheet - identity
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -260,13 +209,9 @@ export default function MembershipPortal({
   const [birthplace, setBirthplace] = useState('');
   const [gender, setGender] = useState('Female');
   const [civilStatus, setCivilStatus] = useState('Single');
-  // Signed-in customers apply using their account email so the board's
-  // approval step (which links members -> users by matching email) reliably
-  // connects the application back to this account's dashboard.
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState('');
 
-  // Step 2: Address & background
   const [addressNumber, setAddressNumber] = useState('');
   const [street, setStreet] = useState('');
   const [zone, setZone] = useState('');
@@ -280,12 +225,10 @@ export default function MembershipPortal({
   const [tin, setTin] = useState('');
   const [religion, setReligion] = useState('');
 
-  // Step 3: Family & dependents
   const [spouseContactPerson, setSpouseContactPerson] = useState('');
   const [spouseCpNumber, setSpouseCpNumber] = useState('');
   const [dependents, setDependents] = useState([]);
 
-  // Step 4: Farm specs & education (mirrors the paper "Member's Farm Profile" form)
   const [eduAttainment, setEduAttainment] = useState('');
   const emptyFarmProfile = () => ({
     coconut: { areaHa: '', bearing: '', nonBearing: '', monthsPerHarvest: '', aveNutsHarvest: '', lastHarvest: '', aveKopraSoldKg: '', aveHarvestCharcoal: '' },
@@ -299,7 +242,6 @@ export default function MembershipPortal({
   const [farmProfile, setFarmProfile] = useState(emptyFarmProfile());
   const [otherCrops, setOtherCrops] = useState([]);
 
-  // Step 5: Documents & requirements
   const [validIdAttached, setValidIdAttached] = useState(false);
   const [validIdName, setValidIdName] = useState('');
   const [validIdFile, setValidIdFile] = useState(null);
@@ -311,58 +253,36 @@ export default function MembershipPortal({
   const [idPlaceIssued, setIdPlaceIssued] = useState('');
   const idFormat = getIdFormat(idType);
 
-  // Step 6: Membership fee & payment
   const [regFeePaid, setRegFeePaid] = useState(false);
   const [refNum, setRefNum] = useState('');
   const [feeReceiptPreview, setFeeReceiptPreview] = useState('');
   const [feeReceiptFile, setFeeReceiptFile] = useState(null);
   const [scanningFeeReceipt, setScanningFeeReceipt] = useState(false);
-  // Digit runs OCR'd off the receipt itself (see handleFeeReceiptUpload) -
-  // lets the typed reference number be cross-checked against what the
-  // receipt actually shows, not just its own 13-digit format.
   const [receiptDigitRuns, setReceiptDigitRuns] = useState(null);
 
-  // Sandbox active applicant status lookups
   const [lookupEmail, setLookupEmail] = useState('');
   const [activeSearchedApplicant, setActiveSearchedApplicant] = useState(null);
 
   const [activePortalTab, setActivePortalTab] = useState('apply');
   const [showPmesSchedule, setShowPmesSchedule] = useState(false);
 
-  // PMES certificate: selecting a file just previews it locally - the
-  // actual upload only fires when the applicant clicks Submit.
   const [pmesCertFile, setPmesCertFile] = useState(null);
   const [pmesCertPreview, setPmesCertPreview] = useState('');
   const [submittingPmesCert, setSubmittingPmesCert] = useState(false);
   const [scanningPmesCert, setScanningPmesCert] = useState(false);
 
-  // Attached files (Valid ID, GCash receipt, PMES certificate) mirrored here
-  // as base64 so the draft-save/restore effects below can persist and bring
-  // them back, instead of the applicant having to re-attach every picture.
   const [persistedFiles, setPersistedFiles] = useState({});
-  // Full-size preview of whichever attached image the applicant clicks on
-  // (Valid ID / receipt / certificate thumbnail) in the Review step, so they
-  // can double check it's the right, legible photo before filing.
   const [viewedAttachmentUrl, setViewedAttachmentUrl] = useState(null);
 
-  // Restore a saved in-progress application (if any) once, when this page
-  // first opens - so an applicant who leaves mid-form (e.g. because they
-  // haven't attended PMES yet) doesn't lose everything they already typed
-  // or already attached (Valid ID / GCash receipt / PMES certificate are
-  // restored too, from DRAFT_FILES_STORAGE_KEY).
   const draftRestoredRef = useRef(false);
   useEffect(() => {
     if (draftRestoredRef.current) return;
     draftRestoredRef.current = true;
 
-    // One-time cleanup: an earlier version of this feature saved the draft
-    // under one bare key shared by every account on the browser, so any
-    // account that opened this page could see whatever the previous account
-    // had typed. Remove that old shared draft so it can never leak again.
     try {
       window.localStorage.removeItem('bocofac_membership_draft_v1');
       window.localStorage.removeItem('bocofac_membership_draft_files_v1');
-    } catch { /* ignore */ }
+    } catch {  }
 
     try {
       const raw = window.localStorage.getItem(draftStorageKey);
@@ -441,7 +361,6 @@ export default function MembershipPortal({
           setPersistedFiles(files);
         }
       } catch {
-        // Corrupted/old file draft - the text fields above still restored fine.
       }
 
       onToast?.(
@@ -451,13 +370,9 @@ export default function MembershipPortal({
         'success'
       );
     } catch {
-      // Corrupted/old draft - ignore it rather than blocking the page.
     }
   }, []);
 
-  // Auto-save everything typed so far (except files, which browsers won't
-  // let us persist to localStorage) every time it changes, so progress isn't
-  // lost if the applicant navigates away or closes the tab before filing.
   useEffect(() => {
     const hasAnyInput = firstName || lastName || phone || barangay || munCity || email !== (user?.email || '');
     if (!hasAnyInput) return;
@@ -473,8 +388,6 @@ export default function MembershipPortal({
     try {
       window.localStorage.setItem(draftStorageKey, JSON.stringify(draft));
     } catch {
-      // Storage full or unavailable (e.g. private browsing) - draft-saving
-      // is a convenience, not a requirement, so this fails silently.
     }
   }, [
     wizardStep,
@@ -486,9 +399,6 @@ export default function MembershipPortal({
     refNum, user,
   ]);
 
-  // Attached files are saved to their own storage key, separately from the
-  // text draft above, so a large image failing to fit in localStorage never
-  // stops the (always-important) text fields from being saved.
   useEffect(() => {
     try {
       if (!persistedFiles || Object.keys(persistedFiles).length === 0) {
@@ -497,7 +407,6 @@ export default function MembershipPortal({
       }
       window.localStorage.setItem(draftFilesStorageKey, JSON.stringify(persistedFiles));
     } catch {
-      // Over quota or unavailable - the applicant just re-attaches the file(s) next time.
     }
   }, [persistedFiles, draftFilesStorageKey]);
 
@@ -528,7 +437,7 @@ export default function MembershipPortal({
     if (!file || file.size > MAX_PERSISTABLE_FILE_BYTES) return;
     readFileAsDataURL(file)
       .then((dataUrl) => setPersistedFiles((prev) => ({ ...prev, [key]: { dataUrl, name: file.name } })))
-      .catch(() => { /* best-effort only - the file still works for this session either way */ });
+      .catch(() => {  });
   };
 
   const handleDocumentUpload = (docType, file) => {
@@ -543,14 +452,10 @@ export default function MembershipPortal({
     onToast(`Attached: ${file.name}`, 'success');
   };
 
-  // Same client-side OCR sanity check used at storefront checkout (see
-  // Storefront.jsx's handleReceiptUpload/RECEIPT_OCR_KEYWORDS) - scans the
-  // image for words any real GCash confirmation would contain, so an
-  // applicant can't accidentally (or otherwise) attach an unrelated photo as
-  // their membership fee proof of payment.
+  // [VALIDATION] Membership fee receipt: OCR scan bago tanggapin
   const handleFeeReceiptUpload = async (e) => {
     const file = e.target.files && e.target.files[0];
-    e.target.value = ''; // allow re-picking the same file to re-trigger onChange
+    e.target.value = '';
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
@@ -586,12 +491,6 @@ export default function MembershipPortal({
     setPersistedFiles((prev) => { const next = { ...prev }; delete next.feeReceipt; return next; });
   };
 
-  // Shared by both places a PMES certificate gets attached (the Review step,
-  // and the Check Application Status panel). PDFs can't be OCR'd client-side
-  // without a heavier PDF-to-image step, so they're trusted structurally and
-  // skip the content scan; images get the same keyword sanity check the
-  // GCash receipt already gets, so an unrelated photo gets rejected instead
-  // of silently accepted as "the certificate."
   const handlePmesCertUpload = async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
@@ -630,11 +529,6 @@ export default function MembershipPortal({
     }
   };
 
-  // Everything typed (and every file attached) already auto-saves in the
-  // background on every change (see the effects above) - this button does
-  // nothing extra to the data itself. It exists purely to give the applicant
-  // an explicit, visible confirmation that their progress is safe, since
-  // "it just saves quietly with no feedback" isn't reassuring on its own.
   const handleSaveDraft = () => {
     onToast('Draft saved! You can leave and come back anytime to continue - nothing will be lost.', 'success');
   };
@@ -770,7 +664,7 @@ export default function MembershipPortal({
       try {
         window.localStorage.removeItem(draftStorageKey);
         window.localStorage.removeItem(draftFilesStorageKey);
-      } catch { /* ignore */ }
+      } catch {  }
       setPersistedFiles({});
       onToast('Digital Registration filed and saved to the cooperative registry! Submitted for board verification.', 'success');
       setActivePortalTab('status');
@@ -805,12 +699,6 @@ export default function MembershipPortal({
     searchApplicantByEmail(lookupEmail);
   };
 
-  // A guest who attended a PMES seminar as a walk-in (checked in present at
-  // the venue by admin) has no applicant/member record yet, so their
-  // attendance can only be recognized by matching this email against the
-  // walk-in roster - same email match POST /applicants uses to auto-link
-  // that attendance once they actually submit. Checking it here just lets
-  // "Apply for Membership" ungate itself before that submission happens.
   const [pmesAttendanceConfirmed, setPmesAttendanceConfirmed] = useState(false);
   const checkPmesAttendance = async (emailValue) => {
     if (!emailValue || !isValidEmail(emailValue)) return;
@@ -819,18 +707,11 @@ export default function MembershipPortal({
       const data = res.ok ? await res.json() : { attended: false };
       setPmesAttendanceConfirmed(!!data.attended);
     } catch {
-      // Best-effort - leave it ungated by this check alone if it fails.
     }
   };
   const pmesConfirmed = !!(activeSearchedApplicant?.pmesAttended || pmesAttendanceConfirmed);
 
-  // Every session (not just one) this email already reserved a slot for -
-  // shown persistently (gate modal, banner, schedule list) so "did I already
-  // reserve?" doesn't depend on remembering a one-time confirmation popup,
-  // and doesn't wrongly suggest a second registered session is reservable.
   const [myPmesRegistrations, setMyPmesRegistrations] = useState([]);
-  // The gate modal/banner talk about "a" seminar in general, not a specific
-  // card, so they just show the most recent registration.
   const myPmesRegistration = myPmesRegistrations[0] || null;
   const checkMyPmesRegistration = async (emailValue) => {
     if (!emailValue || !isValidEmail(emailValue)) return;
@@ -839,20 +720,10 @@ export default function MembershipPortal({
       const data = res.ok ? await res.json() : { registrations: [] };
       setMyPmesRegistrations(data.registrations || []);
     } catch {
-      // Best-effort - just means the persistent reminder won't show.
     }
   };
-  // True once a certificate is actually on file for this applicant - checked
-  // both ways since the field lands under a different name depending on
-  // which endpoint last populated activeSearchedApplicant (the by-email
-  // lookup's reduced toPublicStatusClient vs. the full toClient the upload
-  // endpoint returns).
   const pmesCertOnFile = !!(activeSearchedApplicant?.pmesCertificateAttached || activeSearchedApplicant?.documentsUploaded?.pmesCertificate);
 
-  // Pops up once when landing on "Apply" without a confirmed PMES attendance
-  // - the inline banner below says the same thing, but a popup is harder to
-  // miss than a banner scrolled past. Stays dismissed until the applicant
-  // switches away and back to "Apply", or their attendance status changes.
   const [pmesGateOpen, setPmesGateOpen] = useState(false);
   const [pmesGateDismissed, setPmesGateDismissed] = useState(false);
   useEffect(() => {
@@ -864,9 +735,6 @@ export default function MembershipPortal({
     document.getElementById('pmes-schedule-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // Signed-in customers land here already knowing their email - surface
-  // their existing application status immediately instead of making them
-  // retype it into the lookup form.
   useEffect(() => {
     if (user?.email) {
       setLookupEmail(user.email);
@@ -876,18 +744,9 @@ export default function MembershipPortal({
     }
   }, [user?.email]);
 
-  // Reservation confirmation popup (see render below) - separate from the
-  // toast used for errors, since a successful reservation is worth a harder
-  // to miss confirmation with the actual date/venue on it.
   const [reservedSession, setReservedSession] = useState(null);
 
   const registerForPmesSession = async (session) => {
-    // Preferred identity: an application already on file. Otherwise, a
-    // signed-in account with no application yet can still self-register -
-    // PMES attendance has to happen *before* applying, so requiring an
-    // application first here would be circular. A fully anonymous guest has
-    // no account for the backend to attach the reservation to, so that case
-    // still needs an application on file (or a look-up) first.
     const body = activeSearchedApplicant
       ? { applicantId: activeSearchedApplicant.id, email: activeSearchedApplicant.email }
       : {};
@@ -915,8 +774,6 @@ export default function MembershipPortal({
     }
   };
 
-  // Asks for confirmation (see the modal below) before actually cancelling -
-  // losing a slot isn't reversible if the session fills back up.
   const [cancelConfirmSession, setCancelConfirmSession] = useState(null);
   const cancelPmesReservation = async (session) => {
     const body = activeSearchedApplicant
@@ -944,10 +801,6 @@ export default function MembershipPortal({
     }
   };
 
-  // PMES attendance is now confirmed at the session roster check-in, then
-  // the certificate is sent from there (see BoardDashboardPage's PMES
-  // Attendance tab) - not by this upload. This just lets the applicant keep
-  // a copy of the certificate they were emailed on file.
   const uploadPmesCertificateForActiveApplicant = async (file) => {
     if (!activeSearchedApplicant) {
       onToast('Please look up or submit an active applicant profile first.', 'error');
@@ -979,8 +832,6 @@ export default function MembershipPortal({
     }
   };
 
-  // Once the board has approved this account's application, the apply/track
-  // pipeline no longer applies - contribution tracking moves to the Dashboard.
   const isApprovedMember = !!user && activeSearchedApplicant?.status === 'Approved';
 
   return (
@@ -1120,7 +971,6 @@ export default function MembershipPortal({
         </div>
       ) : (
       <>
-      {/* Tab Navigation header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-2">
         <div className="space-y-1 text-left">
           <p className="text-sm font-mono uppercase tracking-widest text-emerald-700 dark:text-emerald-400 font-bold">BOCOFAC Fellowship</p>
@@ -1173,7 +1023,6 @@ export default function MembershipPortal({
       {activePortalTab === 'apply' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-          {/* Main Onboarding Wizard Form */}
           <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 sm:p-8 space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1191,7 +1040,6 @@ export default function MembershipPortal({
               <Save className="w-4 h-4" /> Save as Draft
             </button>
 
-            {/* Step Indicators */}
             <div className="grid grid-cols-2 sm:grid-cols-7 gap-2 text-center text-[10px] font-bold">
               <div onClick={() => setWizardStep(1)} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 1 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Personal</div>
               <div onClick={() => { if (firstName) setWizardStep(2); }} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 2 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Address</div>
@@ -1705,7 +1553,6 @@ export default function MembershipPortal({
                   <p className="text-slate-500">Cooperative registry fees cover digital profile validation, credentials printing, and onboarding materials logistics. Pay safely via GCash to complete registry filing.</p>
                 </div>
 
-
                 <div className="p-4 bg-slate-100 dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800 rounded-xl space-y-4 text-left">
                   <div className="flex justify-between items-center">
                     <p className="text-xs font-semibold text-slate-600">Off-site Remittance Target (GCash)</p>
@@ -1716,7 +1563,6 @@ export default function MembershipPortal({
                       <p className="text-lg font-mono font-bold">0917-889-4402</p>
                       <p className="text-[10px] text-slate-400">Account Name: BOCOFAC Coop Primary</p>
                     </div>
-                    {/* File chooser */}
                     <div className="relative inline-block">
                       {scanningFeeReceipt ? (
                         <div className="flex flex-col items-center gap-1 px-3 py-1.5">
@@ -1967,7 +1813,6 @@ export default function MembershipPortal({
 
           </div>
 
-          {/* Right Side Info Stats */}
           <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-8 text-left">
             <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 space-y-4">
               <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1999,10 +1844,6 @@ export default function MembershipPortal({
               </p>
             </div>
 
-            {/* Always visible regardless of wizard step (or even before
-                starting the form at all) - not everyone browsing seminar
-                dates has decided to apply yet, and this used to only appear
-                after reaching step 5 of the wizard. */}
             <div id="pmes-schedule-panel" className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 space-y-3">
               <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-emerald-800 dark:text-emerald-400" />
@@ -2099,7 +1940,6 @@ export default function MembershipPortal({
                   <h4 className="font-bold text-slate-900 dark:text-white">{activeSearchedApplicant.fullName}</h4>
                   <p className="text-xs text-slate-400 font-mono">ID Reference: {activeSearchedApplicant.id}</p>
                 </div>
-                {/* Visual Status Badges */}
                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
                   activeSearchedApplicant.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
                   activeSearchedApplicant.status === 'Rejected' ? 'bg-rose-100 text-rose-800' :
@@ -2134,7 +1974,6 @@ export default function MembershipPortal({
                 </div>
               </div>
 
-              {/* Personal data sheet summary, matching the paper application form */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs border-t pt-4">
                 <div>
                   <p className="text-slate-400">Barangay / Mun-City</p>
@@ -2158,7 +1997,6 @@ export default function MembershipPortal({
                 </div>
               </div>
 
-              {/* Status Stepper visualization */}
               <div className="space-y-3 pt-3 border-t">
                 <p className="text-xs font-bold uppercase text-slate-400">Compliance checklist:</p>
                 <div className="space-y-2">
@@ -2271,9 +2109,6 @@ export default function MembershipPortal({
                             <input
                               type="file"
                               accept="image/*,application/pdf"
-                              // Only staged locally until "Submit" below is clicked -
-                              // remembering it here just means a refresh/back doesn't
-                              // silently lose the pick; it never auto-uploads on its own.
                               onChange={handlePmesCertUpload}
                               className="absolute inset-0 opacity-0 w-full cursor-pointer"
                             />

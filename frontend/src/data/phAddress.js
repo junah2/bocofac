@@ -1,23 +1,7 @@
-// src/data/phAddress.js
-// Static Philippine geography for the checkout address form - sourced once
-// from the PSGC (Philippine Standard Geographic Code) public dataset and
-// bundled here so the storefront never depends on a live API at runtime.
-//
-// BOCOFAC only actively delivers within Camarines Sur and Camarines Norte -
-// both provinces are populated down to full City/Municipality + Barangay
-// dropdowns so customers there always pick from a real list, never type it.
-// Anywhere else still gets delivered (see detectShippingZone below), just at
-// the flat "Outside Delivery Area" rate, via a free-text fallback instead of
-// a dropdown - it's not worth bundling nationwide barangay data for that tier.
-
-// BOCOFAC ships from here - the one town/barangay that qualifies for the
-// cheapest "Within Town/Municipality" tier.
 export const HOME_PROVINCE = 'Camarines Sur';
 export const HOME_CITY = 'Sipocot';
 export const HOME_BARANGAY = 'North Villazar';
 
-// The only two provinces offered as structured dropdowns - anything else is
-// captured via the "Other" free-text fallback in the Province selector.
 export const FOCUS_PROVINCES = ['Camarines Sur', 'Camarines Norte'];
 export const OTHER_PROVINCE_OPTION = 'Other (Outside Camarines Sur / Camarines Norte)';
 
@@ -1523,13 +1507,8 @@ export const BARANGAYS_BY_CITY = {
   ],
 };
 
-// Only Sooc, Lupi is genuinely near BOCOFAC's home barangay (North Villazar)
-// in practice - other bordering-on-a-map barangays like Barrera Sr. and La
-// Purisima are still a real trip away, so they stay on the regular
-// same-province rate. Sooc alone gets the reduced neighboring-barangay rate.
 export const LUPI_NEIGHBORING_BARANGAYS = ['Sooc'];
 
-// Mirrors the SHIPPING_ZONES keys in Storefront.jsx / backend/src/routes/orders.routes.js.
 export function detectShippingZone({ province, cityMunicipality, barangay }) {
   if (!province) return '';
   if (province === HOME_PROVINCE) {

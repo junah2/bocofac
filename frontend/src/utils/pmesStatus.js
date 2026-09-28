@@ -1,10 +1,3 @@
-// pmes_sessions.status is a static DB column set at creation (or by an
-// admin edit) - the backend never auto-flips it once a session's date has
-// passed, so a stale "Upcoming" badge would otherwise stick around forever
-// for a session that already happened. Derive the display status from
-// today's date instead of trusting the stored value directly, except for
-// "Cancelled"/"Completed" which are explicit admin overrides that should
-// always win.
 export function getPmesDisplayStatus(session) {
   if (session.status === 'Cancelled' || session.status === 'Completed') {
     return session.status;

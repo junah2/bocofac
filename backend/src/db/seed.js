@@ -2,24 +2,15 @@ require('../loadEnv');
 const bcrypt = require('bcrypt');
 const pool = require('./pool');
 
-// Generic neutral placeholder - the admin dashboard has no product-photo
-// upload yet (see the note on the PATCH /:id/stock route), so real product
-// photos aren't available until that's built; this avoids broken-image
-// icons in the meantime instead of guessing at a stock-photo URL.
 const NO_PHOTO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='100%25' height='100%25' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' font-size='20' text-anchor='middle' fill='%2394a3b8' font-family='sans-serif' dy='.3em'%3ENo Photo%3C/text%3E%3C/svg%3E";
 
 const PRODUCTS = [
-  // Old placeholder/demo catalog - kept (not deleted) because demo seed
-  // orders below still reference these ids via order_items' FK, but hidden
-  // from the storefront (stock 0) now that the real BOCOFAC catalog exists.
   { id: 'prod-01', name: 'Premium Coconut Shell Activated Charcoal', category: 'Charcoal', description: 'High-surface-property activated carbon tailored for supreme air purification, water filtration, and metallurgical applications. Sourced 100% from organic coconut husks.', price: 450, stock: 0, unit: '10kg Bag', image: 'https://images.unsplash.com/photo-1605600656374-27726839e731?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', rating: 4.8, views: 1240, ordersCount: 48, specifications: ['Mesh size: 8x30', 'Moisture < 5%', 'Ash content < 3%', 'Iodine number: 1050 mg/g'] },
   { id: 'prod-02', name: 'Cocopeat Organic Enrichment Fertilizer', category: 'Fertilizer', description: 'Dehydrated luxury cocopeat brick rich in nitrogen, potassium, and magnesium. Retains 800% water by weight—excellent for greenhouse potting mixes.', price: 180, stock: 0, unit: '5kg Block', image: 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', rating: 4.9, views: 1890, ordersCount: 112, specifications: ['pH: 5.8 - 6.5', 'EC < 0.5 mS/cm', '100% biodegradable', 'Double washed to remove salts'] },
   { id: 'prod-wre', name: 'Coir Geo-Textile High-Density EcoRope', category: 'Fibre & Coir', description: 'Heavy-duty eco-ropes constructed with hand-twisted coir fibre. Tailored for steep slope soil erosion prevention, gardening support, and marine utility.', price: 850, stock: 0, unit: '100m Roll', image: 'https://images.unsplash.com/photo-1512428559087-560fa5ceab42?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', rating: 4.6, views: 950, ordersCount: 22, specifications: ['Diameter: 12mm', 'Tensile strength: 120 lbs', 'Rot-resistant (lasts 3-5 years)', 'Natural hemp tint'] },
   { id: 'prod-03', name: 'Artisanal Coconut Shell Salad Bowls (Set)', category: 'Handicraft', description: 'Beautifully polished, reusable serving bowls carved from discarded coconut shells. Sanded and buffed with organic virgin coconut oil for a glossy sheen.', price: 320, stock: 0, unit: 'Set of 4', image: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', rating: 4.7, views: 740, ordersCount: 15, specifications: ['Size: ~12-14cm diameter', 'Food safe', 'Chemical-free processing', 'Zero waste packaging'] },
   { id: 'prod-04', name: 'Heavy Duty Coir Fiber Welcome Doormat', category: 'Handicraft', description: 'Extra stiff natural coir doormat with tough rubber backing. High moisture trapping ability, explicitly engineered for aggressive dirt scraping.', price: 250, stock: 0, unit: 'Piece', image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', rating: 4.5, views: 620, ordersCount: 30, specifications: ['Dimensions: 40x60cm', 'Pile height: 15mm', 'Anti-slip base', 'Fade-free dyes'] },
 
-  // Real BOCOFAC catalog. Stock defaults to 100 (no actual counts given yet)
-  // - adjust via Admin Dashboard > Products, which updates in realtime now.
   { id: 'prod-05', name: 'Organic Fertilizer', category: 'Fertilizer', description: 'Organic soil fertilizer produced by the cooperative, sold by the kilo.', price: 15, stock: 100, unit: '1 kg', image: NO_PHOTO, rating: 0, views: 0, ordersCount: 0, specifications: [] },
   { id: 'prod-06', name: 'Screened Coco Peat', category: 'Fertilizer', description: 'Finely screened coco peat growing medium, sold by the sack.', price: 250, stock: 100, unit: '1 Sack', image: NO_PHOTO, rating: 0, views: 0, ordersCount: 0, specifications: [] },
   { id: 'prod-07', name: 'Unscreened Coco Peat', category: 'Fertilizer', description: 'Raw, unscreened coco peat growing medium, sold by the sack.', price: 200, stock: 100, unit: '1 Sack', image: NO_PHOTO, rating: 0, views: 0, ordersCount: 0, specifications: [] },
@@ -44,9 +35,6 @@ const MEMBERS = [
   { id: 'M-1024', name: 'Fe Corazon De Guzman', email: 'corade_guzman@gmail.com', requiredShareCapital: 15000, joinedDate: '2025-11-02', status: 'Active' },
   { id: 'M-1025', name: 'Anacleto P. Bonifacio', email: 'bonifacio.anac@gmail.com', requiredShareCapital: 10000, joinedDate: '2026-02-14', status: 'Delinquent' },
 
-  // Additional realistic member dataset (generated) so the Membership /
-  // Share Capital admin views have real-looking volume to demonstrate,
-  // instead of just the original 5 handwritten demo rows above.
   { id: "M-1026", name: "Lourdes X. Perete", email: "lourdes.perete@outlook.com", requiredShareCapital: 15000, joinedDate: "2025-12-28", status: "Active", address: "Purok 2, Brgy. Lipilip, Sipocot, Camarines Sur", mobileNumber: "09199970328", ncfrsId: "NCFRS-2025-71040", rsbsaId: "04-08-06-105-899458", membershipFee: 300, membershipFeeDatePaid: "2025-12-31", membershipFeeReference: "REF-85577751", hasCv: true, hasFarmPhoto: true, hasShareCert: true, civicOrgAffiliation: "Sitio Torens Farmers Association" },
   { id: "M-1027", name: "Rodrigo N. Fajardo", email: "rodrigo.fajardo@gmail.com", requiredShareCapital: 10000, joinedDate: "2025-07-15", status: "Active", address: "Purok 6, Brgy. Tarum, Pasacao, Camarines Sur", mobileNumber: "09198359337", ncfrsId: "NCFRS-2025-42792", rsbsaId: "05-03-17-290-017599", membershipFee: 300, membershipFeeDatePaid: "2025-07-16", membershipFeeReference: "REF-12310283", hasCv: true, hasFarmPhoto: false, hasShareCert: true, civicOrgAffiliation: "4-H Club Sipocot Chapter" },
   { id: "M-1028", name: "Perla F. Vergara", email: "perla.vergara@yahoo.com", requiredShareCapital: 4000, joinedDate: "2024-03-23", status: "Delinquent", address: "Purok 7, Brgy. San Miguel, Del Gallego, Camarines Sur", mobileNumber: "09353797121", ncfrsId: "NCFRS-2024-35494", rsbsaId: "04-09-01-757-432165", membershipFee: 300, membershipFeeDatePaid: "2024-03-26", membershipFeeReference: "REF-25384464", hasCv: true, hasFarmPhoto: true, hasShareCert: false, civicOrgAffiliation: null },
@@ -93,8 +81,6 @@ const MEMBERS = [
   { id: "M-1069", name: "Rodel L. Bragais", email: "rodel.bragais@yahoo.com", requiredShareCapital: 4000, joinedDate: "2024-11-03", status: "Active", address: "Purok 4, Brgy. Amtic, Pasacao, Camarines Sur", mobileNumber: "09656439330", ncfrsId: "NCFRS-2024-02526", rsbsaId: "03-10-10-518-027935", membershipFee: 300, membershipFeeDatePaid: "2024-11-04", membershipFeeReference: "REF-40990607", hasCv: true, hasFarmPhoto: true, hasShareCert: true, civicOrgAffiliation: "Camarines Sur Coconut Growers Assoc." },
   { id: "M-1070", name: "Rustico J. Sales", email: "rustico.sales@outlook.com", requiredShareCapital: 6000, joinedDate: "2026-01-20", status: "Active", address: "Purok 7, Brgy. Danawan, Sipocot, Camarines Sur", mobileNumber: "09180303963", ncfrsId: "NCFRS-2026-98281", rsbsaId: "05-05-12-581-866474", membershipFee: 300, membershipFeeDatePaid: "2026-01-21", membershipFeeReference: "REF-99276715", hasCv: true, hasFarmPhoto: true, hasShareCert: true, civicOrgAffiliation: "BOCOFAC Youth Wing" },
 
-
-  // Second additional batch (M-1071..M-1140), same purpose as above.
   { id: "M-1071", name: "Benjamin M. Casulla", email: "benjamin.casulla@yahoo.com", requiredShareCapital: 12500, joinedDate: "2026-03-12", status: "Active", address: "Purok 6, Brgy. Amtic, Del Gallego, Camarines Sur", mobileNumber: "09196772198", ncfrsId: "NCFRS-2026-23079", rsbsaId: "04-04-18-852-150467", membershipFee: 300, membershipFeeDatePaid: "2026-03-14", membershipFeeReference: "REF-49331794", hasCv: true, hasFarmPhoto: true, hasShareCert: true, civicOrgAffiliation: "Camarines Sur Coconut Growers Assoc." },
   { id: "M-1072", name: "Fernando P. Villaruel", email: "fernando.villaruel@gmail.com", requiredShareCapital: 4000, joinedDate: "2025-11-19", status: "Active", address: "Purok 1, Brgy. San Rafael, Del Gallego, Camarines Sur", mobileNumber: "09956570153", ncfrsId: "NCFRS-2025-83416", rsbsaId: "05-13-10-269-426554", membershipFee: 300, membershipFeeDatePaid: "2025-11-22", membershipFeeReference: "REF-94463105", hasCv: true, hasFarmPhoto: false, hasShareCert: true, civicOrgAffiliation: "BOCOFAC Youth Wing" },
   { id: "M-1073", name: "Josefina T. Obias", email: "josefina.obias@yahoo.com", requiredShareCapital: 20000, joinedDate: "2025-11-21", status: "Active", address: "Purok 2, Brgy. Tarum, Libmanan, Camarines Sur", mobileNumber: "09191771129", ncfrsId: "NCFRS-2025-81170", rsbsaId: "02-08-01-190-790966", membershipFee: 300, membershipFeeDatePaid: "2025-11-22", membershipFeeReference: "REF-79502891", hasCv: true, hasFarmPhoto: true, hasShareCert: true, civicOrgAffiliation: null },
@@ -174,7 +160,6 @@ const LEDGER = [
   { id: 'TXN-7004', memberId: 'M-1022', paymentDate: '2025-06-11', amount: 3000, referenceId: 'REF-00103986', paymentMethod: 'GCash', status: 'Verified', verifiedAt: '2025-06-12' },
   { id: 'TXN-7005', memberId: 'M-1023', paymentDate: '2025-01-20', amount: 10000, referenceId: 'REF-00448209', paymentMethod: 'Over-the-Counter', status: 'Verified', verifiedAt: '2025-01-20' },
 
-  // Contribution history for the additional members above.
   { id: "TXN-7100", memberId: "M-1026", paymentDate: "2026-05-02", amount: 3500, referenceId: "REF-20353841", paymentMethod: "GCash", status: "Verified", verifiedAt: "2026-05-03" },
   { id: "TXN-7101", memberId: "M-1026", paymentDate: "2026-08-15", amount: 3500, referenceId: "REF-15038336", paymentMethod: "GCash", status: "Verified", verifiedAt: "2026-08-16" },
   { id: "TXN-7102", memberId: "M-1027", paymentDate: "2025-10-19", amount: 3000, referenceId: "REF-82622085", paymentMethod: "GCash", status: "Verified", verifiedAt: "2025-10-20" },
@@ -258,8 +243,6 @@ const LEDGER = [
   { id: "TXN-7180", memberId: "M-1069", paymentDate: "2025-12-14", amount: 500, referenceId: "REF-95001134", paymentMethod: "GCash", status: "Verified", verifiedAt: "2025-12-15" },
   { id: "TXN-7181", memberId: "M-1070", paymentDate: "2026-02-11", amount: 4000, referenceId: "REF-71983851", paymentMethod: "Over-the-Counter", status: "Verified", verifiedAt: "2026-02-12" },
 
-
-  // Contribution history for the second additional batch.
   { id: "TXN-7200", memberId: "M-1071", paymentDate: "2026-06-17", amount: 2000, referenceId: "REF-16416015", paymentMethod: "GCash", status: "Verified", verifiedAt: "2026-06-18" },
   { id: "TXN-7201", memberId: "M-1071", paymentDate: "2026-08-07", amount: 2000, referenceId: "REF-70719539", paymentMethod: "GCash", status: "Verified", verifiedAt: "2026-08-08" },
   { id: "TXN-7202", memberId: "M-1072", paymentDate: "2026-01-09", amount: 1000, referenceId: "REF-31366375", paymentMethod: "GCash", status: "Verified", verifiedAt: "2026-01-10" },
@@ -378,9 +361,6 @@ const LEDGER = [
   { id: "TXN-7315", memberId: "M-1140", paymentDate: "2025-10-10", amount: 2000, referenceId: "REF-76169248", paymentMethod: "GCash", status: "Verified", verifiedAt: "2025-10-11" },
 ];
 
-// NOTE: documentsUploaded booleans from the old mock data aren't backed by real
-// files, so we don't fabricate applicant_documents rows here - they'll be
-// populated for real once someone uploads through POST /applicants/:id/documents.
 const APPLICANTS = [
   { id: 'APP-901', fullName: 'Ronaldo V. Santos', email: 'ronny.santos@gmail.com', phone: '+63 917 123 4567', agriculturalType: 'Coconut Multi-cropping', farmSizeHectares: 2.5, address: 'Sitio Coco, Brgy. San Juan, San Pablo City, Laguna', submittedAt: '2026-06-10T10:30:00Z', status: 'PMES Pending', pmesAttended: false, registrationFeePaid: true, referenceNumber: 'REF-98761234' },
   { id: 'APP-902', fullName: 'Maria Estela Custodio', email: 'estela.custodio@outlook.com', phone: '+63 920 987 6543', agriculturalType: 'Pure Coconut Cultivation', farmSizeHectares: 4.8, address: 'Zone 4, Brgy. Santa Elena, Tiaong, Quezon', submittedAt: '2026-06-15T14:45:00Z', status: 'Pending Review', pmesAttended: true, pmesDate: '2026-06-14', registrationFeePaid: true, referenceNumber: 'REF-88495021' },
@@ -462,11 +442,6 @@ async function seed() {
     await client.query(`SELECT setval('session_id_seq', (SELECT COALESCE(MAX(NULLIF(regexp_replace(id, '\\D', '', 'g'), '')::int), 300) FROM pmes_sessions))`);
 
     for (const o of ORDERS) {
-      // Skip items too when the order already exists - unlike the other
-      // ON CONFLICT DO NOTHING inserts above, order_items has no unique
-      // constraint to dedupe against, so re-running this loop against an
-      // already-seeded order used to insert a duplicate set of items every
-      // time.
       const { rows: existingOrder } = await client.query('SELECT 1 FROM orders WHERE id = $1', [o.id]);
       if (existingOrder.length) continue;
 
@@ -484,7 +459,6 @@ async function seed() {
     }
     await client.query(`SELECT setval('order_id_seq', (SELECT COALESCE(MAX(NULLIF(regexp_replace(id, '\\D', '', 'g'), '')::int), 500) FROM orders))`);
 
-    // Seed-only admin/board accounts - there is no public signup path for these roles.
     const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@bocofac.coop';
     const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin123!';
     const boardEmail = process.env.SEED_BOARD_EMAIL || 'board@bocofac.coop';

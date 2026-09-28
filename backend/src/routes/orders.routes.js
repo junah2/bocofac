@@ -13,12 +13,7 @@ const { orderBodySchema, orderItemsSchema } = require('../validation/orders.sche
 
 const router = express.Router();
 
-// Flat-rate distance tiers instead of a real geocoded distance - the
-// cooperative has no mapping/logistics API, so the customer just picks the
-// zone their delivery address falls into at checkout. Fee is trusted only
-// from this table, never from whatever the client sends.
-// BOCOFAC's structured delivery area is Camarines Sur and Camarines Norte;
-// orders from anywhere else aren't blocked, they just pay the higher flat fee.
+// [ORDER] Shipping fee depende sa delivery zone
 const SHIPPING_ZONES = {
   'Within Town/Municipality': 50,
   'Neighboring Barangay (Lupi Border)': 50,
@@ -70,10 +65,7 @@ router.get('/me', requireAuth, asyncHandler(async (req, res) => {
   res.json(withItems);
 }));
 
-// An account is required to order - lets the cooperative actually reach a
-// buyer post-purchase (order history, notifications) instead of a one-off
-// guest checkout with no way to follow up if the payment reference turns
-// out to be wrong or disputed.
+// [ORDER PROCESSING] Pag-checkout ng customer: validate, compute total, bawas stock, save order
 router.post('/', requireAuth, uploadOrderReceipt.single('receipt'), validate(orderBodySchema), asyncHandler(async (req, res, next) => {
   const { buyerName, buyerEmail, phone, shippingAddress, paymentMethod, referenceNumber, shippingZone } = req.body;
   let rawItems;
@@ -104,8 +96,6 @@ router.post('/', requireAuth, uploadOrderReceipt.single('receipt'), validate(ord
   try {
     await client.query('BEGIN');
 
-    // Look up membership fresh from the DB rather than trusting the JWT's
-    // memberId claim, which can be stale if approval happened after login.
     let isMember = false;
     if (userId) {
       const { rows: userRows } = await client.query('SELECT member_id FROM users WHERE id = $1', [userId]);
@@ -120,10 +110,6 @@ router.post('/', requireAuth, uploadOrderReceipt.single('receipt'), validate(ord
     const productsById = new Map(productRows.rows.map((p) => [p.id, p]));
 
     let totalAmount = 0;
-    // Unit price actually charged per product - the admin-set promo discount
-    // (products.discount_percent) applied here server-side, not just trusted
-    // from whatever the storefront displayed, so the checkout total always
-    // matches what's recorded on the order.
     const unitPriceByProductId = new Map();
     for (const item of items) {
       const product = productsById.get(item.productId);
@@ -131,10 +117,12 @@ router.post('/', requireAuth, uploadOrderReceipt.single('receipt'), validate(ord
         await client.query('ROLLBACK');
         return res.status(404).json({ error: `Product ${item.productId} not found.` });
       }
+      // [VALIDATION] Bawal umorder ng higit sa natitirang stock
       if (product.stock < item.quantity) {
         await client.query('ROLLBACK');
         return res.status(409).json({ error: `Insufficient stock for ${product.name}. Only ${product.stock} left.` });
       }
+      // [ORDER] Server ang nagco-compute ng presyo (promo discount) para hindi madaya sa browser
       const discountPercent = Number(product.discount_percent) || 0;
       const unitPrice = discountPercent > 0
         ? Math.round(Number(product.price) * (1 - discountPercent / 100) * 100) / 100
@@ -143,10 +131,12 @@ router.post('/', requireAuth, uploadOrderReceipt.single('receipt'), validate(ord
       totalAmount += unitPrice * item.quantity;
     }
 
+    // [ORDER] 10% discount kapag coop member ang bumili
     const MEMBER_DISCOUNT_RATE = 0.10;
     if (isMember) {
       totalAmount = Math.round(totalAmount * (1 - MEMBER_DISCOUNT_RATE) * 100) / 100;
     }
+    // [ORDER] Order Total = Subtotal - Member Discount + Shipping Fee
     totalAmount = Math.round((totalAmount + shippingFee) * 100) / 100;
 
     const orderId = await nextOrderId(client);
@@ -166,6 +156,7 @@ router.post('/', requireAuth, uploadOrderReceipt.single('receipt'), validate(ord
         [orderId, product.id, product.name, unitPriceByProductId.get(item.productId), item.quantity]
       );
       await client.query(
+        // [INVENTORY DEDUCTION] Remaining Stock = Current Stock - Quantity Sold; +units sold
         'UPDATE products SET stock = GREATEST(stock - $1, 0), orders_count = orders_count + $1 WHERE id = $2',
         [item.quantity, product.id]
       );
@@ -173,7 +164,7 @@ router.post('/', requireAuth, uploadOrderReceipt.single('receipt'), validate(ord
 
     await client.query('COMMIT');
     broadcast('orders');
-    broadcast('products'); // stock was just decremented above
+    broadcast('products');
     res.status(201).json(toClient(rows[0], await loadItems(orderId)));
   } catch (err) {
     await client.query('ROLLBACK');
@@ -183,6 +174,7 @@ router.post('/', requireAuth, uploadOrderReceipt.single('receipt'), validate(ord
   }
 }));
 
+// [ORDER PROCESSING] Admin/board: i-verify ang GCash payment ng order
 router.patch('/:id/verify', requireRole('admin', 'board'), asyncHandler(async (req, res) => {
   const { rows: existing } = await pool.query('SELECT status FROM orders WHERE id = $1', [req.params.id]);
   if (!existing[0]) return res.status(404).json({ error: 'Order not found.' });
@@ -202,8 +194,6 @@ router.patch('/:id/verify', requireRole('admin', 'board'), asyncHandler(async (r
   res.json(toClient(rows[0], await loadItems(rows[0].id)));
 }));
 
-// Fulfillment status progression, updated by admin/board after payment is
-// verified (Processing -> Shipped -> Out for Delivery -> Delivered).
 const FULFILLMENT_STATUSES = ['Processing', 'Shipped', 'Out for Delivery', 'Delivered'];
 
 router.patch('/:id/status', requireRole('admin', 'board'), asyncHandler(async (req, res) => {
@@ -221,11 +211,6 @@ router.patch('/:id/status', requireRole('admin', 'board'), asyncHandler(async (r
     [status, req.params.id]
   );
   const statusLabel = status === 'Shipped' ? 'Delivered to Courier' : status;
-  // Handing off to the courier is the one fulfillment step admin actually
-  // triggers from the UI (see ORDER_FULFILLMENT_STATUSES in
-  // AdminDashboardPage.jsx) - give the customer a concrete estimate here
-  // rather than a bare status change, since the coop doesn't track courier
-  // transit itself and can't notify again once it's actually delivered.
   const statusMessage = status === 'Shipped'
     ? `Your order ${rows[0].id} is now Delivered to Courier. Estimated delivery is 3-5 days.`
     : `Your order ${rows[0].id} is now ${statusLabel}.`;
@@ -235,6 +220,7 @@ router.patch('/:id/status', requireRole('admin', 'board'), asyncHandler(async (r
   res.json(toClient(rows[0], await loadItems(rows[0].id)));
 }));
 
+// [ORDER PROCESSING] I-reject ang order (hal. mali ang reference) - may dahilan dapat
 router.patch('/:id/reject', requireRole('admin', 'board'), asyncHandler(async (req, res) => {
   const reason = (req.body.reason || '').trim();
   if (!reason) {
@@ -252,10 +238,6 @@ router.patch('/:id/reject', requireRole('admin', 'board'), asyncHandler(async (r
   res.json(toClient(rows[0], await loadItems(rows[0].id)));
 }));
 
-// Customer-initiated cancellation. Only allowed before the cooperative has
-// verified payment - once verification/fulfillment starts, the customer
-// must contact the co-op instead of self-cancelling. Reverses the stock
-// reservation made at order creation.
 router.patch('/:id/cancel', requireAuth, asyncHandler(async (req, res) => {
   const client = await pool.connect();
   try {
@@ -283,6 +265,7 @@ router.patch('/:id/cancel', requireAuth, asyncHandler(async (req, res) => {
     const { rows: items } = await client.query('SELECT * FROM order_items WHERE order_id = $1', [order.id]);
     for (const item of items) {
       await client.query(
+        // [INVENTORY] Pag na-cancel/reject ang order, ibinabalik ang stock
         'UPDATE products SET stock = stock + $1, orders_count = GREATEST(orders_count - $1, 0) WHERE id = $2',
         [item.quantity, item.product_id]
       );

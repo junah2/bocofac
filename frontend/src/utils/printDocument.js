@@ -1,28 +1,8 @@
-// src/utils/printDocument.js
-// Opens a small, self-contained popup window with print-ready HTML and
-// triggers the browser print dialog. Used for the share-capital Official
-// Receipt and Statement of Account - deliberately not a PDF library
-// dependency, just clean HTML the browser's own "Save as PDF" print
-// destination can turn into a file if the user wants one.
-
 const COOP_NAME = 'BOCOFAC Coconut Farmers Cooperative';
 
-// Mirrors backend/src/utils/shareCapital.js and the Dashboard's "Target
-// Amount" tile (DashboardPage.jsx) - the Statement of Account shows this
-// fixed range for "Required Share Capital" rather than the member's own
-// requiredShareCapital number, and "Remaining Balance" is that same range
-// minus what they've paid so far (floored at 0), not the member's own
-// target minus what they've paid.
 const MIN_REQUIRED_SHARE_CAPITAL = 4000;
 const MAX_REQUIRED_SHARE_CAPITAL = 25000;
 
-// Every value below (buyer names, member names/emails, product names...)
-// can originate from a customer/applicant-controlled form field, not just
-// staff input, and it's about to be dropped straight into document.write().
-// Without escaping, a name like <img src=x onerror=...> would execute as
-// real script in this popup - which is same-origin as the app and would
-// still carry the printing staff member's session cookie on any request it
-// makes. Escape everything interpolated into HTML below, no exceptions.
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -31,7 +11,7 @@ function escapeHtml(value) {
 
 function openPrintWindow(title, bodyHtml, { width = 480, height = 640 } = {}) {
   const win = window.open('', '_blank', `width=${width},height=${height}`);
-  if (!win) return; // popup blocked - nothing we can do without user gesture
+  if (!win) return;
   win.document.write(`
     <html>
       <head>

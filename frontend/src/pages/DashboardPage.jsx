@@ -1,4 +1,3 @@
-// src/pages/DashboardPage.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Camera, Lock, BadgeCheck, ShieldCheck, Hash, Calendar, ShoppingBag, User,
@@ -15,21 +14,14 @@ import RefMatchHint from '../components/RefMatchHint';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
-// Mirrors backend/src/utils/shareCapital.js - the "Target Amount" tile shows
-// this fixed range rather than the member's own requiredShareCapital number,
-// per how the cooperative wants it presented on the customer-facing page.
 const MIN_REQUIRED_SHARE_CAPITAL = 4000;
 const MAX_REQUIRED_SHARE_CAPITAL = 25000;
 
-// Cancellation window matches the backend's own 24-hour cutoff (orders.routes.js).
 const CANCELLABLE_WINDOW_MS = 24 * 60 * 60 * 1000;
 function canStillCancel(order) {
   return order.status === 'Pending Verification' && (Date.now() - new Date(order.orderedAt).getTime()) <= CANCELLABLE_WINDOW_MS;
 }
 
-// Answers reflect this app's actual behavior (24h cancel window above,
-// the real membership/verification flow) rather than generic boilerplate,
-// so nothing here promises something the system doesn't actually do.
 const FAQ_ITEMS = [
   {
     q: 'How do I become a cooperative member?',
@@ -131,9 +123,6 @@ function ApplicationStatusPanel({ applicantStatus, setPage }) {
   }
 
   if (applicantStatus.status === 'Approved') {
-    // Approved as an applicant, but /members/me came back empty - the
-    // application email doesn't match this account's email, so the board's
-    // approval step had nothing to link to.
     return (
       <div style={{ background: 'var(--card-bg)', borderRadius: 14, border: '1.5px solid var(--border)', padding: '28px' }}>
         <h2 style={{ fontWeight: 700, fontSize: 16, marginBottom: 18 }}>Membership Status</h2>
@@ -173,21 +162,14 @@ function ApplicationStatusPanel({ applicantStatus, setPage }) {
 
 export default function DashboardPage({ user, setUser, setPage, pmesSessions = [], onPmesSessionsRefresh, focusTab, onFocusTabConsumed, onToast }) {
   const [activeTab, setActiveTab] = useState('membership');
-  // Branded stand-in for window.confirm() (see AdminDashboardPage.jsx for
-  // the same pattern) - a native confirm() dialog is titled by the raw host
-  // ("localhost:3000 says"), which looks broken/unbranded to a customer.
   const [confirmPrompt, setConfirmPrompt] = useState(null);
 
-  // A notification click (see Navbar.jsx) asks to land on a specific tab -
-  // apply it once, then hand back control so the sidebar behaves normally.
   useEffect(() => {
     if (!focusTab) return;
     setActiveTab(focusTab);
     onFocusTabConsumed?.();
   }, [focusTab, onFocusTabConsumed]);
 
-  // Real orders for the signed-in customer, tied to their account via the
-  // session cookie (not the localStorage-only demo orders used elsewhere).
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
 
@@ -195,26 +177,20 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
   const pending = orders.filter(o => o.status === 'Pending Verification').length;
   const complete = orders.filter(o => o.status === 'Delivered' || o.status === 'Completed').length;
 
-  // Real membership + share-capital data for the signed-in customer.
   const [membership, setMembership] = useState(null);
   const [ledgerEntries, setLedgerEntries] = useState([]);
   const [loadingMembership, setLoadingMembership] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ amount: '', paymentMethod: 'GCash', referenceId: '' });
   const [submittingPayment, setSubmittingPayment] = useState(false);
-  // GCash screenshot for a share capital payment. Only used here in the
-  // browser: OCR reads its digits so the typed reference can be checked
-  // against it live, the same way checkout and the membership fee do.
-  const [payReceipt, setPayReceipt] = useState(null); // { name, preview, digitRuns }
+  const [payReceipt, setPayReceipt] = useState(null);
   const [scanningPayReceipt, setScanningPayReceipt] = useState(false);
 
-  // Accrued 10% monthly earnings + the member's own withdrawal request history.
   const [withdrawalData, setWithdrawalData] = useState({ availableBalance: 0, requests: [] });
   const [showWithdrawForm, setShowWithdrawForm] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
 
-  // Profile editing
   const [profileDraft, setProfileDraft] = useState({
     name: user?.name || '', email: user?.email || '', phone: user?.phone || '',
   });
@@ -222,20 +198,15 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef(null);
 
-  // Change password (Settings tab) - separate from the "forgot password"
-  // email-link flow, since this one already knows who's asking and just
-  // needs to confirm they still know the current password.
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [changingPassword, setChangingPassword] = useState(false);
 
-  // Help Center FAQ accordion + Privacy Policy - both collapsed by default
-  // so the Profile page doesn't turn into a wall of text.
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
 
   const handleAvatarFileChange = async (e) => {
     const file = e.target.files[0];
-    e.target.value = ''; // let picking the same file again re-trigger onChange
+    e.target.value = '';
     if (!file) return;
     setUploadingAvatar(true);
     try {
@@ -245,7 +216,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
         method: 'PATCH',
         credentials: 'include',
         body: formData,
-      });   
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to update profile photo.');
       setUser(data);
@@ -256,10 +227,6 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
     }
   };
 
-  // The customer's membership *application* (if any) - looked up by their
-  // account email, same public endpoint MembershipPortal uses. Lets the
-  // dashboard show real application progress (pending/rejected) instead of
-  // a flat "No Active Membership" box for anyone who has already applied.
   const [applicantStatus, setApplicantStatus] = useState(null);
 
   const loadMembershipData = async () => {
@@ -301,9 +268,6 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
     loadMembershipData();
     loadOrders();
 
-    // Keep polling while the customer sits on this page, so a payment (or
-    // membership application) that admin/board approves or rejects while
-    // they're looking shows up without them having to manually refresh.
     const interval = setInterval(() => {
       loadMembershipData();
       loadOrders();
@@ -337,18 +301,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
     });
   };
 
-  // Signed-in customers used to have no way to see/reserve PMES seminars
-  // once they were an approved member (MembershipPortal replaces its whole
-  // view with a "you're already a member" card) - this works for anyone
-  // signed in regardless of where they are in the pipeline: an approved
-  // member registers by memberId, an in-progress applicant by
-  // applicantId+email (same as MembershipPortal's own flow), and anyone with
-  // neither yet (hasn't applied at all) self-registers by their own account.
   const [registeringSessionId, setRegisteringSessionId] = useState(null);
-  // Every session (not just one) this account already reserved a slot for -
-  // shown persistently on each matching card so "did I already reserve?"
-  // doesn't depend on remembering a one-time confirmation toast, and doesn't
-  // wrongly suggest a second registered session is still reservable.
   const [myPmesRegistrations, setMyPmesRegistrations] = useState([]);
   const checkMyPmesRegistration = async () => {
     if (!user?.email) return;
@@ -357,24 +310,13 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
       const data = res.ok ? await res.json() : { registrations: [] };
       setMyPmesRegistrations(data.registrations || []);
     } catch {
-      // Best-effort - just means the persistent reminder won't show.
     }
   };
   useEffect(() => { checkMyPmesRegistration(); }, [user?.email]);
-  // Full sessions stay visible (with a disabled "Full" button) rather than
-  // vanishing from the list, so a member can see a session exists without
-  // wondering where it went - the backend independently rejects any
-  // over-capacity registration attempt regardless of this UI state.
   const upcomingPmesSessions = pmesSessions.filter(
     s => getPmesDisplayStatus(s) === 'Upcoming'
   );
   const handleReservePmesSlot = async (session) => {
-    // Signed-in on this page by definition, so there's always an account to
-    // attach the reservation to even before an application exists - a
-    // member registers by memberId, an in-progress applicant by
-    // applicantId+email, and anyone with neither yet (hasn't applied at all)
-    // still self-registers by their own account (backend fills that in from
-    // the session), since PMES attendance has to happen before applying.
     const memberId = membership?.member?.id;
     setRegisteringSessionId(session.id);
     try {
@@ -446,7 +388,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
 
   const handlePayReceiptUpload = async (e) => {
     const file = e.target.files && e.target.files[0];
-    e.target.value = ''; // allow re-picking the same file
+    e.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       onToast?.('Please upload an image (JPG, PNG, or WebP) of your GCash receipt.', 'error');
@@ -634,21 +576,12 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
     <div style={{ maxWidth: 1440, margin: '0 auto', padding: '44px 24px 64px' }}>
       <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-8" style={{ alignItems: 'start' }}>
 
-        {/* ── Sidebar ── */}
-        {/* Hidden below md: on a phone this card (avatar + 5 nav buttons +
-            logout) was rendering inline above the page content, pushing the
-            thing the member actually came to see (e.g. the membership
-            status/apply prompt) below the fold. Mobile navigates via the
-            profile icon in the Navbar instead (see Navbar.jsx); the photo
-            upload that used to live only here also has a mobile-only copy
-            in the Profile tab below so it isn't lost on small screens. */}
         <aside className="hidden md:block" style={{
           background: 'var(--card-bg)', borderRadius: 16,
           border: '1.5px solid var(--border)', padding: '28px 20px',
           boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
           position: 'sticky', top: 84,
         }}>
-          {/* Avatar - click the photo (or the camera badge) to replace it any time */}
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <input
               ref={avatarInputRef}
@@ -696,7 +629,6 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
             <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>{user?.email || 'user@example.com'}</p>
           </div>
 
-          {/* Nav items */}
           <nav>
             {sidebarTabs.map(tab => (
               <button
@@ -743,12 +675,8 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
           </nav>
         </aside>
 
-        {/* ── Main Content ── */}
         <main>
 
-          {/* My Orders - welcome banner + at-a-glance stats live here now,
-              right above the full order list, instead of a separate
-              "dashboard" tab that had no sidebar entry to reach it. */}
           {activeTab === 'orders' && (
             <>
               <div style={{
@@ -834,7 +762,6 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
             </>
           )}
 
-          {/* Membership */}
           {activeTab === 'membership' && (
             <>
               {loadingMembership ? (
@@ -868,7 +795,6 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
             </>
           )}
 
-          {/* PMES Seminars */}
           {activeTab === 'pmes' && (
             <div style={{ background: 'var(--card-bg)', borderRadius: 14, border: '1.5px solid var(--border)', padding: '28px' }}>
               <h2 style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Upcoming PMES Seminars</h2>
@@ -937,13 +863,9 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
             </div>
           )}
 
-          {/* Profile */}
           {activeTab === 'profile' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-              {/* Header banner - same gradient treatment as the Dashboard
-                  welcome banner, so Profile reads as part of the same app
-                  instead of a bare settings form. */}
               <div style={{
                 background: 'linear-gradient(135deg, var(--green) 0%, #566343 100%)',
                 borderRadius: 16, padding: '28px 32px',
@@ -975,9 +897,6 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                 </div>
               </div>
 
-              {/* Mobile-only photo editor - the sidebar this normally lives
-                  in is hidden below md so it stops crowding out page
-                  content on a phone, so this is mobile's only way to reach it. */}
               <div className="md:hidden" style={{
                 background: 'var(--card-bg)', borderRadius: 14, border: '1.5px solid var(--border)',
                 padding: '18px 24px', display: 'flex', alignItems: 'center', gap: 16,
@@ -1078,8 +997,6 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                 </div>
               </div>
 
-              {/* Help Center - real contact info (matches the site footer)
-                  plus FAQs grounded in what this app actually does. */}
               <div style={{ background: 'var(--card-bg)', borderRadius: 14, border: '1.5px solid var(--border)', padding: '28px' }}>
                 <h2 style={{ fontWeight: 700, fontSize: 16, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <HelpCircle size={16} /> Help Center
@@ -1156,10 +1073,6 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                 </div>
               </div>
 
-              {/* Privacy Policy - collapsed by default; describes what this
-                  app actually stores and who can see it (order verification
-                  is admin/board-only, per the access rules elsewhere in the
-                  app), not generic boilerplate. */}
               <div style={{ background: 'var(--card-bg)', borderRadius: 14, border: '1.5px solid var(--border)', padding: '28px' }}>
                 <button
                   onClick={() => setShowPrivacyPolicy(v => !v)}
@@ -1206,9 +1119,6 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
             </div>
           )}
 
-          {/* Settings - account editing (name/email/phone) and password
-              security, split out from Profile so that tab stays a read-only
-              account summary. */}
           {activeTab === 'settings' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div style={{ background: 'var(--card-bg)', borderRadius: 14, border: '1.5px solid var(--border)', padding: '28px' }}>
@@ -1240,9 +1150,6 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
                 </GreenBtn>
               </div>
 
-              {/* Security - Change Password (needs the current password) and
-                  Forgot Password (email reset link) live together here, since
-                  they're the same problem from two different starting points. */}
               <div style={{ background: 'var(--card-bg)', borderRadius: 14, border: '1.5px solid var(--border)', padding: '28px' }}>
                 <h2 style={{ fontWeight: 700, fontSize: 16, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Lock size={16} /> Security
@@ -1297,10 +1204,6 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
         </main>
       </div>
 
-      {/* Branded confirmation prompt, replacing window.confirm() (see
-          AdminDashboardPage.jsx for the same pattern) - a native confirm()
-          dialog is titled by the raw host ("localhost:3000 says"), which
-          looks broken/unbranded to a customer. */}
       {confirmPrompt && (
         <div className="fixed inset-0 z-[60] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 space-y-4">
@@ -1378,12 +1281,9 @@ function MembershipContributionPanel({
   const { member, totalContribution = 0, savingsBalance = 0, subscribedShare, paidUpCapital } = membership;
   const { availableBalance = 0, requests: withdrawalRequests = [] } = withdrawalData || {};
   const target = Number(member.requiredShareCapital) || 0;
-  // "Remaining Balance" tracks the same fixed 4k-25k range shown in "Target
-  // Amount" (not the member's own requiredShareCapital) - it's that range
-  // minus what they've paid so far, floored at 0. With no payments yet it's
-  // identical to the Target Amount range.
   const remainingMin = Math.max(MIN_REQUIRED_SHARE_CAPITAL - totalContribution, 0);
   const remainingMax = Math.max(MAX_REQUIRED_SHARE_CAPITAL - totalContribution, 0);
+  // [SHARE CAPITAL] Payment Progress = (Total Contribution / Required Share Capital) x 100
   const progressPct = target > 0 ? Math.min(100, Math.round((totalContribution / target) * 100)) : 0;
   const contributionStatus = target > 0 && totalContribution >= target
     ? 'Complete'
@@ -1393,6 +1293,7 @@ function MembershipContributionPanel({
     Partial: { bg: '#fef3c7', text: '#92400e' },
     Unpaid: { bg: '#f1f5f9', text: '#475569' },
   }[contributionStatus];
+  // [EARNINGS] Monthly Earning = Total Contribution x 10%
   const monthlyEarning = totalContribution * 0.10;
 
   return (
@@ -1520,10 +1421,6 @@ function MembershipContributionPanel({
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)' }}>
                 Payment Method
               </label>
-              {/* GCash is the cooperative's only accepted method right now, so
-                  this is shown as a fixed value instead of a dropdown with
-                  nothing else to pick - an arrow implying other options that
-                  don't exist would just be misleading. */}
               <div style={{
                 width: '100%', padding: '11px 14px', border: '1.5px solid var(--border)',
                 borderRadius: 10, fontSize: 14, fontWeight: 600, color: 'var(--text)', background: 'var(--card-bg)',

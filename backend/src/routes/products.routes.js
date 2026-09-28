@@ -9,9 +9,6 @@ const { auditFromRequest } = require('../utils/audit');
 
 const router = express.Router();
 
-// Mirrors the CHECK constraint on products.category in schema.sql - checked
-// here too so a bad category comes back as a clear 400 instead of a raw
-// Postgres constraint-violation error.
 const CATEGORIES = ['Charcoal', 'Fertilizer', 'Fibre & Coir', 'Handicraft'];
 
 function parseSpecifications(raw) {
@@ -28,6 +25,7 @@ function parseSpecifications(raw) {
 function toClient(row) {
   const price = Number(row.price);
   const discountPercent = Number(row.discount_percent) || 0;
+  // [PRICING] Sale price = presyo - promo discount %
   const salePrice = discountPercent > 0 ? Math.round(price * (1 - discountPercent / 100) * 100) / 100 : price;
   return {
     id: row.id,
@@ -62,6 +60,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
 
 router.post('/:id/view', asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
+    // [ANALYTICS] +1 view tuwing binubuksan ang product (gamit sa conversion rate)
     'UPDATE products SET views = views + 1 WHERE id = $1 RETURNING *',
     [req.params.id]
   );
@@ -69,6 +68,7 @@ router.post('/:id/view', asyncHandler(async (req, res) => {
   res.json(toClient(rows[0]));
 }));
 
+// [INVENTORY] Admin/board: manual na pag-update ng stock (restock)
 router.patch('/:id/stock', requireRole('admin', 'board'), asyncHandler(async (req, res) => {
   const { stock } = req.body;
   if (typeof stock !== 'number' || stock < 0) {
@@ -188,9 +188,6 @@ router.put('/:id', requireRole('admin'), uploadProductImage.single('image'), asy
 }));
 
 router.delete('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
-  // A product that already has order_items pointing at it can't be hard-deleted
-  // (see the FK in schema.sql) without rewriting order history - fall back to
-  // hiding it from the catalog instead so past orders stay intact.
   const { rows: referenced } = await pool.query('SELECT 1 FROM order_items WHERE product_id = $1 LIMIT 1', [req.params.id]);
   if (referenced.length > 0) {
     const { rows } = await pool.query('UPDATE products SET is_active = false WHERE id = $1 RETURNING *', [req.params.id]);

@@ -1,21 +1,15 @@
-// src/pages/AuthPages.jsx
 import React, { useState } from 'react';
 import { Mail, Lock, UserCircle, ShieldCheck, ArrowLeft, UserPlus, Sprout, ShoppingBag, Handshake, Eye, EyeOff } from 'lucide-react';
 import { GreenBtn, FormInput } from '../components/UI';
 import coconutHero from '../assets/coconut-palms-hero.jpg';
 import bocofacLogo from '../assets/bocofac-logo.jpg';
 
-// FRONTEND TO BACKEND- CONNECTION
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
-// Mirrors the backend's own rules (backend/src/validation/auth.schema.js) so
-// bad input gets caught here instead of round-tripping to the server first.
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const isValidEmail = value => EMAIL_REGEX.test(value.trim());
 const isValidPhone = value => /^09\d{9}$/.test(value);
 const digitsOnly = (value, maxLen) => value.replace(/\D/g, '').slice(0, maxLen);
-// Mirrors the backend's passwordSchema (auth.schema.js) - at least 8
-// characters, with a letter, a number, and a special character.
 function passwordError(value) {
   if (value.length < 8) return 'Password must be at least 8 characters.';
   if (!/[A-Za-z]/.test(value)) return 'Password must include at least one letter.';
@@ -24,14 +18,6 @@ function passwordError(value) {
   return '';
 }
 
-/* Chrome shows its "Saved passwords" dropdown on login-shaped forms even
-   when autoComplete="off" is set - it ignores that attribute for fields it
-   thinks are a username/password pair. The reliable fix is these hidden
-   decoy fields: placed first in the DOM, they match Chrome's heuristic for
-   "the" username/password inputs, so Chrome anchors its autofill targeting
-   to them instead of the real, visible fields below. They're never
-   reachable by the user (tabIndex=-1, zero size, aria-hidden) and aren't
-   wired to any state. */
 function AutofillDecoy() {
   const hiddenStyle = { position: 'absolute', width: 0, height: 0, padding: 0, margin: 0, border: 0, opacity: 0, overflow: 'hidden', pointerEvents: 'none' };
   return (
@@ -42,9 +28,6 @@ function AutofillDecoy() {
   );
 }
 
-/* Shared branded backdrop for the Forgot Password flow only - Sign In and
-   Create Account instead share AuthSplitLayout below, which keeps the same
-   left-side photo panel under both, swapping only the form on the right. */
 function AuthShell({ children, wide }) {
   return (
     <div className="h-full min-h-[calc(100vh-64px)] flex items-center justify-center px-5 py-6 relative overflow-hidden bg-[#1e2318]">
@@ -61,8 +44,6 @@ function AuthShell({ children, wide }) {
   );
 }
 
-/* Left-side branded panel shared by Sign In and Create Account - decorative
-   only, so it's dropped on small screens rather than squeezed. */
 function AuthBrandPanel() {
   return (
     <div className="hidden lg:flex flex-col lg:w-1/2 relative overflow-hidden bg-[#1e2318] px-10 py-10">
@@ -82,9 +63,6 @@ function AuthBrandPanel() {
           Sign in to manage your membership, track your share capital, and shop the marketplace — all in one place.
         </p>
 
-        {/* Real coconut grove photo fills the rest of the panel - the
-            gradient scrim keeps the feature row below readable without
-            needing a separate illustration on top of it. */}
         <div className="flex-1 flex items-center justify-center">
           <div className="relative">
             <div className="absolute inset-0 rounded-full bg-emerald-400/20 blur-2xl" />
@@ -124,9 +102,6 @@ function AuthBrandPanel() {
   );
 }
 
-/* Shared outer frame for Sign In and Create Account - same left photo panel
-   under both, so switching between them only swaps the card on the right
-   instead of the whole page changing shape. */
 function AuthSplitLayout({ children }) {
   return (
     <div className="min-h-screen flex">
@@ -140,7 +115,6 @@ function AuthSplitLayout({ children }) {
   );
 }
 
-/* ── Sign Up ── */
 function validateSignupField(key, values) {
   switch (key) {
     case 'name': return values.name.trim() ? '' : 'Name is required.';
@@ -199,10 +173,6 @@ export function SignupPage({ setPage, onToast }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not create your account.');
-      // Land back on Sign In (not straight into the dashboard) so the new
-      // member's very first action is actually signing in with the
-      // credentials they just set - one consistent login path for every
-      // account, freshly created or not.
       onToast('Account created! Please sign in to continue.', 'success');
       setPage('signin');
     } catch (err) {
@@ -244,12 +214,6 @@ export function SignupPage({ setPage, onToast }) {
           </p>
         </div>
 
-        {/* This form only ever creates a Member account - Admin and Board
-            accounts aren't self-registered. Everyone, staff included,
-            signs in through the same shared form via the "Sign In" link
-            below (see SigninPage), so no separate staff link is needed
-            here. */}
-
         <AutofillDecoy />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5">
@@ -282,8 +246,6 @@ export function SignupPage({ setPage, onToast }) {
   );
 }
 
-
-// sign-in validation
 function validateSigninField(key, values) {
   switch (key) {
     case 'email':
@@ -295,19 +257,16 @@ function validateSigninField(key, values) {
   }
 }
 
-// One shared sign-in form for every role (member/customer, admin, board) -
-// there's nothing to pick beforehand. The backend's response tells us the
-// account's actual role, and that alone decides which dashboard opens.
 export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
-  const [form, setForm] = useState({ email: '', pass: '' });  //dito nai-store yung data sa email and pass
+  const [form, setForm] = useState({ email: '', pass: '' });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const noAutofillProps = {
-    'data-lpignore': 'true', // LastPass
-    'data-1p-ignore': '', // 1Password
-    'data-bwignore': 'true', // Bitwarden
-    'data-form-type': 'other', // Dashlane and other generic password managers
+    'data-lpignore': 'true',
+    'data-1p-ignore': '',
+    'data-bwignore': 'true',
+    'data-form-type': 'other',
   };
 
   const set = key => e => {
@@ -317,11 +276,9 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
     setErrors(prevErr => (prevErr[key] ? { ...prevErr, [key]: validateSigninField(key, next) } : prevErr));
   };
 
-// 359-401 login inputt validation
-
   const handleBlur = key => () => setErrors(prev => ({ ...prev, [key]: validateSigninField(key, form) }));
 
-  const handleSubmit = async () => { // submit
+  const handleSubmit = async () => {
     const fieldErrors = {
       email: validateSigninField('email', form),
       pass: validateSigninField('pass', form),
@@ -332,7 +289,7 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
     setSubmitting(true);
     try {
 
-      // CONNECTION OF FRONTEND TO BACKEND
+      // [LOGIN] Tinatawag ang /api/auth/signin; cookie ang nagdadala ng session
       const res = await fetch(`${API_BASE}/auth/signin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -460,12 +417,8 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
   );
 }
 
-/* ── Forgot Password ── */
-// Two steps in one page: request a code by email, then enter that code plus
-// a new password. No link/token in a URL to click - the customer just types
-// the code back into the same screen they requested it from.
 export function ForgotPasswordPage({ setPage, onToast }) {
-  const [step, setStep] = useState('email'); // 'email' | 'code'
+  const [step, setStep] = useState('email');
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [requestingCode, setRequestingCode] = useState(false);

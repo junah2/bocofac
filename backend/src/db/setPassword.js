@@ -2,11 +2,6 @@ require('../loadEnv');
 const bcrypt = require('bcrypt');
 const pool = require('./pool');
 
-// Sets a new password for one account and signs it out everywhere - for
-// staff accounts whose password needs replacing without going through the
-// email reset flow. The password is read from NEW_PASSWORD (set it with
-// `read -s`) so it never appears in the command line or shell history.
-//   usage: NEW_PASSWORD=... npm run set-password -- admin@bocofac.coop
 async function run() {
   const email = process.argv[2];
   const password = process.env.NEW_PASSWORD;

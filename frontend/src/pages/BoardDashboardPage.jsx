@@ -71,8 +71,6 @@ export default function BoardDashboardPage({
   const [attendanceSession, setAttendanceSession] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef(null);
-  // Full-size preview for the small avatar thumbnail in Settings - clicking
-  // it opens the actual photo instead of leaving it stuck at 48x48px.
   const [viewedAvatarUrl, setViewedAvatarUrl] = useState(null);
 
   const handleAvatarFileChange = async (e) => {
@@ -105,7 +103,6 @@ export default function BoardDashboardPage({
     setPage('home');
   };
 
-  // ── Stat calculations (real, derived from app data) ──
   const realizedOrders = useMemo(() => orders.filter(o => o.status !== 'Pending Verification' && o.status !== 'Rejected' && o.status !== 'Cancelled'), [orders]);
   const totalFinancial = useMemo(() => realizedOrders.reduce((sum, o) => sum + o.totalAmount, 0), [realizedOrders]);
   const totalSales = useMemo(() => products.reduce((sum, p) => sum + p.ordersCount, 0), [products]);
@@ -122,20 +119,17 @@ export default function BoardDashboardPage({
   const rejectedApplicants = useMemo(() => applicants.filter(a => a.status === 'Rejected').length, [applicants]);
   const delinquentMembers = useMemo(() => members.filter(m => m.status !== 'Active').length, [members]);
 
-  // ── Reports tab breakdowns ──
   const pendingVerificationOrders = useMemo(() => orders.filter(o => o.status === 'Pending Verification').length, [orders]);
   const rejectedCancelledOrders = useMemo(() => orders.filter(o => o.status === 'Rejected' || o.status === 'Cancelled').length, [orders]);
   const avgOrderValue = useMemo(() => (realizedOrders.length ? totalFinancial / realizedOrders.length : 0), [realizedOrders, totalFinancial]);
   const lowStockProducts = useMemo(() => products.filter(p => p.stock > 0 && p.stock < LOW_STOCK_THRESHOLD), [products]);
   const outOfStockProducts = useMemo(() => products.filter(p => p.stock === 0), [products]);
 
-  // ── Financial Report chart data ──
   const financialChartData = useMemo(() => {
     const buckets = reportRange === 'Monthly' ? lastNMonths(6) : lastNQuarters(4);
     return bucketOrderRevenue(realizedOrders, buckets, reportRange);
   }, [realizedOrders, reportRange]);
 
-  // ── Application status donut data ──
   const applicationStatusData = [
     { name: 'Pending', value: pendingApplicants },
     { name: 'Approved', value: approvedApplicants },
@@ -206,12 +200,10 @@ export default function BoardDashboardPage({
   return (
     <div className="min-h-screen flex bg-[#faf8f4] dark:bg-slate-950 text-slate-900 dark:text-slate-100">
 
-      {/* Desktop sidebar: fixed to the viewport (like the footer) so it never scrolls with the page */}
       <aside className="hidden md:flex w-72 bg-gradient-to-b from-emerald-600 to-emerald-700 dark:from-emerald-800 dark:to-emerald-950 flex-col shrink-0 select-none fixed top-0 left-0 z-20 h-[calc(100vh-var(--footer-h,0px))] overflow-y-auto">
         <SidebarNav />
       </aside>
 
-      {/* Mobile drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="w-72 bg-gradient-to-b from-emerald-600 to-emerald-700 dark:from-emerald-800 dark:to-emerald-950 flex flex-col h-full">
@@ -222,7 +214,6 @@ export default function BoardDashboardPage({
       )}
 
       <div className="flex-1 min-w-0 md:ml-72">
-        {/* Mobile header */}
         <div className="md:hidden flex items-center justify-between px-4 py-3.5 bg-emerald-600 text-white sticky top-0 z-40">
           <span className="font-bold text-sm">BOCOFAC Board of Director</span>
           <button onClick={() => setMobileMenuOpen(true)}><Menu className="w-5 h-5" /></button>
@@ -253,7 +244,6 @@ export default function BoardDashboardPage({
                 </div>
               </div>
 
-              {/* Stat cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 space-y-3">
                   <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold">₱</div>
@@ -290,7 +280,6 @@ export default function BoardDashboardPage({
                 </div>
               </div>
 
-              {/* Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6">
                   <div className="flex items-center justify-between mb-4">
@@ -346,7 +335,6 @@ export default function BoardDashboardPage({
                 </div>
               </div>
 
-              {/* Recent activity */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6">
                   <div className="flex items-center justify-between mb-4">

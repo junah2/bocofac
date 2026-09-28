@@ -10,6 +10,7 @@ const { SHARE_CAPITAL_CAP } = require('../utils/shareCapital');
 
 const router = express.Router();
 
+// [EARNINGS] 10% kada buwan ng share capital (fully paid members lang)
 const MONTHLY_RATE = 0.10;
 
 function toClient(row) {
@@ -28,9 +29,7 @@ function toClient(row) {
   };
 }
 
-// Whole calendar months elapsed since `joinedDate`, floored - a partial
-// month in progress doesn't count yet, matching how the flat monthly-earning
-// display on the dashboard only shows one month's worth at a time.
+// [EARNINGS] Bilang ng buong buwan mula nang sumali ang member
 function monthsElapsed(joinedDate) {
   const start = new Date(joinedDate);
   const now = new Date();
@@ -39,11 +38,6 @@ function monthsElapsed(joinedDate) {
   return Math.max(0, months);
 }
 
-// Earnings only ever accrue for members who have fully paid their required
-// share capital (mirrors the "Fully Paid" badge elsewhere) - months are
-// counted from `joined_date` since that's the only membership-start
-// timestamp the schema tracks. Available balance nets out everything
-// already sent so a member can never double-withdraw the same accrual.
 async function getEarningsSummary(client, memberId) {
   const { rows } = await client.query(
     `SELECT m.required_share_capital, m.joined_date,
@@ -55,13 +49,12 @@ async function getEarningsSummary(client, memberId) {
   const row = rows[0];
   if (!row) return { lifetimeAccrued: 0, totalSent: 0, availableBalance: 0 };
 
-  // Same cap as members.routes.js GET /me: payments beyond SHARE_CAPITAL_CAP
-  // are the member's savings, not more share capital, so they don't accrue
-  // the monthly earnings rate either.
   const shareCapitalContribution = Math.min(Number(row.total_contribution), SHARE_CAPITAL_CAP);
   const isFullyPaid = Number(row.required_share_capital) > 0 && shareCapitalContribution >= Number(row.required_share_capital);
+  // [EARNINGS] Lifetime Earnings = Share Capital x 10% x Months Elapsed
   const lifetimeAccrued = isFullyPaid ? shareCapitalContribution * MONTHLY_RATE * monthsElapsed(row.joined_date) : 0;
   const totalSent = Number(row.total_sent);
+  // [EARNINGS] Available Balance = Lifetime Earnings - Nai-release na
   const availableBalance = Math.max(0, lifetimeAccrued - totalSent);
   return { lifetimeAccrued, totalSent, availableBalance };
 }
@@ -71,7 +64,6 @@ async function currentMemberId(req) {
   return rows[0] && rows[0].member_id;
 }
 
-// Self-service: the signed-in customer's own accrued balance + request history.
 router.get('/mine', requireAuth, asyncHandler(async (req, res) => {
   const memberId = await currentMemberId(req);
   if (!memberId) return res.json({ availableBalance: 0, lifetimeAccrued: 0, totalSent: 0, requests: [] });
@@ -84,9 +76,6 @@ router.get('/mine', requireAuth, asyncHandler(async (req, res) => {
   res.json({ ...summary, requests: rows.map(toClient) });
 }));
 
-// Customer requests a cashout of their accrued earnings - recorded Pending,
-// same maker-checker spirit as ledger payments: a real person (admin) has to
-// actually send the money and record it before this counts as paid out.
 router.post('/mine', requireAuth, asyncHandler(async (req, res) => {
   const memberId = await currentMemberId(req);
   if (!memberId) {
@@ -101,6 +90,7 @@ router.post('/mine', requireAuth, asyncHandler(async (req, res) => {
   try {
     await client.query('BEGIN');
     const { availableBalance } = await getEarningsSummary(client, memberId);
+    // [VALIDATION] Bawal mag-withdraw nang higit sa available balance
     if (amount > availableBalance) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: `Amount exceeds your available balance of ₱${availableBalance.toLocaleString()}.` });
@@ -122,7 +112,6 @@ router.post('/mine', requireAuth, asyncHandler(async (req, res) => {
   }
 }));
 
-// Admin/board visibility over every member's withdrawal requests.
 router.get('/', requireRole('admin', 'board'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT w.*, m.name AS member_name, u.name AS processed_by_name FROM withdrawals w
@@ -133,9 +122,6 @@ router.get('/', requireRole('admin', 'board'), asyncHandler(async (req, res) => 
   res.json(rows.map(toClient));
 }));
 
-// Admin marks a request Sent once they've actually transferred the money
-// (via GCash, outside the system) - sentAmount is recorded independently of
-// requestedAmount since what actually got sent is the source of truth.
 router.patch('/:id/send', requireRole('admin'), asyncHandler(async (req, res) => {
   const sentAmount = Number(req.body.sentAmount);
   const { reference } = req.body;

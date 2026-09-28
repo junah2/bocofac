@@ -1,13 +1,5 @@
-// src/data/initialData.js
-
-// Generic neutral placeholder - mirrors backend/src/db/seed.js's NO_PHOTO.
-// There's no product-photo upload in the admin dashboard yet, so real photos
-// aren't available; this avoids a broken-image icon in the meantime.
 const NO_PHOTO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='100%25' height='100%25' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' font-size='20' text-anchor='middle' fill='%2394a3b8' font-family='sans-serif' dy='.3em'%3ENo Photo%3C/text%3E%3C/svg%3E";
 
-// This is only the shape a first-ever visitor sees for an instant before
-// the real GET /api/products fetch resolves (see App.jsx's loadProducts) -
-// mirrors the seeded DB catalog so that flash of content matches reality.
 export const INITIAL_PRODUCTS = [
   { id: 'prod-05', name: 'Organic Fertilizer', category: 'Fertilizer', description: 'Organic soil fertilizer produced by the cooperative, sold by the kilo.', price: 15, stock: 100, unit: '1 kg', image: NO_PHOTO, rating: 0, views: 0, ordersCount: 0, specifications: [] },
   { id: 'prod-06', name: 'Screened Coco Peat', category: 'Fertilizer', description: 'Finely screened coco peat growing medium, sold by the sack.', price: 250, stock: 100, unit: '1 Sack', image: NO_PHOTO, rating: 0, views: 0, ordersCount: 0, specifications: [] },

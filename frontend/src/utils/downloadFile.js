@@ -1,4 +1,3 @@
-// src/utils/downloadFile.js
 export function downloadFile(filename, content, mimeType = 'text/plain') {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);

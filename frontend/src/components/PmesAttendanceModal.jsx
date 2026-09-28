@@ -1,10 +1,3 @@
-// src/components/PmesAttendanceModal.jsx
-// Shared by AdminDashboardPage and BoardDashboardPage, but the two roles see
-// different things: admin runs the physical roll-call (mark present, enroll
-// walk-ins) and never sends certificates; the board never checks anyone in -
-// they only ever see whoever admin already marked present (the backend
-// filters the roster itself for board, not just this UI) and their only
-// action is Send Certificate. Both restrictions are enforced server-side too.
 import React, { useEffect, useState } from 'react';
 import { Check, X, UserPlus, Mail, Send, AlertTriangle } from 'lucide-react';
 
@@ -17,26 +10,11 @@ export default function PmesAttendanceModal({ session, role, onClose, onToast })
   const [busyId, setBusyId] = useState(null);
   const [walkInForm, setWalkInForm] = useState({ fullName: '', email: '' });
   const [addingWalkIn, setAddingWalkIn] = useState(false);
-  // Confirms before an actual, hard-to-undo certificate email goes out - a
-  // stray/accidental click on "Send Certificate" would otherwise email the
-  // wrong person immediately with no way to recall it.
   const [confirmSend, setConfirmSend] = useState(null);
-  // Board's send-certificate list splits into Pending/Sent (mirrors the
-  // Active/History pattern used for Orders elsewhere) so a long roster of
-  // already-sent names doesn't bury the people still waiting.
   const [sendView, setSendView] = useState('pending');
-  // Clearing a name here only hides it from this board view (saved per
-  // session in the browser) - it never deletes the actual attendance /
-  // certificate-sent record, which stays as the cooperative's real audit
-  // trail of who was actually emailed a certificate.
   const [dismissedSentIds, setDismissedSentIds] = useState([]);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
-  // Cleared names are never actually gone - this reveals them again so the
-  // board can always prove a certificate really was sent, and undo a clear.
   const [showCleared, setShowCleared] = useState(false);
-  // Confirms before toggling attendance - a stray click on "Mark Present"
-  // would otherwise instantly check someone in (which can unlock sending
-  // them a certificate) with no prompt to double-check it's the right name.
   const [confirmAttendance, setConfirmAttendance] = useState(null);
   const dismissedStorageKey = `bocofac_pmes_dismissed_sent_${session.id}`;
 
@@ -67,7 +45,7 @@ export default function PmesAttendanceModal({ session, role, onClose, onToast })
     setDismissedSentIds(ids);
     try {
       window.localStorage.setItem(dismissedStorageKey, JSON.stringify(ids));
-    } catch { /* best-effort only */ }
+    } catch {  }
   };
   const dismissSentEntry = (id) => persistDismissed([...dismissedSentIds, id]);
   const restoreSentEntry = (id) => persistDismissed(dismissedSentIds.filter((x) => x !== id));

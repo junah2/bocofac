@@ -42,7 +42,6 @@ export default function PublicAbout({ onApplyMembership }) {
   return (
     <div className="animate-in fade-in duration-500">
 
-      {/* Hero */}
       <section className="relative overflow-hidden bg-[#1e2318]">
         <div className="relative max-w-6xl mx-auto px-6 py-20 sm:py-28 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="text-center lg:text-left space-y-8">
@@ -58,7 +57,6 @@ export default function PublicAbout({ onApplyMembership }) {
           </div>
 
           <div className="relative rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10 aspect-[4/5] max-w-sm mx-auto lg:mx-0">
-            {/* Video layer — keeps playing underneath even while a photo is shown */}
             <video
               ref={videoRef}
               src={aboutHeroVideo}
@@ -76,7 +74,6 @@ export default function PublicAbout({ onApplyMembership }) {
               }}
             />
 
-            {/* Photo layers — cross-fade in on top of the video */}
             {HERO_SLIDES.map((slide, i) =>
               slide.type === 'image' ? (
                 <div
@@ -97,7 +94,6 @@ export default function PublicAbout({ onApplyMembership }) {
               ) : null
             )}
 
-            {/* Slide indicators */}
             <div className="absolute top-3 right-3 flex gap-1.5 z-10">
               {HERO_SLIDES.map((_, i) => (
                 <span
@@ -114,7 +110,6 @@ export default function PublicAbout({ onApplyMembership }) {
         </div>
       </section>
 
-      {/* Mission & Vision */}
       <section className="max-w-6xl mx-auto px-6 py-20 space-y-10">
         <div className="text-center max-w-2xl mx-auto space-y-3">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">Our Purpose</h2>
@@ -144,7 +139,6 @@ export default function PublicAbout({ onApplyMembership }) {
         </div>
       </section>
 
-      {/* Governance & Compliance */}
       <section className="bg-[#FDFCF7] dark:bg-slate-950 border-y border-slate-200 dark:border-slate-800">
         <div className="max-w-6xl mx-auto px-6 py-20 space-y-12">
           <div className="text-center max-w-2xl mx-auto space-y-3">
@@ -177,7 +171,6 @@ export default function PublicAbout({ onApplyMembership }) {
         </div>
       </section>
 
-      {/* CTA */}
       <section className="max-w-5xl mx-auto px-6 py-20">
         <div className="rounded-2xl bg-[#313826] text-white px-8 py-12 sm:px-14 flex flex-col sm:flex-row items-center justify-between gap-6 relative overflow-hidden">
           <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />

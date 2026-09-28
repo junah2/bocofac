@@ -27,18 +27,11 @@ function toClient(row) {
   };
 }
 
-// Looks up member_id fresh from the users table rather than trusting the JWT
-// claim - a member gets linked to a user asynchronously (Board approval), so
-// a session issued before that would otherwise carry a stale/null memberId
-// until the user signs out and back in.
 async function currentMemberId(req) {
   const { rows } = await pool.query('SELECT member_id FROM users WHERE id = $1', [req.user.sub]);
   return rows[0] && rows[0].member_id;
 }
 
-// Self-service payment history for the signed-in customer's own Dashboard -
-// scoped to the caller's own member, so a customer can never read another
-// member's ledger, unlike the admin/board-only GET / below.
 router.get('/mine', requireAuth, asyncHandler(async (req, res) => {
   const memberId = await currentMemberId(req);
   if (!memberId) return res.json([]);
@@ -51,13 +44,7 @@ router.get('/mine', requireAuth, asyncHandler(async (req, res) => {
   res.json(rows.map(toClient));
 }));
 
-// Customer self-reports a payment (e.g. GCash reference) - recorded as
-// Pending, not Verified, since the reference number is only a self-report
-// at this point; it must not count toward the member's balance (see the
-// status = 'Verified' filter in members.routes.js /me) until an admin/board
-// user confirms the GCash reference is real via PATCH /:id/verify below.
-// Mirrors the admin POST / below but the memberId always comes from the
-// session, never the request body.
+// [SHARE CAPITAL] Member nag-submit ng bayad - Pending muna hanggang ma-verify
 router.post('/mine', requireAuth, asyncHandler(async (req, res) => {
   const memberId = await currentMemberId(req);
   if (!memberId) {
@@ -93,19 +80,12 @@ router.get('/', requireRole('admin', 'board'), asyncHandler(async (req, res) => 
   res.json(rows.map(toClient));
 }));
 
-// Admin-entered digital payments (GCash) still start Pending (see the
-// `entered_by` column and PATCH /:id/verify below) - the same admin who logs
-// a contribution must not be the one who verifies it, since a GCash
-// reference still needs a second person to actually check it against the
-// real transfer. Over-the-Counter is different: the admin taking the walk-in
-// cash payment witnesses it directly (no receipt/reference to cross-check
-// later), so it's recorded as Verified immediately instead of sitting
-// Pending for a maker-checker that has nothing left to verify.
 router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
   const { memberId, amount, referenceId, paymentMethod, paymentDate } = req.body;
   if (!memberId || !amount || amount <= 0 || !paymentMethod) {
     return res.status(400).json({ error: 'memberId, a positive amount, and paymentMethod are required.' });
   }
+  // [SHARE CAPITAL] Over-the-Counter = verified agad; GCash = kailangan pang i-verify
   const isOverTheCounter = paymentMethod === 'Over-the-Counter';
 
   const client = await pool.connect();
@@ -159,13 +139,13 @@ router.patch('/:id/verify', requireRole('admin', 'board'), asyncHandler(async (r
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Ledger entry not found.' });
     }
+    // [AUTHORIZATION] Maker-checker: ang nag-encode ng bayad ay hindi pwedeng siya rin ang mag-verify
     if (existing[0].entered_by === req.user.sub) {
       await client.query('ROLLBACK');
       return res.status(403).json({ error: 'You cannot verify a payment you entered yourself - ask another admin or board member to verify it.' });
     }
 
-    // Keep the existing OR number if this entry was somehow verified before
-    // (shouldn't normally happen) rather than burning a new number on it.
+    // [SHARE CAPITAL] Official Receipt number (OR-YYYY-NNNNNN) pag verified na
     const orNumber = existing[0].or_number || await nextOrNumber(client);
     const { rows } = await client.query(
       `UPDATE ledger SET status = 'Verified', verified_at = CURRENT_DATE, verified_by = $1, or_number = $2

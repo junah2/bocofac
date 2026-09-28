@@ -1,12 +1,7 @@
-// OCR for GCash receipt screenshots, shared by checkout and the
-// membership fee step. Tesseract misreads the small reference-number text on
-// phone screenshots ("9" for "3", a dropped leading digit) unless the text is
-// large, so small images are first redrawn at up to 3x size in grayscale -
-// on a 460px-wide GCash screenshot that turned a garbled reference into an
-// exact read.
 const TARGET_WIDTH = 1400;
 const MAX_SCALE = 3;
 
+// [OCR] Pinapalaki at ginagawang grayscale ang picture para mas mabasa ang reference number
 async function upscaleForOcr(file) {
   try {
     const bitmap = await createImageBitmap(file);
@@ -22,7 +17,7 @@ async function upscaleForOcr(file) {
     bitmap.close && bitmap.close();
     return canvas;
   } catch {
-    return file; // unsupported format for canvas - let Tesseract try the original
+    return file;
   }
 }
 

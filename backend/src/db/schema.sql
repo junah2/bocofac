@@ -1,6 +1,3 @@
--- BOCOFAC schema. Formatted-ID sequences let us keep the app's existing
--- human-readable ID style (M-1021, TXN-7001, ...) while letting Postgres
--- guarantee uniqueness instead of the old client-side Math.random() scheme.
 CREATE SEQUENCE IF NOT EXISTS member_id_seq START 1000;
 CREATE SEQUENCE IF NOT EXISTS ledger_id_seq START 7000;
 CREATE SEQUENCE IF NOT EXISTS applicant_id_seq START 900;
@@ -10,6 +7,7 @@ CREATE SEQUENCE IF NOT EXISTS product_id_seq START 20;
 CREATE SEQUENCE IF NOT EXISTS withdrawal_id_seq START 1;
 CREATE SEQUENCE IF NOT EXISTS notification_id_seq START 1;
 
+-- [DATABASE] Mga member ng coop at required share capital nila
 CREATE TABLE IF NOT EXISTS members (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -20,11 +18,6 @@ CREATE TABLE IF NOT EXISTS members (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Extra fields from the paper "Member's Information Sheet" that aren't
--- captured anywhere else (an admin-filed member has no applicant record
--- behind it at all, so these can't just be joined in from `applicants`).
--- Kept nullable/blank-by-default since they're filled in over time as the
--- physical folder for a shareholder is completed, not all at once at intake.
 ALTER TABLE members ADD COLUMN IF NOT EXISTS address TEXT;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS mobile_number TEXT;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS ncfrs_id TEXT;
@@ -38,13 +31,11 @@ ALTER TABLE members ADD COLUMN IF NOT EXISTS has_share_cert BOOLEAN NOT NULL DEF
 ALTER TABLE members ADD COLUMN IF NOT EXISTS farm_profile_notes TEXT;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS civic_org_affiliation TEXT;
 
--- "Removed" lets admin revoke a delinquent member's standing after a
--- reminder goes unheeded, without deleting the row (their share capital
--- ledger, orders, and withdrawal history all stay intact for the record).
 ALTER TABLE members DROP CONSTRAINT IF EXISTS members_status_check;
 ALTER TABLE members ADD CONSTRAINT members_status_check
   CHECK (status IN ('Active', 'Delinquent', 'Removed'));
 
+-- [DATABASE] Accounts: password_hash (bcrypt) at role (customer / admin / board)
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -60,6 +51,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token_hash TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 
+-- [DATABASE] Share capital payments (GCash / Over-the-Counter), Pending hanggang ma-verify
 CREATE TABLE IF NOT EXISTS ledger (
   id TEXT PRIMARY KEY,
   member_id TEXT NOT NULL REFERENCES members(id),
@@ -73,26 +65,15 @@ CREATE TABLE IF NOT EXISTS ledger (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_ledger_member_id ON ledger(member_id);
--- BOCOFAC takes share capital by GCash (online) or Over-the-Counter
--- (walk-in) only - there is no bank transfer option. Any old "Bank Transfer"
--- rows are recorded as GCash first, since Postgres checks existing rows
--- against a new CHECK constraint when it is added.
 ALTER TABLE ledger DROP CONSTRAINT IF EXISTS ledger_payment_method_check;
 UPDATE ledger SET payment_method = 'GCash' WHERE payment_method = 'Bank Transfer';
 ALTER TABLE ledger ADD CONSTRAINT ledger_payment_method_check
   CHECK (payment_method IN ('GCash', 'Over-the-Counter'));
--- Maker-checker control: whoever logs a payment (member self-report or an
--- admin manually posting one) cannot be the same person who verifies it.
 ALTER TABLE ledger ADD COLUMN IF NOT EXISTS entered_by INTEGER REFERENCES users(id);
--- Official Receipt number, assigned only once a payment is Verified (a
--- receipt certifies a confirmed transaction, not a self-reported one).
 CREATE SEQUENCE IF NOT EXISTS ledger_or_seq START 1;
 ALTER TABLE ledger ADD COLUMN IF NOT EXISTS or_number TEXT;
 
--- Member-requested cashouts of their accrued 2% monthly cooperative earnings.
--- Kept separate from `ledger` since that table is share-capital contributions
--- flowing IN; this is earnings flowing OUT, sent manually by an admin outside
--- the system (via GCash) and then recorded here for the audit trail.
+-- [DATABASE] Withdrawal requests ng earnings ng members
 CREATE TABLE IF NOT EXISTS withdrawals (
   id TEXT PRIMARY KEY,
   member_id TEXT NOT NULL REFERENCES members(id),
@@ -107,11 +88,6 @@ CREATE TABLE IF NOT EXISTS withdrawals (
 );
 CREATE INDEX IF NOT EXISTS idx_withdrawals_member_id ON withdrawals(member_id);
 
--- Per-user notification feed backing the customer navbar bell icon. Every
--- customer-relevant event (payment verified, withdrawal sent/rejected, order
--- status change, membership decision) writes a row here so the customer sees
--- it regardless of which device/tab they check from, with real read/unread
--- state instead of a derived "what changed recently" guess.
 CREATE TABLE IF NOT EXISTS notifications (
   id TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id),
@@ -122,6 +98,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 
+-- [DATABASE] Membership applications
 CREATE TABLE IF NOT EXISTS applicants (
   id TEXT PRIMARY KEY,
   full_name TEXT NOT NULL,
@@ -139,8 +116,6 @@ CREATE TABLE IF NOT EXISTS applicants (
   reviewed_by INTEGER REFERENCES users(id),
   reviewed_at TIMESTAMPTZ,
   created_member_id TEXT REFERENCES members(id),
-  -- Personal data sheet fields, matching the paper "Application for Regular
-  -- Membership" form so the digital intake captures the same content.
   first_name TEXT,
   middle_name TEXT,
   last_name TEXT,
@@ -175,17 +150,10 @@ CREATE TABLE IF NOT EXISTS applicants (
   subscribed_share NUMERIC(12,2),
   paid_up_capital NUMERIC(12,2),
   or_number TEXT,
-  -- Structured "Member's Farm Profile" data (coconut/swine/livestock/cacao/
-  -- rice/corn/other crops breakdown) from the paper form. Kept as JSONB
-  -- rather than dozens of flat columns since the field set is a fixed,
-  -- form-shaped bundle that's only ever read/written as a whole.
   farm_profile JSONB
 );
 CREATE INDEX IF NOT EXISTS idx_applicants_email ON applicants(email);
 
--- applicants may already exist from an earlier migration run, so add the
--- personal-data-sheet columns individually (idempotent on both fresh and
--- already-migrated databases).
 ALTER TABLE applicants ADD COLUMN IF NOT EXISTS first_name TEXT;
 ALTER TABLE applicants ADD COLUMN IF NOT EXISTS middle_name TEXT;
 ALTER TABLE applicants ADD COLUMN IF NOT EXISTS last_name TEXT;
@@ -222,8 +190,6 @@ ALTER TABLE applicants ADD COLUMN IF NOT EXISTS paid_up_capital NUMERIC(12,2);
 ALTER TABLE applicants ADD COLUMN IF NOT EXISTS or_number TEXT;
 ALTER TABLE applicants ADD COLUMN IF NOT EXISTS farm_profile JSONB;
 
--- Board must record why an application was rejected so the applicant can
--- see the reason (mirrors orders.rejection_reason above).
 ALTER TABLE applicants ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
 
 CREATE TABLE IF NOT EXISTS applicant_dependents (
@@ -246,13 +212,11 @@ CREATE TABLE IF NOT EXISTS applicant_documents (
   UNIQUE(applicant_id, doc_type)
 );
 
--- farm_declaration and barangay_clearance were never actually collectible (no
--- upload UI ever asked applicants for them) and the client doesn't require
--- them, so they're dropped from the allowed doc_type list here too.
 ALTER TABLE applicant_documents DROP CONSTRAINT IF EXISTS applicant_documents_doc_type_check;
 ALTER TABLE applicant_documents ADD CONSTRAINT applicant_documents_doc_type_check
   CHECK (doc_type IN ('valid_id', 'registration_fee_receipt', 'pmes_certificate'));
 
+-- [DATABASE] PMES seminar schedules (max 40 participants)
 CREATE TABLE IF NOT EXISTS pmes_sessions (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -277,19 +241,11 @@ CREATE TABLE IF NOT EXISTS pmes_registrations (
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_pmes_reg_applicant ON pmes_registrations(session_id, applicant_id) WHERE applicant_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_pmes_reg_member ON pmes_registrations(session_id, member_id) WHERE member_id IS NOT NULL;
 
--- Attendance roll-call: `attended` alone used to be write-only-by-nobody (no
--- route ever set it) - the board's "Mark PMES Attended" call was the sole,
--- unverified source of truth. These columns let staff actually check people
--- off against the roster at the seminar itself, walk-ins included (someone
--- who showed up without reserving a slot has no applicant/member row to
--- attach to - just the name/email captured at check-in).
 ALTER TABLE pmes_registrations ADD COLUMN IF NOT EXISTS walk_in_name TEXT;
 ALTER TABLE pmes_registrations ADD COLUMN IF NOT EXISTS walk_in_email TEXT;
 ALTER TABLE pmes_registrations ADD COLUMN IF NOT EXISTS attended_at TIMESTAMPTZ;
 ALTER TABLE pmes_registrations ADD COLUMN IF NOT EXISTS certificate_sent_at TIMESTAMPTZ;
 
--- Widen the original "must be a real applicant or member" identity rule to
--- also accept a walk-in's captured name+email as a third valid identity shape.
 ALTER TABLE pmes_registrations DROP CONSTRAINT IF EXISTS pmes_registrations_check;
 ALTER TABLE pmes_registrations DROP CONSTRAINT IF EXISTS pmes_registrations_identity_check;
 ALTER TABLE pmes_registrations ADD CONSTRAINT pmes_registrations_identity_check
@@ -297,6 +253,7 @@ ALTER TABLE pmes_registrations ADD CONSTRAINT pmes_registrations_identity_check
 
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_pmes_reg_walkin ON pmes_registrations(session_id, walk_in_email) WHERE walk_in_email IS NOT NULL;
 
+-- [DATABASE] Products at stock (inventory)
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -311,23 +268,12 @@ CREATE TABLE IF NOT EXISTS products (
   orders_count INTEGER NOT NULL DEFAULT 0,
   specifications TEXT[] DEFAULT '{}'
 );
--- Lets admin "delete" a product that already has order_items referencing it
--- (the FK on order_items.product_id blocks a hard DELETE there) without
--- rewriting order history - it just stops showing up in the catalog.
 ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
--- Optional size-variant grouping (e.g. the four separate "Coconut Husk Pole"
--- length SKUs). Each length stays its own product row - own price/stock/id,
--- so existing order_items references and stock math are untouched - but rows
--- sharing the same variant_group render as one storefront card with a length
--- dropdown instead of four redundant cards. NULL on both for every product
--- that isn't a size variant of anything, which is most of the catalog.
 ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_group TEXT;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_label TEXT;
--- Admin-set promo discount (0-100), applied on top of the base price for the
--- storefront and at checkout. 0 means no active promo. Kept as a simple flat
--- percentage (no start/end dates) - admin turns it off by setting it back to 0.
 ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5,2) NOT NULL DEFAULT 0;
 
+-- [DATABASE] Orders ng customers (GCash / Cash on Delivery)
 CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY,
   user_id INTEGER REFERENCES users(id),
@@ -346,20 +292,12 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 
--- Admin/board can reject a manually-verified payment (wrong/duplicate
--- reference number, unreadable screenshot, etc.) and must record why.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
 
--- Shipping/fulfillment stages, tracked after payment is verified (Shopee-
--- style progression). 'Completed' is kept above for old rows but new code
--- writes 'Processing' on verify and 'Delivered' as the final state instead.
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
 ALTER TABLE orders ADD CONSTRAINT orders_status_check
   CHECK (status IN ('Pending Verification', 'Completed', 'Rejected', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'));
 
--- Orders are paid by GCash or Cash on Delivery only - no bank transfer.
--- Old "Bank Transfer" orders are recorded as GCash (with a 13-digit GCash
--- style reference in place of a bank one) before the constraint narrows.
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_payment_method_check;
 UPDATE orders SET payment_method = 'GCash',
   reference_number = CASE WHEN reference_number ~ '^[0-9]{13}$' THEN reference_number
@@ -368,14 +306,8 @@ WHERE payment_method = 'Bank Transfer';
 ALTER TABLE orders ADD CONSTRAINT orders_payment_method_check
   CHECK (payment_method IN ('GCash', 'Cash on Delivery'));
 
--- Records whether the 2% coop-member discount was applied to total_amount,
--- so admin/board can audit pricing without recomputing it from scratch.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS member_discount_applied BOOLEAN NOT NULL DEFAULT false;
 
--- Distance-tiered shipping fee (see SHIPPING_ZONES in orders.routes.js) - the
--- fee is folded into total_amount at order time, but kept broken out here too
--- so a receipt/order detail view can show it as its own line item. NULL/0 on
--- orders placed before this feature existed.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_zone TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC(10,2) NOT NULL DEFAULT 0;
 
@@ -389,11 +321,6 @@ CREATE TABLE IF NOT EXISTS order_items (
 );
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 
--- Server-side session store backing each signed JWT (id = the token's jti
--- claim). Lets the server enforce a 30-minute idle timeout and actually
--- revoke a session on logout/password-reset - a bare stateless JWT can do
--- neither, since a copied cookie would stay valid until its 7-day expiry
--- regardless of what the server "thinks" happened.
 CREATE TABLE IF NOT EXISTS sessions (
   id UUID PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -405,10 +332,6 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 
--- Append-only record of security-relevant actions (auth events and every
--- role-gated approve/verify/reject/create/delete) for admin review.
--- actor_user_id/actor_email are both nullable/independent so a failed login
--- attempt (no authenticated user yet) can still be recorded by email.
 CREATE TABLE IF NOT EXISTS audit_log (
   id BIGSERIAL PRIMARY KEY,
   occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -430,9 +353,6 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
 CREATE SEQUENCE IF NOT EXISTS conversation_id_seq START 1;
 CREATE SEQUENCE IF NOT EXISTS message_id_seq START 1;
 
--- One continuous message thread per customer (not per order) - a customer
--- asks questions here regardless of which order they're about, and an admin
--- reply can optionally tag the specific order it concerns via messages.order_id.
 CREATE TABLE IF NOT EXISTS conversations (
   id TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL UNIQUE REFERENCES users(id),

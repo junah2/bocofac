@@ -1,4 +1,3 @@
-// src/components/AdminMessageWidget.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MessageCircle, X, Send, Package, ArrowLeft, ChevronDown } from 'lucide-react';
 
@@ -13,12 +12,6 @@ function formatOrderBlock(order) {
   return `Order ${order.id}\nStatus: ${order.status}\nItems: ${itemsLine || 'N/A'}\nTotal: ₱${order.totalAmount.toLocaleString()}`;
 }
 
-// Floating admin counterpart to CustomerMessageWidget - a two-level panel
-// (conversation list, then a selected thread) since an admin has many
-// customers rather than one thread. The conversation list itself is owned by
-// App.jsx (same pattern as orders/members/etc.) and pushed in as a prop so
-// it refreshes on the shared admin SSE stream; only the opened thread's
-// detail is fetched locally here, same as any other transient dashboard view.
 export default function AdminMessageWidget({ conversations = [], onRefetchConversations, onToast }) {
   const [open, setOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -35,7 +28,6 @@ export default function AdminMessageWidget({ conversations = [], onRefetchConver
       const res = await fetch(`${API_BASE}/messages/conversations/${userId}`, { credentials: 'include' });
       if (res.ok) setThread(await res.json());
     } catch {
-      // Network hiccup - keep showing the last known thread.
     }
   }, []);
 
@@ -47,13 +39,9 @@ export default function AdminMessageWidget({ conversations = [], onRefetchConver
       await fetch(`${API_BASE}/messages/conversations/${userId}/read`, { method: 'PATCH', credentials: 'include' });
       onRefetchConversations && onRefetchConversations();
     } catch {
-      // Best-effort - the next SSE-triggered refetch will reconcile.
     }
   };
 
-  // The shared admin SSE stream (App.jsx) refreshes the `conversations` prop
-  // the instant any customer's message activity changes - if a thread is
-  // currently open, pull its detail again too so a reply shows up live.
   useEffect(() => {
     if (selectedUserId) fetchThread(selectedUserId);
   }, [conversations, selectedUserId, fetchThread]);

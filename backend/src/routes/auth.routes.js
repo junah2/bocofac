@@ -15,6 +15,7 @@ const { signupSchema, signinSchema, updateMeSchema, passwordSchema } = require('
 const { signinLimiter, signupLimiter, forgotPasswordLimiter, resetPasswordLimiter } = require('../middleware/rateLimit');
 const { uploadAvatar, verifyUploadedFileType, IMAGE_MIME_TYPES } = require('../middleware/upload');
 
+// [PASSWORD HASHING] bcrypt, 12 rounds - hindi sine-save ang totoong password, hash lang
 const BCRYPT_ROUNDS = 12;
 const router = express.Router();
 
@@ -22,6 +23,7 @@ function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
+// [SIGN UP] Gagawa ng bagong customer account (validated muna ang input)
 router.post('/signup', signupLimiter, validate(signupSchema), asyncHandler(async (req, res) => {
   const { name, email, phone, password } = req.body;
 
@@ -30,9 +32,9 @@ router.post('/signup', signupLimiter, validate(signupSchema), asyncHandler(async
     return res.status(409).json({ error: 'An account with that email already exists.' });
   }
 
+  // [PASSWORD HASHING] Hina-hash ang password bago i-save sa database
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-  // Link to an existing Member/shareholder record by email match, if one exists.
   const memberMatch = await pool.query(
     'SELECT id FROM members WHERE lower(email) = lower($1)',
     [email]
@@ -56,16 +58,17 @@ router.post('/signup', signupLimiter, validate(signupSchema), asyncHandler(async
   res.status(201).json(user);
 }));
 
+// [LOGIN] Sign in: may rate limit para iwas brute-force
 router.post('/signin', signinLimiter, validate(signinSchema), asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // CHECKS USERS CREDENTIALS and password
   const { rows } = await pool.query(
     `SELECT id, name, email, phone, role, password_hash AS "passwordHash", member_id AS "memberId", avatar_url AS "avatarUrl", created_at AS "createdAt"
      FROM users WHERE email = $1`,
     [email]
   );
   const user = rows[0];
+  // [LOGIN] Kinukumpara ang tinype na password sa naka-hash na password
   const valid = user && (await bcrypt.compare(password, user.passwordHash));
 
   if (!valid) {
@@ -98,7 +101,6 @@ router.post('/logout', asyncHandler(async (req, res) => {
         ip: req.ip, userAgent: req.get('user-agent'),
       });
     } catch (err) {
-      // Invalid/expired token - nothing to revoke, just clear the cookie below.
     }
   }
   clearAuthCookie(res);
@@ -132,9 +134,6 @@ router.patch('/me', requireAuth, validate(updateMeSchema), asyncHandler(async (r
   }
 }));
 
-// Split out from PATCH /me (JSON body) since this one is multipart/form-data
-// and swaps the file the moment it's picked, independent of the rest of the
-// profile form/its Save Changes click.
 router.patch('/me/avatar', requireAuth, uploadAvatar.single('avatar'), asyncHandler(async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'An image file is required.' });
@@ -154,10 +153,6 @@ router.patch('/me/avatar', requireAuth, uploadAvatar.single('avatar'), asyncHand
   res.json(rows[0]);
 }));
 
-// Change password while signed in - distinct from /forgot-password +
-// /reset-password (the token-via-email flow for a customer who's locked
-// out). This one requires knowing the current password, so it doesn't need
-// a reset token or session revocation.
 router.patch('/me/password', requireAuth, asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) {
@@ -182,6 +177,7 @@ router.patch('/me/password', requireAuth, asyncHandler(async (req, res) => {
   res.json({ message: 'Password updated successfully.' });
 }));
 
+// [FORGOT PASSWORD] Magse-send ng 6-digit code sa email (Brevo)
 router.post('/forgot-password', forgotPasswordLimiter, asyncHandler(async (req, res) => {
   const { email } = req.body;
   if (!email) {
@@ -190,10 +186,6 @@ router.post('/forgot-password', forgotPasswordLimiter, asyncHandler(async (req, 
 
   const { rows } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
   if (rows[0]) {
-    // 6-digit code instead of a link token - the customer types this back
-    // into the app themselves, so it needs to stay short/typeable. Padded
-    // so a code like "004821" keeps its full 10^6 keyspace (no leading-zero
-    // codes silently becoming 5-digit).
     const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
     const codeHash = hashToken(code);
     const expires = new Date(Date.now() + 15 * 60 * 1000);
@@ -201,10 +193,6 @@ router.post('/forgot-password', forgotPasswordLimiter, asyncHandler(async (req, 
       'UPDATE users SET password_reset_token_hash = $1, password_reset_expires = $2 WHERE id = $3',
       [codeHash, expires, rows[0].id]
     );
-    // Fire-and-forget on purpose - awaiting this (or letting a failure
-    // change the response) would leak whether the address exists via
-    // response timing/content. Both outcomes are logged so a delivery
-    // failure is still visible to whoever is watching the server console.
     sendPasswordResetCodeEmail(email, code)
       .then(() => console.log(`Password reset code sent to ${email}`))
       .catch((err) => {
@@ -216,11 +204,10 @@ router.post('/forgot-password', forgotPasswordLimiter, asyncHandler(async (req, 
     });
   }
 
-  // Same response whether or not the email matched, so this endpoint can't
-  // be used to probe which addresses have accounts.
   res.json({ message: 'If an account exists for that email, a reset code has been sent.' });
 }));
 
+// [RESET PASSWORD] Bagong password gamit ang code; lahat ng lumang session ay nilo-logout
 router.post('/reset-password', resetPasswordLimiter, asyncHandler(async (req, res) => {
   const { email, code, newPassword } = req.body;
   if (!email || !code || !newPassword) {
@@ -246,8 +233,6 @@ router.post('/reset-password', resetPasswordLimiter, asyncHandler(async (req, re
      WHERE id = $2`,
     [passwordHash, rows[0].id]
   );
-  // A password reset should invalidate any existing sessions for the account
-  // (e.g. if the reset was triggered because the account was compromised).
   await revokeAllSessionsForUser(rows[0].id);
   await logAudit(pool, {
     actorUserId: rows[0].id, action: 'auth.password_reset.completed',

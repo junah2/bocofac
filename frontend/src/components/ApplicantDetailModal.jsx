@@ -1,4 +1,3 @@
-// src/components/ApplicantDetailModal.jsx
 import React, { useState } from 'react';
 import { X, Check, FileText, AlertTriangle } from 'lucide-react';
 import { displayApplicantStatus } from '../utils/applicantStatus';
@@ -6,26 +5,14 @@ import { Field, Section } from './ProfileField';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
-// Mirrors backend/src/utils/shareCapital.js - every member's required share
-// capital target must fall inside this range.
 const MIN_REQUIRED_SHARE_CAPITAL = 4000;
 const MAX_REQUIRED_SHARE_CAPITAL = 25000;
 
-// Shared between the Board (full review, approve/reject/set required share
-// capital) and Admin (read-only - approval decisions belong to the Board)
-// Membership tabs, so both always show the exact same applicant record
-// instead of two views drifting apart. Passing onUpdateApplicantStatus is
-// what turns on the approve/reject controls; leaving it out renders a
-// read-only profile.
 export default function ApplicantDetailModal({ applicant: a, onClose, onUpdateApplicantStatus, onToast }) {
   const readOnly = !onUpdateApplicantStatus;
   const docs = a.documentsUploaded || {};
   const [rejectReasonDraft, setRejectReasonDraft] = useState('');
   const [requiredShareCapitalDraft, setRequiredShareCapitalDraft] = useState('10000');
-  // Confirms the final Approve/Reject decision before it's actually sent -
-  // both are hard to walk back (approval auto-creates the member account;
-  // rejection is final for that submission), so a stray click shouldn't
-  // decide someone's membership outright.
   const [confirmAction, setConfirmAction] = useState(null);
 
   return (

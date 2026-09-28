@@ -36,11 +36,6 @@ router.get('/', asyncHandler(async (req, res) => {
   res.json(rows.map(toClient));
 }));
 
-// Lets a guest with no applicant/member record yet find out whether they're
-// already recognized as having attended a PMES seminar (walked in and were
-// checked in present at the venue), so the Membership page can gate/ungate
-// "Apply for Membership" for someone who hasn't filed an application at all
-// - the same email match used by POST /applicants to auto-link a walk-in.
 router.get('/attendance-check/:email', applicantLookupLimiter, asyncHandler(async (req, res) => {
   const email = req.params.email.trim().toLowerCase();
   const walkIn = await pool.query(
@@ -56,15 +51,6 @@ router.get('/attendance-check/:email', applicantLookupLimiter, asyncHandler(asyn
   res.json({ attended: !!applicant.rows[0]?.pmes_attended });
 }));
 
-// Lets the Membership page and client dashboard show "you're already
-// registered for X" persistently, instead of only in a one-time toast/modal
-// right after clicking Reserve Slot - covers all three ways a registration
-// can be linked (applicant, member, or a walk-in/self-registered account
-// email), same matching logic /:id/register itself uses to attach one.
-// Returns every session this email is registered for (not just the latest) -
-// nothing stops someone from reserving more than one, and showing only one
-// as "Registered" made the others look reservable when they'd actually be
-// rejected as a duplicate.
 router.get('/my-registration/:email', applicantLookupLimiter, asyncHandler(async (req, res) => {
   const email = req.params.email.trim().toLowerCase();
   const { rows } = await pool.query(
@@ -91,6 +77,7 @@ router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
   if (!title || !date || !time || !capacity) {
     return res.status(400).json({ error: 'title, date, time and capacity are required.' });
   }
+  // [VALIDATION] PMES session: max 40 participants
   if (Number(capacity) > 40) {
     return res.status(400).json({ error: 'Capacity cannot exceed 40 seats per session.' });
   }
@@ -179,10 +166,6 @@ const REGISTRATION_SELECT = `
   LEFT JOIN members m ON m.id = r.member_id
 `;
 
-// Admin sees the full roster (needed to call out names not yet checked in).
-// The board only ever sees whoever admin has already marked attended - not
-// a frontend-only filter, enforced here so the board can't fetch or act on
-// anyone who hasn't actually been checked in yet.
 router.get('/:id/registrations', requireRole('admin', 'board'), asyncHandler(async (req, res) => {
   const attendedOnly = req.user.role === 'board';
   const { rows } = await pool.query(
@@ -192,11 +175,6 @@ router.get('/:id/registrations', requireRole('admin', 'board'), asyncHandler(asy
   res.json(rows.map(toRegistrationClient));
 }));
 
-// Roll-call check-in: admin-only, working the physical roster at the seminar
-// itself - this is the actual attendance evidence, unlike the old bare
-// "Mark Attended" click it replaces. The board never touches this; they only
-// see whoever admin has already checked in (see GET /:id/registrations) and
-// decide whether to send the certificate.
 router.patch('/:sessionId/registrations/:regId/attended', requireRole('admin'), asyncHandler(async (req, res) => {
   const attended = !!req.body.attended;
   const { rows } = await pool.query(
@@ -217,11 +195,6 @@ router.patch('/:sessionId/registrations/:regId/attended', requireRole('admin'), 
   res.json(toRegistrationClient(joined[0]));
 }));
 
-// Someone who showed up without reserving a slot ahead of time - captured by
-// name/email only, same as a walk-in customer at any front desk. Bypasses
-// the capacity check below on purpose: they're already physically present,
-// this is just recording that fact, not requesting a reservation. Admin-only,
-// same reasoning as the attended toggle above - this is part of the roll-call.
 router.post('/:sessionId/registrations/walk-in', requireRole('admin'), asyncHandler(async (req, res) => {
   const fullName = (req.body.fullName || '').trim();
   const email = (req.body.email || '').trim().toLowerCase();
@@ -254,10 +227,6 @@ router.post('/:sessionId/registrations/walk-in', requireRole('admin'), asyncHand
   }
 }));
 
-// Board-only: send the certificate for a registration that's actually been
-// checked in as attended. If the registration is linked to an applicant,
-// keep the applicant's own pmes_attended flag/date in sync so their "Check
-// Application Status" page and board review reflect the same confirmation.
 router.patch('/:sessionId/registrations/:regId/send-certificate', requireRole('board'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
     `${REGISTRATION_SELECT} WHERE r.id = $1 AND r.session_id = $2`,
@@ -276,14 +245,8 @@ router.patch('/:sessionId/registrations/:regId/send-certificate', requireRole('b
   const email = reg.applicant_email || reg.member_email || reg.walk_in_email;
   const dateAttended = reg.attended_at;
 
-  // The JWT only carries sub/role/memberId (see setAuthCookie in
-  // auth.routes.js), not the signed-in person's name, so look up this board
-  // member's actual name to print on the certificate instead of just a
-  // generic "BOCOFAC Board of Directors" line.
   const { rows: signatoryRows } = await pool.query('SELECT name FROM users WHERE id = $1', [req.user.sub]);
   const signatoryName = signatoryRows[0] && signatoryRows[0].name;
-  // The seminar's own speaker/facilitator signs the certificate; the board
-  // member sending it is only the fallback for a session with no speaker set.
   const { rows: sessionRows } = await pool.query('SELECT speaker FROM pmes_sessions WHERE id = $1', [req.params.sessionId]);
   const speakerName = sessionRows[0] && sessionRows[0].speaker;
 
@@ -344,24 +307,11 @@ router.patch('/:sessionId/registrations/:regId/send-certificate', requireRole('b
   res.json({ ...toRegistrationClient(refreshed[0]), emailSent, emailError, emailPreviewUrl, emailIsTest });
 }));
 
-// Applicants at this stage of the workflow don't have a user account yet
-// (they're identified purely by their application's email, same as the
-// GET /applicants/by-email lookup this flow follows) - so this stays
-// reachable without requireAuth. What it must NOT do is trust a bare
-// applicantId/memberId at face value, since either lets a caller register
-// an arbitrary third party's slot just by guessing/enumerating an id.
 router.post('/:id/register', asyncHandler(async (req, res) => {
   const { applicantId, memberId, email } = req.body;
   let selfName = null;
   let selfEmail = null;
   if (!applicantId && !memberId) {
-    // Not everyone reserving a slot has filed an application yet - PMES
-    // attendance is required *before* applying, so a signed-in customer with
-    // no applicant/member record on file can still self-register here, using
-    // their own account's name/email (pulled server-side from the session,
-    // never trusted from the request body). Recorded the same way a walk-in
-    // check-in is (see the walk-in columns below) so it still surfaces on the
-    // session roster and still satisfies GET /attendance-check by email.
     if (!req.user) {
       return res.status(400).json({ error: 'applicantId or memberId is required.' });
     }
@@ -379,11 +329,6 @@ router.post('/:id/register', asyncHandler(async (req, res) => {
     if (!req.user) {
       return res.status(403).json({ error: 'You may only register your own member record.' });
     }
-    // Look up member_id fresh from the DB rather than trusting the JWT's
-    // memberId claim (same reasoning as GET /members/me) - a member gets
-    // linked to a user asynchronously on Board approval, so a session issued
-    // before that would otherwise carry a stale/null memberId and wrongly
-    // block a freshly-approved member from registering for a seminar.
     const { rows: userRows } = await pool.query('SELECT member_id FROM users WHERE id = $1', [req.user.sub]);
     const actualMemberId = userRows[0] && userRows[0].member_id;
     if (actualMemberId !== memberId) {
@@ -413,11 +358,6 @@ router.post('/:id/register', asyncHandler(async (req, res) => {
       return res.status(404).json({ error: 'Session not found.' });
     }
 
-    // The self-registration (walk_in_*) shape has no DB unique constraint
-    // the way applicant_id/member_id do (see uniq_pmes_reg_applicant/
-    // uniq_pmes_reg_member in schema.sql - a walk-in check-in can legitimately
-    // repeat a name/email across different people), so this path checks for
-    // an existing registration by this exact account email itself.
     if (selfEmail) {
       const dupeCheck = await client.query(
         'SELECT 1 FROM pmes_registrations WHERE session_id = $1 AND lower(walk_in_email) = lower($2)',
@@ -433,6 +373,7 @@ router.post('/:id/register', asyncHandler(async (req, res) => {
       'SELECT COUNT(*) AS n FROM pmes_registrations WHERE session_id = $1',
       [req.params.id]
     );
+    // [PMES] Full na ang session - hindi na pwedeng mag-reserve
     if (Number(countResult.rows[0].n) >= session.capacity) {
       await client.query('ROLLBACK');
       return res.status(409).json({ error: 'This session is at full capacity.' });
@@ -461,11 +402,6 @@ router.post('/:id/register', asyncHandler(async (req, res) => {
   }
 }));
 
-// Lets the same identity that reserved a slot (applicant, member, or their
-// own account) cancel it before attending - mirrors POST /:id/register's
-// identity checks exactly, so this can't be used to cancel someone else's
-// reservation. Blocked once attendance is already marked, since undoing that
-// would contradict the roster/certificate trail already tied to it.
 router.delete('/:id/register', asyncHandler(async (req, res) => {
   const { applicantId, memberId, email } = req.body;
   let selfEmail = null;

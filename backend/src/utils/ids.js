@@ -1,5 +1,3 @@
-// Formatted IDs are generated from Postgres sequences (see schema.sql) so
-// concurrent requests can never collide, unlike the old Math.random() scheme.
 async function nextFormattedId(client, sequenceName, prefix) {
   const { rows } = await client.query('SELECT nextval($1) AS n', [sequenceName]);
   return `${prefix}-${rows[0].n}`;
@@ -21,9 +19,6 @@ function nextReferenceNumber() {
   return `MOB-${n}`;
 }
 
-// OR-<year issued>-<sequence, zero-padded>. The sequence itself never
-// resets per year (keeping it a simple always-incrementing Postgres
-// sequence) - the year prefix just reflects when the receipt was issued.
 async function nextOrNumber(client) {
   const { rows } = await client.query('SELECT nextval($1) AS n', ['ledger_or_seq']);
   const year = new Date().getFullYear();

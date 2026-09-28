@@ -25,8 +25,6 @@ function toClient(row) {
     requiredShareCapital: Number(row.required_share_capital),
     joinedDate: row.joined_date,
     status: row.status,
-    // Member's Information Sheet fields (paper form) - blank until an admin
-    // fills them in from the physical folder, see schema.sql.
     address: row.address,
     mobileNumber: row.mobile_number,
     ncfrsId: row.ncfrs_id,
@@ -42,8 +40,6 @@ function toClient(row) {
   };
 }
 
-// Fields editable via PATCH /:id, matching the paper "Member's Information
-// Sheet" content that isn't set at creation time (see POST / below).
 const SHEET_FIELDS = [
   ['address', 'address'],
   ['mobileNumber', 'mobile_number'],
@@ -65,13 +61,7 @@ router.get('/', requireRole('admin', 'board'), asyncHandler(async (req, res) => 
   res.json(rows.map(toClient));
 }));
 
-// Real membership status + share-capital balance for the signed-in customer's
-// own Dashboard, replacing the old hardcoded "No Active Membership" placeholder.
 router.get('/me', requireAuth, asyncHandler(async (req, res) => {
-  // Look up member_id fresh rather than trusting the JWT claim - a member
-  // gets linked to a user asynchronously (Board approval, see
-  // applicants.routes.js), so a session issued before that would otherwise
-  // carry a stale/null memberId until the user signs out and back in.
   const userResult = await pool.query('SELECT member_id FROM users WHERE id = $1', [req.user.sub]);
   const memberId = userResult.rows[0] && userResult.rows[0].member_id;
   if (!memberId) {
@@ -85,18 +75,14 @@ router.get('/me', requireAuth, asyncHandler(async (req, res) => {
     `SELECT COALESCE(SUM(amount), 0) AS total FROM ledger WHERE member_id = $1 AND status = 'Verified'`,
     [member.id]
   );
-  // Verified payments only count as share capital up to SHARE_CAPITAL_CAP -
-  // anything paid in beyond that is the member's savings instead, not more
-  // share capital (and doesn't accrue the monthly earnings rate either, see
-  // withdrawals.routes.js).
   const rawTotalContribution = Number(contribResult.rows[0].total);
+  // [SHARE CAPITAL] Total Contribution = sum ng verified payments (max ₱25,000)
   const totalContribution = Math.min(rawTotalContribution, SHARE_CAPITAL_CAP);
+  // [SHARE CAPITAL] Savings = sobra sa ₱25,000
   const savingsBalance = Math.max(rawTotalContribution - SHARE_CAPITAL_CAP, 0);
+  // [SHARE CAPITAL] Remaining Balance = Required Share Capital - Total Contribution
   const remainingBalance = Math.max(Number(member.required_share_capital) - totalContribution, 0);
 
-  // Subscribed share / paid-up capital were captured on the approved
-  // application, not on the member record itself - pull them from the
-  // applicant row that produced this member.
   const applicantResult = await pool.query(
     `SELECT subscribed_share, paid_up_capital FROM applicants
      WHERE created_member_id = $1 AND status = 'Approved'
@@ -150,11 +136,6 @@ router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
   }
 }));
 
-// Admin-only edit of the Member's Information Sheet fields (address, mobile,
-// NCFRS/RSBSA IDs, membership fee filing, attached-copy checklist, farm
-// profile notes, civic org affiliation) - a bounded field list rather than
-// accepting an arbitrary body, so this can't be used to sneak a status/email
-// change through a route that was only ever meant for sheet data.
 router.patch('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body, 'requiredShareCapital')) {
     const capital = validateRequiredShareCapital(req.body.requiredShareCapital);
@@ -190,9 +171,6 @@ router.patch('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
   res.json(toClient(rows[0]));
 }));
 
-// Lets admin/board nudge a Delinquent member before escalating to removal,
-// instead of the only options being "do nothing" or "remove them" - sends an
-// in-app notification to whichever account is linked to this member record.
 router.patch('/:id/remind', requireRole('admin', 'board'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM members WHERE id = $1', [req.params.id]);
   const member = rows[0];
@@ -213,10 +191,6 @@ router.patch('/:id/remind', requireRole('admin', 'board'), asyncHandler(async (r
   res.json({ ok: true });
 }));
 
-// Admin-only, same operational-management reasoning as PATCH /:id above.
-// "Removed" is a soft status (the row, and every ledger/order/withdrawal
-// record that references this member id, stays intact for history) - this
-// does not delete anything or touch the linked user account.
 router.patch('/:id/status', requireRole('admin'), asyncHandler(async (req, res) => {
   const { status } = req.body;
   if (!['Active', 'Delinquent', 'Removed'].includes(status)) {

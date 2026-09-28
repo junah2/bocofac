@@ -24,13 +24,6 @@ import RefMatchHint from './RefMatchHint';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
-// Mirrors SHIPPING_ZONES in backend/src/routes/orders.routes.js - the fee
-// actually charged is always recomputed server-side from the zone name, this
-// copy is only for showing the customer a live total before they submit.
-// Text shown above the variant dropdown - "Length" reads right for the husk
-// poles, but a set like the sandok variants is really about which piece you
-// want, so it needs its own wording per variant group instead of one
-// hardcoded label for every group.
 const VARIANT_SELECTOR_LABELS = {
   'coconut-husk-pole': 'Length',
   'coconut-sandok-set': 'Type',
@@ -44,12 +37,6 @@ const SHIPPING_ZONES = {
   'Outside Delivery Area': 350,
 };
 
-// Products sharing a variantGroup (e.g. the four "Coconut Husk Pole" lengths)
-// collapse into one catalog entry with all their variants attached, so the
-// grid renders one card with a size dropdown instead of one redundant card
-// per length. Every other product (the vast majority) is unaffected - it
-// just becomes a "group" of exactly one, which ProductCard below renders
-// identically to how a single product always looked.
 function groupProductsForDisplay(products) {
   const seenGroups = new Set();
   const items = [];
@@ -75,7 +62,6 @@ function ProductCard({ variants, isMember, memberPrice, onAddToCart, onViewDetai
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden hover-lift flex flex-col group relative">
-      {/* Active product zoom thumbnail container */}
       <div className="h-48 overflow-hidden relative bg-slate-100 dark:bg-slate-950 block">
         <img
           src={resolveImageUrl(product.image)}
@@ -93,7 +79,6 @@ function ProductCard({ variants, isMember, memberPrice, onAddToCart, onViewDetai
           </div>
         )}
 
-        {/* Out of stock overlay badge */}
         {product.stock <= 0 && (
           <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center">
             <span className="text-xs font-bold text-rose-400 tracking-wider uppercase border border-rose-400 p-2 rounded-lg bg-rose-950/20">
@@ -118,7 +103,6 @@ function ProductCard({ variants, isMember, memberPrice, onAddToCart, onViewDetai
           </p>
         </div>
 
-        {/* Size selector - only rendered when this catalog entry actually has more than one size/variant */}
         {hasSizes && (
           <div>
             <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
@@ -204,8 +188,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
   const [viewedAttachmentUrl, setViewedAttachmentUrl] = useState(null);
   const [showAccountRequiredModal, setShowAccountRequiredModal] = useState(false);
 
-  // Manual payment state - prefilled for signed-in customers so a repeat
-  // buyer never has to retype delivery details they already gave us once.
   const [recipientName, setRecipientName] = useState(user?.name || '');
   const [recipientEmail, setRecipientEmail] = useState(user?.email || '');
   const [recipientPhone, setRecipientPhone] = useState('');
@@ -215,11 +197,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
   const [barangay, setBarangay] = useState('');
   const [shippingZone, setShippingZone] = useState('');
 
-  // Camarines Sur and Camarines Norte are the two provinces BOCOFAC actually
-  // delivers to on a structured basis - both are populated down to full
-  // City/Municipality + Barangay dropdowns (see src/data/phAddress.js).
-  // Anything else still ships, just via the free-text "Other" fallback below
-  // at the flat out-of-area rate.
   const isFocusProvince = FOCUS_PROVINCES.includes(province);
   const citiesForProvince = CITIES_BY_PROVINCE[province] || [];
   const barangaysForCity = BARANGAYS_BY_CITY[cityMunicipality] || [];
@@ -239,25 +216,11 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptPreview, setReceiptPreview] = useState('');
   const [scanningReceipt, setScanningReceipt] = useState(false);
-  // Digit runs OCR'd off the receipt itself (see handleReceiptUpload) - lets
-  // the typed reference number be cross-checked against what the receipt
-  // actually shows, not just its own 13-digit format.
   const [receiptDigitRuns, setReceiptDigitRuns] = useState(null);
 
-  // Backend only stores/expects a single shippingAddress string - compose it
-  // from the structured picks instead of changing its shape server-side.
   const shippingAddress = [streetAddress, barangay && `Barangay ${barangay}`, cityMunicipality, province]
     .filter(Boolean).join(', ');
 
-  // Name/email come from the account instantly; phone/address aren't part
-  // of the account itself, so restore them from this browser's own last
-  // checkout instead of making a repeat buyer re-type it every time.
-  // Deliberately NOT sourced from a past order's `shippingAddress` - that's
-  // already a single flattened "street, Barangay X, city, province" string,
-  // and re-seeding the free-text Street field with it would double up with
-  // whatever province/city/barangay get picked for *this* order (each
-  // checkout compounding the last into one ever-growing address). Storing
-  // the still-separate fields client-side avoids that entirely.
   useEffect(() => {
     if (!user?.email) return;
     try {
@@ -269,13 +232,9 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
       setCityMunicipality(prev => prev || saved.cityMunicipality || '');
       setBarangay(prev => prev || saved.barangay || '');
     } catch {
-      // Corrupt/missing localStorage entry - fall back to a blank form.
     }
   }, [user?.email]);
 
-  // Re-detect the delivery zone every time the selected province/city/
-  // barangay changes, so it never drifts out of sync with what was actually
-  // picked (barangay matters for the Lupi-border discount).
   useEffect(() => {
     setShippingZone(detectShippingZone({ province, cityMunicipality, barangay }));
   }, [province, cityMunicipality, barangay]);
@@ -288,8 +247,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
 
   const viewProductDetail = (product) => {
     setActiveProductDetail(product);
-    // Fire-and-forget view counter, powers the Conv. Rate analytic on the
-    // exec dashboard - a failed ping shouldn't block browsing.
     fetch(`${API_BASE}/products/${product.id}/view`, { method: 'POST' }).catch(() => {});
   };
 
@@ -344,36 +301,23 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
     onToast('Item removed from cart.', 'info');
   };
 
-  // Coop members (accounts linked to an approved membership record) get 10%
-  // off - a plain customer account with no memberId pays full price.
+  // [ORDER] 10% member discount (pareho sa backend)
   const MEMBER_DISCOUNT_RATE = 0.10;
   const isMember = !!(user && user.memberId);
   const memberPrice = (price) => (isMember ? price * (1 - MEMBER_DISCOUNT_RATE) : price);
-  // Admin-set promo (product.discountPercent/salePrice, from the Analytics
-  // promo suggestions) is applied first, then the member discount stacks on
-  // top of that - a member buying a promo item gets both.
   const effectivePrice = (product) => (product.discountPercent > 0 ? product.salePrice : product.price);
 
-  // Broken out in three steps so the cart summary can itemize each discount
-  // instead of silently folding the promo into "Subtotal" - a shopper needs
-  // to see where the 25% (or whatever %) actually went, not just a smaller
-  // number with no line explaining it.
   const cartOriginalTotal = cart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
   const cartSubtotal = cart.reduce((total, item) => total + (effectivePrice(item.product) * item.quantity), 0);
   const cartPromoDiscount = cartOriginalTotal - cartSubtotal;
   const memberDiscount = isMember ? cartSubtotal * MEMBER_DISCOUNT_RATE : 0;
   const shippingFee = SHIPPING_ZONES[shippingZone] ?? 0;
+  // [ORDER] Order Total = Subtotal - Member Discount + Shipping Fee
   const cartTotal = cartSubtotal - memberDiscount + shippingFee;
 
-  // Screenshot upload - OCR'd client-side (tesseract.js, loaded on demand so
-  // it doesn't bloat the initial bundle for shoppers who never reach
-  // checkout) to reject obviously-unrelated images before they're even
-  // attached. This is a content sanity check, not a substitute for the
-  // admin's own manual verification of the reference number against the
-  // actual GCash screenshot.
   const handleReceiptUpload = async (e) => {
     const file = e.target.files && e.target.files[0];
-    e.target.value = ''; // let picking the same file again re-trigger onChange
+    e.target.value = '';
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
@@ -415,6 +359,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
         onToast('Transaction reference number must be exactly 13 digits.', 'error');
         return;
       }
+      // [VALIDATION] Hindi makaka-checkout kapag hindi tugma ang reference sa receipt
       if (refNumberMatchesReceipt(receiptDigitRuns, referenceNumber) === false) {
         onToast("The reference number you entered doesn't match your attached receipt. Please double-check it.", 'error');
         return;
@@ -443,9 +388,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
         formData.append('receipt', receiptFile);
       }
 
-      // credentials: 'include' sends the signed-in customer's session cookie,
-      // so the backend ties this order to their account (req.user.sub) - no
-      // guest fallback needed when the shopper is actually logged in.
       const res = await fetch(`${API_BASE}/orders`, {
         method: 'POST',
         credentials: 'include',
@@ -454,8 +396,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
       const newOrder = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(newOrder.error || 'Failed to submit order.');
 
-      // Remember this checkout's still-separate fields (not the flattened
-      // `shippingAddress` sent above) for next time - see the prefill effect.
       if (user?.email) {
         localStorage.setItem(`bocofac_last_shipping_${user.email}`, JSON.stringify({
           phone: recipientPhone, streetAddress, province, cityMunicipality, barangay,
@@ -478,12 +418,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
     }
   };
 
-  // An account is required to place an order (so the cooperative can follow
-  // up on a disputed/wrong payment reference, and the buyer gets order
-  // history). Gated at Add to Cart rather than only at checkout, so a guest
-  // never builds up a cart they can't actually order - and kept here too as
-  // a fallback in case a cart was already saved to localStorage from before
-  // this account requirement existed.
   const handleProceedToCheckout = () => {
     if (!user) {
       setShowAccountRequiredModal(true);
@@ -492,10 +426,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
     setIsCheckouting(true);
   };
 
-  // Cart summary content, shared between two placements: alone and centered
-  // when just browsing with the cart opened, or docked beside the checkout
-  // form (with its own "Proceed" button hidden mid-checkout) once the
-  // customer has moved into isCheckouting - see the layout branches below.
   const cartPanelJSX = (
     <>
       <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 space-y-4">
@@ -538,7 +468,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                     <p className="text-xs font-semibold text-slate-900 dark:text-white line-clamp-1">{item.product.name}</p>
                     <p className="text-xs text-emerald-800 dark:text-emerald-400 font-bold">₱{memberPrice(effectivePrice(item.product)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
                     <div className="flex items-center justify-between pt-1">
-                      {/* Quantity selector */}
                       <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg">
                         <button
                           onClick={() => updateCartQuantity(item.product.id, -1)}
@@ -554,7 +483,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
-                      {/* Remove button */}
                       <button
                         onClick={() => removeFromCart(item.product.id)}
                         className="text-rose-500 hover:text-rose-700 transition"
@@ -606,7 +534,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
         )}
       </div>
 
-      {/* Secure cooperative logistics guarantee panel */}
       <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex gap-3 text-xs leading-relaxed text-slate-500">
         <Info className="w-5 h-5 text-emerald-800 shrink-0" />
         <p>
@@ -619,14 +546,10 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
   return (
     <div className="animate-in fade-in duration-500">
 
-      {/* 1. Hero Showcase - full-bleed, matching the home page hero. Hidden
-          once the cart or checkout is showing, so those stay a focused,
-          single-purpose screen instead of a marketing banner plus content. */}
       {!cartPanelOpen && !isCheckouting && (
       <section className="relative overflow-hidden bg-neutral-900 border-b border-emerald-800/30">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-900/60 via-slate-950/90 to-slate-950 -z-10" />
 
-        {/* Banner decorative graphics */}
         <div className="max-w-4xl mx-auto px-6 py-16 sm:py-24 text-center space-y-6 relative">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider backdrop-blur">
             <Sparkles className="w-3 mx-auto text-emerald-400" />
@@ -667,17 +590,10 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
       )}
 
       <div className="max-w-[1680px] mx-auto w-full p-4 sm:p-8 space-y-8">
-      {/* Main Content Area - a checkout in progress uses the two-column
-          grid (form + live cart summary beside it); otherwise the catalog
-          and the cart panel are mutually exclusive full-width views, so
-          opening the cart doesn't leave the product grid peeking in beside
-          it (each branch keeps id="catalog-section" so the hero's "Browse
-          Curated Catalog" scroll target always resolves). */}
       {isCheckouting ? (
       <div id="catalog-section" className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
         <div className="lg:col-span-8 space-y-6">
-            {/* Multi-step Manual Payment and Checkout Flow */}
             <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 sm:p-8 space-y-6 relative">
               <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60 pb-4">
                 <button
@@ -691,7 +607,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                 </span>
               </div>
 
-              {/* Steps Progress Visualizer */}
               <div className="flex items-center justify-between max-w-md mx-auto py-2">
                 <div className="flex items-center gap-2">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
@@ -897,7 +812,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
 
                     {paymentMethod === 'GCash' ? (
                       <>
-                        {/* GCash Account Information */}
                         <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-1">
                           <p className="text-xs font-semibold text-amber-800 dark:text-amber-400">GCash Official Wallet</p>
                           <p className="text-lg font-mono font-bold text-slate-900 dark:text-white">0917-889-4402</p>
@@ -921,7 +835,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                           <RefMatchHint value={referenceNumber} receiptDigitRuns={receiptDigitRuns} hasReceipt={!!receiptFile} />
                         </div>
 
-                        {/* Screenshot Interactive Drag-and-Drop Area */}
                         <div>
                           <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
                             Payment Confirmation Image Screenshot
@@ -1013,23 +926,16 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
 
       </div>
       ) : cartPanelOpen ? (
-      /* Cart alone, full width and centered - the product grid is hidden
-         entirely while the cart is open, rather than always sitting beside
-         it as a sidebar. */
       <div id="catalog-section" className="max-w-xl mx-auto w-full space-y-6">
         {cartPanelJSX}
       </div>
       ) : (
-      /* E-commerce Catalog Storefront Grid & Filters - full width with more
-         columns at wider breakpoints, so cards stay a normal size instead of
-         stretching to fill the space the (now hidden) cart sidebar used to take. */
       <div id="catalog-section" className="space-y-6">
         <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
           <div className="space-y-1">
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Flagship Coconut Products</h2>
             <p className="text-sm text-slate-500">Direct trade supplies of premium organic agricultural carbon, fibres and doormats.</p>
           </div>
-          {/* Category filters */}
           <div className="flex gap-2 overflow-x-auto pb-1 max-w-full">
             {categories.map(cat => (
               <button
@@ -1047,7 +953,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
           </div>
         </div>
 
-        {/* Product list grid - size-variant products (e.g. Coconut Husk Pole lengths) collapse into one card with a size dropdown via groupProductsForDisplay */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {groupProductsForDisplay(filteredProducts).map(({ key, variants }) => (
             <ProductCard
@@ -1064,7 +969,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
       )}
       </div>
 
-      {/* Model Spec Modal view on catalog detail clicks */}
       {activeProductDetail && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-xl w-full p-6 space-y-6 relative animate-in zoom-in-95 duration-200">
@@ -1123,9 +1027,6 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
         </div>
       )}
 
-      {/* Account-required dialog - blocks checkout for guests instead of a
-          toast, since this isn't a dismiss-and-move-on notice but something
-          that needs an actual decision (sign up now, or come back later). */}
       {showAccountRequiredModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 space-y-5 relative animate-in zoom-in-95 duration-200 text-center">

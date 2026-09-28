@@ -1,4 +1,3 @@
-// src/utils/dateBuckets.js
 export const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function lastNMonths(n) {
@@ -24,8 +23,6 @@ export function lastNQuarters(n) {
   return out;
 }
 
-// Sums realized order totals into month or quarter buckets, e.g. for
-// revenue trend line charts.
 export function bucketOrderRevenue(orders, buckets, granularity) {
   return buckets.map(b => {
     const amount = orders.reduce((sum, o) => {

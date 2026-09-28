@@ -1,17 +1,9 @@
-// protection for sql injection and CONNECTION BACKEND TO  DATABASE
 const { Pool } = require('pg');
 
-// Locally this is a plain DATABASE_URL pool. On Firebase (Cloud Functions),
-// INSTANCE_CONNECTION_NAME is set instead and the connection goes through
-// Google's Cloud SQL connector, which authenticates with the function's own
-// service account - so the database never has to accept connections from the
-// open internet. The connector's setup is async, hence the lazily-created
-// pool behind the same query/connect/end interface every route already uses.
 let poolPromise = null;
-// Kept so end() can stop its background certificate-refresh timer - without
-// that, one-off scripts (migrate, seed, import) never exit on their own.
 let connector = null;
 
+// [DATABASE] Koneksyon sa PostgreSQL: Cloud SQL connector kapag naka-deploy, DATABASE_URL kapag local
 async function createPool() {
   if (process.env.INSTANCE_CONNECTION_NAME) {
     const { Connector, IpAddressTypes } = require('@google-cloud/cloud-sql-connector');
@@ -34,13 +26,14 @@ async function createPool() {
 function getPool() {
   if (!poolPromise) {
     poolPromise = createPool().catch((err) => {
-      poolPromise = null; // let the next request retry instead of caching the failure
+      poolPromise = null;
       throw err;
     });
   }
   return poolPromise;
 }
 
+// [DATABASE] Parameterized queries ($1, $2...) ang gamit sa lahat ng routes para iwas SQL injection
 module.exports = {
   query: (...args) => getPool().then((pool) => pool.query(...args)),
   connect: () => getPool().then((pool) => pool.connect()),

@@ -1,8 +1,3 @@
-// src/components/MobileScrollHint.jsx
-// Sits just above a horizontally-scrollable data table (built for desktop's
-// column count, not resized for mobile) so a phone screen doesn't just look
-// like the table got cut off - it's a hint, not a restructure, so the table
-// itself and the desktop view are untouched.
 import React from 'react';
 import { MoveHorizontal } from 'lucide-react';
 

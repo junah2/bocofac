@@ -1,23 +1,17 @@
-// 2-42 JWT for authentication and session management. The JWT is stored in an httpOnly cookie, and the server maintains a sessions table to enforce idle timeouts and allow revocation.
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const pool = require('../db/pool');
 
-// auto logout 30 mins
-// Must be exactly "__session": Firebase Hosting strips every other cookie
-// before forwarding a request to a Cloud Function.
 const COOKIE_NAME = '__session';
 const ABSOLUTE_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
+// [AUTH] Session: auto-logout pag 30 mins walang ginagawa, max 7 days
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
+// [AUTH] Gumagawa ng JWT token na ilalagay sa httpOnly cookie pag nag-login
 function signToken(payload) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
-// Creates the JWT (carrying a fresh jti) and the server-side session row that
-// jti points to. The row is what actually enforces the 30-minute idle
-// timeout and makes logout/password-reset able to revoke a session - the JWT
-// alone can only expire, never be revoked, once handed to the client.
 async function setAuthCookie(res, payload, req) {
   const jti = crypto.randomUUID();
   const token = signToken({ ...payload, jti });
@@ -26,14 +20,7 @@ async function setAuthCookie(res, payload, req) {
      VALUES ($1, $2, now() + interval '7 days', $3, $4)`,
     [jti, payload.sub, req && req.ip, req && req.get('user-agent')]
   );
-  // 'lax' only carries the cookie on same-site requests (fine for local dev,
-  // where frontend and backend are just different localhost ports under the
-  // same effective site). Once deployed, frontend and backend typically sit
-  // on genuinely different domains, so the cookie must be 'none' to survive
-  // the frontend's cross-origin fetch() calls - browsers require 'secure'
-  // alongside 'none', which is exactly when COOKIE_SECURE is true anyway.
 
-  // http only cookies 
   const secure = process.env.COOKIE_SECURE === 'true';
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
@@ -45,9 +32,6 @@ async function setAuthCookie(res, payload, req) {
 }
 
 function clearAuthCookie(res) {
-  // Must repeat the same sameSite/secure attributes used when the cookie was
-  // set - browsers only accept a clearing Set-Cookie as a match for the
-  // original if these line up, otherwise the cookie survives "logout".
   const secure = process.env.COOKIE_SECURE === 'true';
   res.clearCookie(COOKIE_NAME, { path: '/', sameSite: secure ? 'none' : 'lax', secure });
 }
@@ -61,9 +45,7 @@ async function revokeAllSessionsForUser(userId) {
   await pool.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
 }
 
-// Populates req.user if a valid cookie AND a live, non-idle session are
-// present, but does not reject the request otherwise - used for routes like
-// POST /orders that work for both guests and signed-in customers.
+// [AUTH] Chine-check kung valid pa ang token at session (hindi expired / hindi naka-logout)
 async function attachUser(req, res, next) {
   const token = req.cookies && req.cookies[COOKIE_NAME];
   if (!token) return next();
@@ -78,9 +60,6 @@ async function attachUser(req, res, next) {
     const absoluteExpired = session && new Date(session.absolute_expires_at).getTime() < Date.now();
 
     if (!session || idleExpired || absoluteExpired) {
-      // Session revoked, idle-timed-out, or past its absolute cap - clean up
-      // the stale row (if any) and the cookie, and fall through as anonymous
-      // rather than erroring, matching this middleware's non-rejecting contract.
       if (session) await pool.query('DELETE FROM sessions WHERE id = $1', [payload.jti]);
       clearAuthCookie(res);
       return next();
@@ -89,16 +68,17 @@ async function attachUser(req, res, next) {
     await pool.query('UPDATE sessions SET last_activity_at = now() WHERE id = $1', [payload.jti]);
     req.user = payload;
   } catch (err) {
-    // Invalid/expired token - treat as anonymous rather than erroring.
   }
   next();
 }
 
+// [AUTHORIZATION] Kailangan naka-login para ma-access ang route
 function requireAuth(req, res, next) {
   if (!req.user) return res.status(401).json({ error: 'Authentication required.' });
   next();
 }
 
+// [AUTHORIZATION] Role check: admin / board / customer lang ang pwede sa route depende sa nakalagay
 function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: 'Authentication required.' });

@@ -22,10 +22,6 @@ import { printOfficialReceipt } from '../utils/printDocument';
 import MobileScrollHint from './MobileScrollHint';
 import { isValidPhone11, isValidGcashRef13, digitsOnly, validationBorderClass } from '../utils/validators';
 
-// Required share capital targets are set between these two amounts (see
-// MIN/MAX_REQUIRED_SHARE_CAPITAL in backend/src/utils/shareCapital.js, which
-// enforces the same range server-side). Verified payments only count as
-// share capital up to this cap; anything paid beyond it becomes savings.
 const MIN_SHARE_CAPITAL = 4000;
 const MAX_SHARE_CAPITAL = 25000;
 const SHARE_CAPITAL_CAP = MAX_SHARE_CAPITAL;
@@ -53,22 +49,16 @@ export default function ShareCapitalLedger({
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [verifyingId, setVerifyingId] = useState(null);
 
-  // Earnings withdrawal review (admin "Send" action)
   const [sendingWithdrawal, setSendingWithdrawal] = useState(null);
   const [sentAmount, setSentAmount] = useState('');
   const [sentReference, setSentReference] = useState('');
   const [submittingSend, setSubmittingSend] = useState(false);
   const [rejectingId, setRejectingId] = useState(null);
-  // The withdrawal list grows with every request ever made - show the newest
-  // few by default, the rest on demand.
   const WITHDRAWAL_PREVIEW_COUNT = 10;
   const [showAllWithdrawals, setShowAllWithdrawals] = useState(false);
   const LEDGER_PREVIEW_COUNT = 10;
   const [showAllLedger, setShowAllLedger] = useState(false);
 
-  // Member's Information Sheet editing (address/IDs/fee filing/attached
-  // copies/farm profile/civic org affiliation - the paper-form fields that
-  // live directly on the member record, see backend members.routes.js)
   const [editingSheet, setEditingSheet] = useState(false);
   const [sheetForm, setSheetForm] = useState(null);
   const [submittingSheet, setSubmittingSheet] = useState(false);
@@ -112,27 +102,20 @@ export default function ShareCapitalLedger({
       setViewedMember(updated);
       setEditingSheet(false);
     } catch {
-      // onUpdateMember already surfaced a toast on failure.
     } finally {
       setSubmittingSheet(false);
     }
   };
 
-  // New Membership Post forms
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [requiredCapital, setRequiredCapital] = useState(10000);
 
-  // New Ledger payment entry forms
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [paymentAmount, setPaymentAmount] = useState(1000);
   const [paymentMethod, setPaymentMethod] = useState('GCash');
   const [txnRef, setTxnRef] = useState('');
 
-  // 1. Math balance algorithms per member - verified payments only count as
-  // share capital up to SHARE_CAPITAL_CAP; anything paid beyond that is the
-  // member's savings instead (kept in sync with backend members.routes.js /
-  // withdrawals.routes.js, which enforce the same cap for real).
   const getMemberBalances = (member) => {
     const verifiedPayments = ledger
       .filter(l => l.memberId === member.id && l.status === 'Verified')
@@ -142,7 +125,6 @@ export default function ShareCapitalLedger({
     const savingsBalance = Math.max(verifiedPayments - SHARE_CAPITAL_CAP, 0);
     const remaining = Math.max(member.requiredShareCapital - shareCapitalContribution, 0);
 
-    // Status badges formula
     let badge = 'Outstanding Balance';
     if (remaining === 0) {
       badge = 'Fully Paid';
@@ -158,8 +140,6 @@ export default function ShareCapitalLedger({
     };
   };
 
-  // Co-op total indicators - each member's payments are capped before
-  // summing, so these reflect actual share capital, not savings.
   const memberBalanceTotals = members.reduce((acc, m) => {
     const { totalContribution, savingsBalance } = getMemberBalances(m);
     acc.contribution += totalContribution;
@@ -293,15 +273,14 @@ export default function ShareCapitalLedger({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      
-      {/* Visual Header */}
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-2">
         <div className="space-y-1 text-left">
           <p className="text-xs font-mono uppercase tracking-widest text-emerald-700 dark:text-emerald-400 font-bold">FINANCIAL INTEGRITY BOARD</p>
           <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Share Capital ledger</h2>
         </div>
         <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border">
-          <button 
+          <button
             onClick={() => setActiveLedgerTab('members')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition ${
               activeLedgerTab === 'members' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'
@@ -309,7 +288,7 @@ export default function ShareCapitalLedger({
           >
             Registered Shareholders
           </button>
-          <button 
+          <button
             onClick={() => setActiveLedgerTab('transactions')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition ${
               activeLedgerTab === 'transactions' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'
@@ -328,7 +307,6 @@ export default function ShareCapitalLedger({
         </div>
       </div>
 
-      {/* High-Contrast Visual Balance Widgets */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
         <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl p-6 border-l-4 border-emerald-600 shadow-sm">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Share Contribution</p>
@@ -360,11 +338,9 @@ export default function ShareCapitalLedger({
         </div>
       </div>
 
-      {/* MEMBERS TAB */}
       {activeLedgerTab === 'members' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
-          {/* Main List */}
+
           <div className={`${canManage ? 'lg:col-span-8' : 'lg:col-span-12'} bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 space-y-4 text-left`}>
             <div className="flex justify-between items-center sm:pb-2">
               <div>
@@ -444,11 +420,9 @@ export default function ShareCapitalLedger({
             </div>
           </div>
 
-          {/* Right side form drawer to Add Payment - board members can view/verify but not post entries (backend restricts POST /members and /ledger to admin) */}
           {canManage && (
           <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-8 text-left">
-            
-            {/* Direct Ledger Posting Card */}
+
             <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 space-y-4">
               <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <BookOpen className="w-4 h-4 text-emerald-800" />
@@ -524,7 +498,6 @@ export default function ShareCapitalLedger({
               </form>
             </div>
 
-            {/* Regulatory guideline boards info */}
             <div className="p-4 bg-slate-100 dark:bg-slate-900 border text-slate-500 rounded-xl text-xs space-y-2">
               <div className="flex gap-2 font-semibold text-slate-800 dark:text-slate-300">
                 <Info className="w-4 h-4 text-emerald-800" /> Administrative audits
@@ -540,7 +513,6 @@ export default function ShareCapitalLedger({
         </div>
       )}
 
-      {/* TRANSACTIONS GAAP LEDGER HISTORY TAB */}
       {activeLedgerTab === 'transactions' && (
         <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 text-left space-y-4">
           <div className="flex justify-between items-start gap-4 pb-2">
@@ -654,7 +626,6 @@ export default function ShareCapitalLedger({
         </div>
       )}
 
-      {/* EARNINGS WITHDRAWALS TAB */}
       {activeLedgerTab === 'withdrawals' && (
         <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 text-left space-y-4">
           <div className="flex items-start justify-between gap-4">
@@ -742,7 +713,6 @@ export default function ShareCapitalLedger({
         </div>
       )}
 
-      {/* Confirm Send modal for an earnings withdrawal request */}
       {sendingWithdrawal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
           <form
@@ -790,11 +760,10 @@ export default function ShareCapitalLedger({
         </div>
       )}
 
-      {/* Model Dialog popup for registering shareholder directly */}
       {isAddingMember && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <form 
-            onSubmit={handlePostMemberSubmit} 
+          <form
+            onSubmit={handlePostMemberSubmit}
             className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-5 text-left relative animate-in zoom-in-95 duration-200 animate-out"
           >
             <div className="flex justify-between items-start border-b pb-3">
@@ -802,8 +771,8 @@ export default function ShareCapitalLedger({
                 <Building2 className="w-5 h-5 text-emerald-800" />
                 Register Shareholder profile
               </h3>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setIsAddingMember(false)}
                 className="text-slate-400 hover:text-slate-600 text-sm font-semibold p-1"
               >
@@ -874,10 +843,6 @@ export default function ShareCapitalLedger({
         </div>
       )}
 
-      {/* View Shareholder details drawer - mirrors the paper "Member's
-          Information Sheet" (BOCOFAC ID, NCFRS/RSBSA IDs, membership fee
-          filing, attached copies checklist, farm profile, civic org
-          affiliation, and the Date/Reference/Share Capital ledger table) */}
       {viewedMember && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full p-6 space-y-5 text-left relative animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
@@ -955,7 +920,6 @@ export default function ShareCapitalLedger({
                     </span>
                   </div>
 
-                  {/* Member's Information Sheet - editable fields */}
                   {editingSheet ? (
                     <form onSubmit={handleSheetSubmit} className="space-y-4 border-t pt-4">
                       <h4 className="text-[10px] uppercase font-bold text-slate-400">Member's Information Sheet</h4>
@@ -1146,7 +1110,6 @@ export default function ShareCapitalLedger({
         </div>
       )}
 
-      {/* View transaction reference drawer */}
       {viewedTxn && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-5 text-left relative animate-in zoom-in-95 duration-200">

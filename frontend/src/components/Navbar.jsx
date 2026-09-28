@@ -1,12 +1,8 @@
-// src/components/Navbar.jsx
 import React, { useState } from 'react';
 import { ShoppingCart, ShieldCheck, UserCircle, Landmark, Menu, X, Sun, Moon, Bell } from 'lucide-react';
 import bocofacLogo from '../assets/bocofac-logo.jpg';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 
-// Same tab ids as DashboardPage's own sidebar (see sidebarTabs there) - kept
-// in sync manually since the sidebar is hidden on mobile now and this menu
-// is a phone's only way to reach those tabs without a full page visit.
 const PROFILE_TABS = [
   { id: 'membership', label: 'Contribution' },
   { id: 'pmes', label: 'PMES Seminars' },
@@ -15,22 +11,12 @@ const PROFILE_TABS = [
   { id: 'settings', label: 'Settings' },
 ];
 
-// Every customer notification message is one of a fixed handful of strings
-// this app itself generates server-side (see notifyUser/notifyByMemberId/
-// notifyByEmail call sites in backend/src/routes, and messages.routes.js for
-// the "new message" one) - matching on their stable prefixes tells us where
-// the notification is actually about, the same way the admin notification
-// bell already carries an explicit tab per notification. A "new message"
-// notification isn't a Dashboard tab at all - it's about the chat widget
-// (CustomerMessageWidget, floating on every page), so it opens that instead.
 function resolveNotificationTarget(message) {
   if (message.startsWith('You have a new message')) return { kind: 'messages' };
   if (message.startsWith('Your order')) return { kind: 'tab', tab: 'orders' };
   return { kind: 'tab', tab: 'membership' };
 }
 
-// "Just now" / "5m ago" / "3h ago" / "2d ago" - notifications skew recent, so
-// a relative label reads better here than a full timestamp.
 function timeAgo(dateStr) {
   const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
   if (seconds < 60) return 'Just now';
@@ -52,12 +38,6 @@ export default function Navbar({
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  // Jumps straight to whatever the notification is actually about - the
-  // Dashboard tab, or the message widget - same as clicking an admin
-  // notification jumps straight to its tab, via setPage's in-app page state
-  // or the widget's own open flag, never a hardcoded URL (so it works the
-  // same wherever this app is actually hosted, not just on a local dev
-  // server, and on every page since both the bell and the widget are global).
   const openNotification = (n) => {
     onMarkNotificationRead(n.id);
     setNotifOpen(false);
@@ -69,9 +49,6 @@ export default function Navbar({
     }
   };
 
-  // Already-approved members apply/track nothing new on that page anymore -
-  // their contribution status now lives on the Dashboard - so the public
-  // "apply for membership" link no longer belongs in their nav.
   const navLinks = [
     { key: 'home', label: 'Home' },
     { key: 'products', label: 'Products' },
@@ -84,22 +61,14 @@ export default function Navbar({
     setMobileMenuOpen(false);
   };
 
-  // Single account entry point: routes to whichever role is currently
-  // signed in. A guest is assumed to be a new customer, so it opens
-  // Create Account first (Sign In / Admin / Board of Directors are all
-  // reachable from there).
   const accountTarget = admin ? 'admin-dashboard' : bod ? 'bod-dashboard' : user ? 'dashboard' : 'signin';
   const accountLabel = admin ? 'Admin' : bod ? 'Board' : user ? 'Me' : 'Sign Up';
   const AccountIcon = admin ? ShieldCheck : bod ? Landmark : UserCircle;
-  // Already standing on the page this button leads to (e.g. a signed-in
-  // member viewing their own Dashboard) - showing "Me" there just points
-  // back at the page you're already on, so it's dropped from the navbar.
   const showAccountButton = page !== accountTarget;
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur border-b border-slate-200 dark:border-slate-800">
       <div className="max-w-[1680px] mx-auto px-4 sm:px-8 h-20 flex items-center justify-between">
-        {/* Brand */}
         <button onClick={() => go('home')} className="flex items-center gap-2.5 cursor-pointer shrink-0">
           <img
             src={bocofacLogo}
@@ -109,7 +78,6 @@ export default function Navbar({
           <span className="font-serif font-extrabold tracking-tight text-slate-900 dark:text-white text-2xl hidden sm:inline">BOCOFAC</span>
         </button>
 
-        {/* Desktop nav links */}
         <nav className="hidden md:flex items-center gap-1">
           {navLinks.map(link => (
             <button
@@ -126,7 +94,6 @@ export default function Navbar({
           ))}
         </nav>
 
-        {/* Right actions */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             onClick={onToggleDarkMode}
@@ -214,11 +181,6 @@ export default function Navbar({
               <AccountIcon className="w-3.5 h-3.5" /> {accountLabel}
             </button>
           )}
-          {/* Mobile-only quick account menu - the customer Dashboard's own
-              sidebar (Contribution/PMES/Orders/Profile/Settings/Logout) is
-              hidden on phones now, so this is how a signed-in customer
-              reaches those without a full page visit. Desktop already has
-              the "Me" pill above for that. */}
           {user && (
             <div className="relative md:hidden">
               <button
@@ -289,7 +251,6 @@ export default function Navbar({
         </div>
       </div>
 
-      {/* Mobile menu */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 dark:border-slate-800 px-4 py-3 space-y-1 bg-white dark:bg-slate-950">
           {navLinks.map(link => (
@@ -305,8 +266,6 @@ export default function Navbar({
               {link.label}
             </button>
           ))}
-          {/* Signed-in customers reach their account via the new profile
-              icon instead (see above) - this stays for guests/admin/board. */}
           {showAccountButton && !user && (
             <button
               onClick={() => { setPage(accountTarget); setMobileMenuOpen(false); }}

@@ -1,12 +1,6 @@
 const { z } = require('zod');
 const { phSchema, emailSchema } = require('./auth.schema');
 
-// A bucketed "Member's Farm Profile" value is always a short display string
-// picked from a fixed option list in the frontend (e.g. '11–25', '₱50–100/kg')
-// or a short free-typed date/number. We don't mirror each of the ~12 option
-// lists here (that would mean keeping 12 backend enums in lockstep with
-// frontend constants forever, for a field the board reads manually rather
-// than a security boundary) - just cap length as a blanket abuse guard.
 const farmLeaf = z.string().max(100).optional().or(z.literal(''));
 
 const farmSectionSchema = (fields) => z.object(
@@ -34,16 +28,12 @@ const farmProfileSchema = z.object({
     areaHaSqm: farmLeaf,
   })).max(20).optional(),
 }).partial().strict()
-  // Blanket size guard against an oversized/malformed JSON blob, independent
-  // of the per-field caps above.
   .refine((val) => JSON.stringify(val).length <= 20_000, {
     message: 'Farm profile data is too large.',
   });
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be a YYYY-MM-DD date.');
 
-// Optional short free-text field, matching the paper form's open-ended
-// fields (no format beyond a sane length cap).
 const shortText = (max = 200) => z.string().trim().max(max).optional().nullable().or(z.literal(''));
 
 const dependentSchema = z.object({

@@ -3,10 +3,6 @@ const PDFDocument = require('pdfkit');
 
 const COOP_NAME = 'BOCOFAC Coconut Farmers Cooperative';
 const COOP_PLACE = 'Sipocot, Camarines Sur';
-// Same artwork as the frontend navbar (frontend/src/assets/bocofac-logo.jpg),
-// kept as its own backend copy rather than reaching across into the frontend
-// folder - the two apps can be deployed/hosted independently, so this
-// certificate generator shouldn't depend on the frontend's file layout.
 const LOGO_PATH = path.join(__dirname, '../assets/bocofac-logo.jpg');
 
 const GREEN = '#0b4d3a';
@@ -22,7 +18,6 @@ function ordinal(n) {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-// Gold L-shaped flourish in each corner, just inside the inner border.
 function drawCorners(doc, x, y, w, h, len) {
   doc.save().lineWidth(2).strokeColor(GOLD);
   [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]].forEach(([cx, cy, dx, dy]) => {
@@ -32,8 +27,6 @@ function drawCorners(doc, x, y, w, h, len) {
   doc.restore();
 }
 
-// Session facilitators are often stored as "Name (Organization)" - split the
-// organization out so the signature line shows just the name.
 function splitSpeaker(raw) {
   const text = (raw || '').trim();
   const match = text.match(/^(.*?)\s*\((.+)\)\s*$/);
@@ -54,8 +47,6 @@ function signatureBlock(doc, centerX, y, name, title) {
     .text(title, centerX - half - 20, y + 28, { width: (half + 20) * 2, align: 'center' });
 }
 
-// Renders the PMES certificate straight into a Buffer (no disk write) so it
-// can go directly into an email attachment.
 function generatePmesCertificatePdf({ applicantName, dateAttended, signatoryName, speakerName }) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 0 });
@@ -72,15 +63,12 @@ function generatePmesCertificatePdf({ applicantName, dateAttended, signatoryName
     const year = attended.toLocaleDateString('en-PH', { ...dateOpts, year: 'numeric' });
     const chairpersonName = (process.env.CHAIRPERSON_NAME || '').trim();
 
-    // Paper, borders, corner flourishes.
     doc.rect(0, 0, width, height).fill(PAPER);
     doc.lineWidth(6).strokeColor(GREEN).rect(18, 18, width - 36, height - 36).stroke();
     doc.lineWidth(1.2).strokeColor(GOLD).rect(30, 30, width - 60, height - 60).stroke();
     doc.lineWidth(0.6).strokeColor(GREEN_SOFT).rect(35, 35, width - 70, height - 70).stroke();
     drawCorners(doc, 44, 44, width - 88, height - 88, 34);
 
-    // Faint logo watermark behind the text. The logo JPG has a white square
-    // background, so both copies are clipped to its circular seal.
     const markSize = 300;
     const markX = width / 2 - markSize / 2;
     const markY = height / 2 - markSize / 2 + 20;
@@ -88,7 +76,6 @@ function generatePmesCertificatePdf({ applicantName, dateAttended, signatoryName
       .image(LOGO_PATH, markX, markY, { width: markSize, height: markSize })
       .restore();
 
-    // Header.
     const logoSize = 78;
     doc.save().circle(width / 2, 52 + logoSize / 2, logoSize / 2 - 1).clip()
       .image(LOGO_PATH, width / 2 - logoSize / 2, 52, { width: logoSize, height: logoSize })
@@ -96,7 +83,6 @@ function generatePmesCertificatePdf({ applicantName, dateAttended, signatoryName
     doc.font('Helvetica-Bold').fontSize(13).fillColor(GREEN)
       .text(COOP_NAME.toUpperCase(), 0, 140, { align: 'center', characterSpacing: 2 });
 
-    // Title.
     doc.font('Times-Bold').fontSize(46).fillColor(GREEN)
       .text('CERTIFICATE', 0, 164, { align: 'center', characterSpacing: 4 });
     doc.font('Helvetica-Bold').fontSize(14).fillColor(GOLD)
@@ -105,8 +91,6 @@ function generatePmesCertificatePdf({ applicantName, dateAttended, signatoryName
     doc.font('Times-Italic').fontSize(15).fillColor(MUTED)
       .text('This certificate is proudly presented to', 0, 248, { align: 'center' });
 
-    // Recipient name with a gold rule underneath - shrunk as needed so a long
-    // name stays on one line instead of wrapping into the rule.
     const recipient = applicantName || 'Applicant';
     const nameMaxWidth = width - 170;
     let nameSize = 38;
@@ -126,11 +110,6 @@ function generatePmesCertificatePdf({ applicantName, dateAttended, signatoryName
     doc.font('Times-Italic').fontSize(13.5).fillColor(MUTED)
       .text(`Given this ${ordinal(day)} day of ${month} ${year} at ${COOP_PLACE}.`, 0, 392, { align: 'center' });
 
-    // Signatures: the seminar's resource speaker, and the chairperson (set
-    // via CHAIRPERSON_NAME, so a change after a board election needs no code
-    // change). With no speaker on the session, the board member who sent the
-    // certificate signs instead. If the speaker IS the chairperson, one
-    // centered block covers both roles rather than printing her twice.
     const sigY = height - 118;
     const speaker = splitSpeaker(speakerName);
     const left = speaker.name
