@@ -63,6 +63,8 @@ export default function ShareCapitalLedger({
   // few by default, the rest on demand.
   const WITHDRAWAL_PREVIEW_COUNT = 10;
   const [showAllWithdrawals, setShowAllWithdrawals] = useState(false);
+  const LEDGER_PREVIEW_COUNT = 10;
+  const [showAllLedger, setShowAllLedger] = useState(false);
 
   // Member's Information Sheet editing (address/IDs/fee filing/attached
   // copies/farm profile/civic org affiliation - the paper-form fields that
@@ -541,20 +543,30 @@ export default function ShareCapitalLedger({
       {/* TRANSACTIONS GAAP LEDGER HISTORY TAB */}
       {activeLedgerTab === 'transactions' && (
         <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 text-left space-y-4">
-          <div className="flex justify-between items-center pb-2">
-            <div>
+          <div className="flex justify-between items-start gap-4 pb-2">
+            <div className="min-w-0">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
                 <Layers className="w-4.5 h-4.5 text-emerald-800" />
                 Cooperative General ledger Books (GAAP)
               </h3>
               <p className="text-[10px] text-slate-500">Historical archive of share payments verified by the board audit. Exportable to CSV standard.</p>
             </div>
-            <button 
-              onClick={exportLedgerToCSV}
-              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs border dark:bg-slate-950 dark:text-slate-300 cursor-pointer flex items-center gap-1"
-            >
-              <ArrowDownToLine className="w-3.5 h-3.5" /> Export ledger report
-            </button>
+            <div className="flex flex-wrap justify-end gap-2 shrink-0">
+              {ledger.length > LEDGER_PREVIEW_COUNT && (
+                <button
+                  onClick={() => setShowAllLedger(v => !v)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer transition-colors whitespace-nowrap"
+                >
+                  {showAllLedger ? 'Hide' : `View all (${ledger.length})`}
+                </button>
+              )}
+              <button
+                onClick={exportLedgerToCSV}
+                className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs border dark:bg-slate-950 dark:text-slate-300 cursor-pointer flex items-center gap-1 whitespace-nowrap"
+              >
+                <ArrowDownToLine className="w-3.5 h-3.5" /> Export ledger report
+              </button>
+            </div>
           </div>
 
           <MobileScrollHint />
@@ -572,7 +584,7 @@ export default function ShareCapitalLedger({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-150 dark:divide-slate-800">
-                {ledger.map(entry => (
+                {(showAllLedger ? ledger : ledger.slice(0, LEDGER_PREVIEW_COUNT)).map(entry => (
                   <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/30 transition-colors">
                     <td className="p-3">
                       <p className="font-bold text-[#d97706] font-mono">{entry.id}</p>
