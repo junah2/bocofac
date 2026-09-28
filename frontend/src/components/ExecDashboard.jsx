@@ -758,27 +758,8 @@ export default function ExecDashboard({
       </div>
 
       {/* 3b. Share Capital Analytics - populated live from the ledger, no manual admin step required.
-          Totals sit on top; the per-member breakdown gets the full width below. */}
+          One card: the totals sit right under its header, the per-member breakdown below. */}
       <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-              <PhilippinePeso className="w-3.5 h-3.5 text-emerald-800" /> Total Contributed
-            </p>
-            <p className="text-3xl font-light text-slate-950 dark:text-white mt-1">
-              ₱{totalShareCapitalContributed.toLocaleString()}
-            </p>
-          </div>
-          <div className="bg-[#FDFCF7] dark:bg-emerald-950/25 border border-emerald-100 dark:border-slate-800 rounded-2xl p-6">
-            <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest flex items-center gap-1.5">
-              <PieChart className="w-3.5 h-3.5 text-amber-600" /> Outstanding Balance
-            </p>
-            <p className="text-3xl font-bold text-emerald-950 dark:text-emerald-400 mt-1">
-              ₱{outstandingShareCapital.toLocaleString()}
-            </p>
-          </div>
-        </div>
-
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 space-y-4">
           <div className="border-b pb-3 flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -796,6 +777,25 @@ export default function ExecDashboard({
                 {showAllShareCapital ? 'Hide' : `View all (${shareCapitalByMember.length})`}
               </button>
             )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-xl p-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <PhilippinePeso className="w-3.5 h-3.5 text-emerald-800" /> Total Contributed
+              </p>
+              <p className="text-3xl font-light text-slate-950 dark:text-white mt-1">
+                ₱{totalShareCapitalContributed.toLocaleString()}
+              </p>
+            </div>
+            <div className="bg-[#FDFCF7] dark:bg-emerald-950/25 border border-emerald-100 dark:border-slate-800 rounded-xl p-4">
+              <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest flex items-center gap-1.5">
+                <PieChart className="w-3.5 h-3.5 text-amber-600" /> Outstanding Balance
+              </p>
+              <p className="text-3xl font-bold text-emerald-950 dark:text-emerald-400 mt-1">
+                ₱{outstandingShareCapital.toLocaleString()}
+              </p>
+            </div>
           </div>
 
           {shareCapitalByMember.length === 0 ? (
