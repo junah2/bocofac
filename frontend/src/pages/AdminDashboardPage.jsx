@@ -633,7 +633,7 @@ export default function AdminDashboardPage({
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm text-slate-500">Total Members</p>
-                    <p className="text-2xl font-extrabold text-violet-600 break-words">{members.length}</p>
+                    <p className="text-2xl font-extrabold text-violet-600 break-words">{members.filter(m => m.status !== 'Removed').length}</p>
                     <p className="text-xs font-semibold text-violet-600 mt-1">{pendingApplicants} pending applications</p>
                   </div>
                   <div className="w-14 h-14 rounded-full bg-violet-100 dark:bg-violet-950/50 flex items-center justify-center text-violet-700 dark:text-violet-400 shrink-0">
@@ -1540,7 +1540,7 @@ export default function AdminDashboardPage({
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 space-y-3">
                 <Users className="w-6 h-6 text-violet-700" />
                 <h3 className="font-bold text-slate-900 dark:text-white">Membership Report</h3>
-                <p className="text-xs text-slate-500">{members.length} members, {pendingApplicants} pending applications.</p>
+                <p className="text-xs text-slate-500">{members.filter(m => m.status !== 'Removed').length} members, {pendingApplicants} pending applications.</p>
                 <button onClick={() => printMembershipReport(members, pendingApplicants)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
                   <Printer className="w-3.5 h-3.5" /> Print Report
                 </button>

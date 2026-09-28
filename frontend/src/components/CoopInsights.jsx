@@ -45,6 +45,7 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const REALIZED_ORDER_STATUSES = ['Completed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered'];
 const INACTIVE_PAYER_DAYS = 90;
+const REMOVAL_DAYS = 365;
 
 const peso = (n) => `₱${Math.round(n).toLocaleString()}`;
 const pct = (part, whole) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
@@ -142,21 +143,28 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
     const now = Date.now();
     let fullyPaid = 0, paying = 0, noPayment = 0, inactive = 0;
     const inactiveMembers = [];
+    // Coop rule: a year with no payment toward share capital gets a member
+    // dropped. Those are counted separately as due for removal instead of
+    // being listed as merely "late".
+    const dueForRemoval = [];
     members.filter(m => m.status !== 'Removed').forEach(m => {
       const payments = ledger.filter(l => l.memberId === m.id && l.status === 'Verified');
       const paid = payments.reduce((s, l) => s + l.amount, 0);
       if (paid >= m.requiredShareCapital && m.requiredShareCapital > 0) { fullyPaid++; return; }
+      const lastActivity = payments.length
+        ? Math.max(...payments.map(l => new Date(l.paymentDate).getTime()))
+        : new Date(m.joinedDate).getTime();
+      const days = Math.floor((now - lastActivity) / 86400000);
+      if (days >= REMOVAL_DAYS) dueForRemoval.push({ id: m.id, name: m.name, days });
       if (payments.length === 0) { noPayment++; return; }
       paying++;
-      const lastPaid = Math.max(...payments.map(l => new Date(l.paymentDate).getTime()));
-      const days = Math.floor((now - lastPaid) / 86400000);
-      if (days >= INACTIVE_PAYER_DAYS) {
+      if (days >= INACTIVE_PAYER_DAYS && days < REMOVAL_DAYS) {
         inactive++;
         inactiveMembers.push({ id: m.id, name: m.name, days, remaining: m.requiredShareCapital - paid });
       }
     });
     inactiveMembers.sort((a, b) => b.days - a.days);
-    return { fullyPaid, paying, noPayment, inactive, inactiveMembers, total: fullyPaid + paying + noPayment };
+    return { fullyPaid, paying, noPayment, inactive, inactiveMembers, dueForRemoval, total: fullyPaid + paying + noPayment };
   }, [members, ledger]);
 
   // --- When customers order ---
@@ -203,8 +211,11 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
   if (payerStatus.noPayment > 0) {
     takeaways.push(`${plural(payerStatus.noPayment, 'member has', 'members have')} not paid any share capital yet. Send them a reminder.`);
   }
+  if (payerStatus.dueForRemoval.length > 0) {
+    takeaways.push(`${plural(payerStatus.dueForRemoval.length, 'member has', 'members have')} gone over a year without paying. Under the 1-year rule, they should be removed from the member list.`);
+  }
   if (payerStatus.inactive > 0) {
-    takeaways.push(`${plural(payerStatus.inactive, 'member has', 'members have')} not paid in over 3 months. Follow up with them.`);
+    takeaways.push(`${plural(payerStatus.inactive, 'member has', 'members have')} not paid in over 3 months. Follow up with them before they reach a year.`);
   }
   if (totalWeekdayOrders >= 7 && busiestDay.count > quietestDay.count) {
     takeaways.push(`Most orders come in on ${busiestDay.name} and the fewest on ${quietestDay.name}. Restock before ${busiestDay.name} and try running promos on ${quietestDay.name}.`);
