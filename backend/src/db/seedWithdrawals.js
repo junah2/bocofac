@@ -9,6 +9,7 @@ const { SHARE_CAPITAL_CAP } = require('../utils/shareCapital');
 // see withdrawals.routes.js), and nothing sent ever exceeds what a member had
 // earned by that date. Deterministic (fixed random seed), so reruns on a
 // copy of the same data produce the same history.
+// Only members with no withdrawals yet get a history, so it's safe to rerun.
 //   usage: npm run seed-withdrawals              (preview only, writes nothing)
 //          npm run seed-withdrawals -- --apply   (insert the records)
 const MONTHLY_RATE = 0.10;
@@ -79,11 +80,6 @@ const gcashReference = () => `${pick(['5', '6', '7', '8', '9'])}${String(Math.fl
 
 async function run() {
   const now = new Date();
-  const { rows: existing } = await pool.query('SELECT COUNT(*)::int AS n FROM withdrawals');
-  if (existing[0].n > 5) {
-    console.log(`There are already ${existing[0].n} withdrawal records - not adding more.`);
-    return;
-  }
   const { rows: admins } = await pool.query(`SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1`);
   const processedBy = admins[0] ? admins[0].id : null;
 
@@ -91,7 +87,12 @@ async function run() {
     `SELECT m.id, m.name, m.joined_date, m.required_share_capital,
             COALESCE((SELECT SUM(amount) FROM ledger WHERE member_id = m.id AND status = 'Verified'), 0) AS paid,
             COALESCE((SELECT SUM(sent_amount) FROM withdrawals WHERE member_id = m.id AND status = 'Sent'), 0) AS already_sent
-     FROM members m WHERE m.status <> 'Removed' ORDER BY m.id`
+     FROM members m
+     WHERE m.status <> 'Removed'
+       -- only members with no withdrawal history yet, so reruns (e.g. after
+       -- adding members) never double up anyone's history
+       AND NOT EXISTS (SELECT 1 FROM withdrawals w WHERE w.member_id = m.id)
+     ORDER BY m.id`
   );
   const eligible = members.filter(m => {
     const capital = Math.min(Number(m.paid), SHARE_CAPITAL_CAP);
@@ -136,7 +137,11 @@ async function run() {
   records.sort((a, b) => a.requestedAt - b.requestedAt);
 
   const count = (s) => records.filter(r => r.status === s).length;
-  console.log(`${eligible.length} fully paid members eligible. ${records.length} withdrawals: ${count('Sent')} sent, ${count('Rejected')} rejected, ${count('Pending')} pending.`);
+  if (eligible.length === 0) {
+    console.log('Every fully paid member already has a withdrawal history - nothing to add.');
+    return;
+  }
+  console.log(`${eligible.length} fully paid members without a history. ${records.length} withdrawals: ${count('Sent')} sent, ${count('Rejected')} rejected, ${count('Pending')} pending.`);
   const byAmount = {};
   records.forEach(r => { byAmount[r.amount] = (byAmount[r.amount] || 0) + 1; });
   console.log('By amount:', Object.entries(byAmount).map(([a, n]) => `₱${Number(a).toLocaleString()} x${n}`).join(', '));
