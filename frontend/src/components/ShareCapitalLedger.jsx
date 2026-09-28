@@ -59,6 +59,10 @@ export default function ShareCapitalLedger({
   const [sentReference, setSentReference] = useState('');
   const [submittingSend, setSubmittingSend] = useState(false);
   const [rejectingId, setRejectingId] = useState(null);
+  // The withdrawal list grows with every request ever made - show the newest
+  // few by default, the rest on demand.
+  const WITHDRAWAL_PREVIEW_COUNT = 10;
+  const [showAllWithdrawals, setShowAllWithdrawals] = useState(false);
 
   // Member's Information Sheet editing (address/IDs/fee filing/attached
   // copies/farm profile/civic org affiliation - the paper-form fields that
@@ -641,12 +645,22 @@ export default function ShareCapitalLedger({
       {/* EARNINGS WITHDRAWALS TAB */}
       {activeLedgerTab === 'withdrawals' && (
         <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-6 text-left space-y-4">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-emerald-800 dark:text-emerald-400" />
-              Member Earnings Withdrawal Requests
-            </h3>
-            <p className="text-[10px] text-slate-500">Members cash out their accrued 10% monthly earnings here - send the money outside the system, then record it below.</p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-emerald-800 dark:text-emerald-400" />
+                Member Earnings Withdrawal Requests
+              </h3>
+              <p className="text-[10px] text-slate-500">Members cash out their accrued 10% monthly earnings here - send the money outside the system, then record it below.</p>
+            </div>
+            {withdrawals.length > WITHDRAWAL_PREVIEW_COUNT && (
+              <button
+                onClick={() => setShowAllWithdrawals(v => !v)}
+                className="shrink-0 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer transition-colors whitespace-nowrap"
+              >
+                {showAllWithdrawals ? 'Hide' : `View all (${withdrawals.length})`}
+              </button>
+            )}
           </div>
 
           <MobileScrollHint />
@@ -666,7 +680,7 @@ export default function ShareCapitalLedger({
                 {withdrawals.length === 0 && (
                   <tr><td colSpan={6} className="p-6 text-center text-slate-400">No withdrawal requests yet.</td></tr>
                 )}
-                {withdrawals.map(w => (
+                {(showAllWithdrawals ? withdrawals : withdrawals.slice(0, WITHDRAWAL_PREVIEW_COUNT)).map(w => (
                   <tr key={w.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/30 transition-colors">
                     <td className="p-3 font-bold text-[#d97706] font-mono">{w.id}</td>
                     <td className="p-3">
