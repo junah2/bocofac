@@ -1,5 +1,5 @@
 // In-memory pub/sub for the admin/board realtime feed. A single Node
-// process is assumed (see start.bat) - if this ever runs across multiple
+// process is assumed (see `npm run dev` in the root package.json) - if this ever runs across multiple
 // instances, broadcasts would need to go through something shared (e.g.
 // Postgres LISTEN/NOTIFY or Redis) instead of this in-process Set.
 const clients = new Set();
