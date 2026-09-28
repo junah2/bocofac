@@ -30,12 +30,15 @@ const PALETTE = {
 // Withdrawal size bands - small enough to be useful for cash planning,
 // few enough to read at a glance.
 const WITHDRAWAL_BANDS = [
-  { label: '₱500 & below', short: '≤500', max: 500 },
-  { label: '₱501–1,000', short: '501–1k', max: 1000 },
-  { label: '₱1,001–2,000', short: '1k–2k', max: 2000 },
-  { label: '₱2,001–5,000', short: '2k–5k', max: 5000 },
-  { label: '₱5,001–10,000', short: '5k–10k', max: 10000 },
-  { label: 'Over ₱10,000', short: '10k+', max: Infinity },
+  // Labels use round numbers ("₱1,000 to ₱2,000", not "₱1,001–2,000") so
+  // they read naturally; each band holds amounts above the previous max, up
+  // to and including its own.
+  { label: 'up to ₱500', short: '≤500', max: 500 },
+  { label: '₱500 to ₱1,000', short: '500–1k', max: 1000 },
+  { label: '₱1,000 to ₱2,000', short: '1k–2k', max: 2000 },
+  { label: '₱2,000 to ₱5,000', short: '2k–5k', max: 5000 },
+  { label: '₱5,000 to ₱10,000', short: '5k–10k', max: 10000 },
+  { label: 'over ₱10,000', short: '10k+', max: Infinity },
 ];
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -179,32 +182,38 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
   }, [applicants]);
 
   // --- Plain-language takeaways, strongest signals first ---
+  // Short, everyday wording - each one says what's happening, then what to do.
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   const takeaways = [];
   if (withdrawalStats.count > 0) {
-    takeaways.push(`Most withdrawals are ${withdrawalStats.topBand.label} (${withdrawalStats.topBand.count} of ${withdrawalStats.count} request${withdrawalStats.count === 1 ? '' : 's'}, ${pct(withdrawalStats.topBand.count, withdrawalStats.count)}%). A typical request is ${peso(withdrawalStats.median)}${withdrawalStats.mostCommonAmount && withdrawalStats.mostCommonAmount.count > 1 ? `, and ${peso(withdrawalStats.mostCommonAmount.amount)} is the single most requested amount` : ''}.`);
+    const basis = withdrawalStats.count < 5 ? ` (based on only ${plural(withdrawalStats.count, 'request', 'requests')} so far)` : '';
+    takeaways.push(`Members usually withdraw ${withdrawalStats.topBand.label}. The typical amount is ${peso(withdrawalStats.median)}${basis}.`);
   }
   if (avgMonthlyOut > 0) {
-    takeaways.push(`Members withdrew about ${peso(avgMonthlyOut)} a month over the last 6 months - keeping at least that much cash ready each month avoids delayed releases.`);
+    takeaways.push(`About ${peso(avgMonthlyOut)} is withdrawn each month. Keep at least this much cash ready so releases aren't delayed.`);
   }
   if (last3In > 0 || last3Out > 0) {
     takeaways.push(last3Out > last3In
-      ? `Withdrawals (${peso(last3Out)}) exceeded share capital collected (${peso(last3In)}) in the last 3 months - consider a contribution drive or pacing large withdrawals.`
-      : `Share capital collected (${peso(last3In)}) covered withdrawals (${peso(last3Out)}) in the last 3 months - a net gain of ${peso(last3In - last3Out)}.`);
+      ? `In the last 3 months, more money went out (${peso(last3Out)} in withdrawals) than came in (${peso(last3In)} in share capital). Encourage members to keep paying their share capital.`
+      : `In the last 3 months, ${peso(last3In)} came in from share capital and ${peso(last3Out)} went out as withdrawals, so the coop gained ${peso(last3In - last3Out)}.`);
   }
   if (withdrawalStats.pendingCount > 0) {
-    takeaways.push(`${withdrawalStats.pendingCount} withdrawal request${withdrawalStats.pendingCount > 1 ? 's are' : ' is'} waiting (${peso(withdrawalStats.pendingAmount)} total) - prepare this amount for release.`);
+    takeaways.push(`${plural(withdrawalStats.pendingCount, 'withdrawal request is', 'withdrawal requests are')} waiting to be released. Prepare ${peso(withdrawalStats.pendingAmount)}.`);
   }
-  if (payerStatus.inactive > 0 || payerStatus.noPayment > 0) {
-    const parts = [];
-    if (payerStatus.noPayment > 0) parts.push(`${payerStatus.noPayment} member${payerStatus.noPayment > 1 ? 's have' : ' has'} not paid any share capital yet`);
-    if (payerStatus.inactive > 0) parts.push(`${payerStatus.inactive} ha${payerStatus.inactive > 1 ? 've' : 's'} not paid in ${INACTIVE_PAYER_DAYS}+ days`);
-    takeaways.push(`${parts.join(' and ')} - a payment reminder could raise collections.`);
+  if (payerStatus.noPayment > 0) {
+    takeaways.push(`${plural(payerStatus.noPayment, 'member has', 'members have')} not paid any share capital yet. Send them a reminder.`);
+  }
+  if (payerStatus.inactive > 0) {
+    takeaways.push(`${plural(payerStatus.inactive, 'member has', 'members have')} not paid in over 3 months. Follow up with them.`);
   }
   if (totalWeekdayOrders >= 7 && busiestDay.count > quietestDay.count) {
-    takeaways.push(`${busiestDay.name} is the busiest ordering day (${pct(busiestDay.count, totalWeekdayOrders)}% of orders) and ${quietestDay.name} the quietest - schedule restocking and deliveries around it, and try promos on ${quietestDay.name}.`);
+    takeaways.push(`Most orders come in on ${busiestDay.name} and the fewest on ${quietestDay.name}. Restock before ${busiestDay.name} and try running promos on ${quietestDay.name}.`);
   }
-  if (pipeline.waitingPmes + pipeline.forReview > 0) {
-    takeaways.push(`${pipeline.forReview} application${pipeline.forReview === 1 ? ' is' : 's are'} ready for Board review and ${pipeline.waitingPmes} still need${pipeline.waitingPmes === 1 ? 's' : ''} to attend PMES.`);
+  if (pipeline.forReview > 0) {
+    takeaways.push(`${plural(pipeline.forReview, 'membership application is', 'membership applications are')} waiting for Board approval.`);
+  }
+  if (pipeline.waitingPmes > 0) {
+    takeaways.push(`${plural(pipeline.waitingPmes, 'applicant still needs', 'applicants still need')} to attend the PMES seminar.`);
   }
 
   const ChartTooltip = ({ active, payload, label, render }) => {
@@ -246,7 +255,7 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatTile label="Typical Withdrawal" value={peso(withdrawalStats.median)} sub={`Median of ${withdrawalStats.count} request${withdrawalStats.count === 1 ? '' : 's'}`} />
+        <StatTile label="Typical Withdrawal" value={peso(withdrawalStats.median)} sub={`Based on ${withdrawalStats.count} request${withdrawalStats.count === 1 ? '' : 's'}`} />
         <StatTile
           label="Most Requested Amount"
           value={withdrawalStats.mostCommonAmount ? peso(withdrawalStats.mostCommonAmount.amount) : '—'}
@@ -269,7 +278,7 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: palette.axis }} axisLine={false} tickLine={false} width={40} />
                   <Tooltip
                     cursor={{ fill: 'rgba(148,163,184,0.12)' }}
-                    content={<ChartTooltip render={(p) => <p>{p[0].payload.label}: {p[0].value} request{p[0].value === 1 ? '' : 's'} ({pct(p[0].value, withdrawalStats.count)}%)</p>} />}
+                    content={<ChartTooltip render={(p) => <p>{p[0].payload.label.charAt(0).toUpperCase() + p[0].payload.label.slice(1)}: {p[0].value} request{p[0].value === 1 ? '' : 's'} ({pct(p[0].value, withdrawalStats.count)}%)</p>} />}
                   />
                   <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={40}>
                     {withdrawalStats.bands.map(b => (
@@ -322,7 +331,7 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
               { label: 'Fully paid', value: payerStatus.fullyPaid },
               { label: 'Still paying', value: payerStatus.paying },
               { label: 'No payment yet', value: payerStatus.noPayment },
-              { label: `No payment in ${INACTIVE_PAYER_DAYS}+ days`, value: payerStatus.inactive, of: payerStatus.paying, ofLabel: 'of those still paying' },
+              { label: 'No payment in over 3 months', value: payerStatus.inactive, of: payerStatus.paying, ofLabel: 'of those still paying' },
             ].map(s => (
               <div key={s.label} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
                 <p className="text-xl font-bold text-slate-900 dark:text-white">{s.value}</p>
