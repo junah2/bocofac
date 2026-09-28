@@ -1,4 +1,4 @@
-// OCR for GCash/bank receipt screenshots, shared by checkout and the
+// OCR for GCash receipt screenshots, shared by checkout and the
 // membership fee step. Tesseract misreads the small reference-number text on
 // phone screenshots ("9" for "3", a dropped leading digit) unless the text is
 // large, so small images are first redrawn at up to 3x size in grayscale -

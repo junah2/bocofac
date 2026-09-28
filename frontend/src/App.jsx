@@ -695,7 +695,7 @@ export default function App() {
     }
   };
 
-  // Confirms a member-submitted GCash/bank reference actually matches a real
+  // Confirms a member-submitted GCash reference actually matches a real
   // remittance before it counts toward that member's share-capital balance.
   const handleVerifyLedgerEntry = async (entryId) => {
     try {
@@ -714,7 +714,7 @@ export default function App() {
     }
   };
 
-  // Admin has actually sent the money (GCash/bank, outside the system) and is
+  // Admin has actually sent the money (via GCash, outside the system) and is
   // now recording it against the member's earnings withdrawal request.
   const handleSendWithdrawal = async (withdrawalId, { sentAmount, reference }) => {
     try {

@@ -545,7 +545,7 @@ export default function MembershipPortal({
 
   // Same client-side OCR sanity check used at storefront checkout (see
   // Storefront.jsx's handleReceiptUpload/RECEIPT_OCR_KEYWORDS) - scans the
-  // image for words any real GCash/bank confirmation would contain, so an
+  // image for words any real GCash confirmation would contain, so an
   // applicant can't accidentally (or otherwise) attach an unrelated photo as
   // their membership fee proof of payment.
   const handleFeeReceiptUpload = async (e) => {
@@ -562,7 +562,7 @@ export default function MembershipPortal({
     try {
       const text = await recognizeReceiptText(file);
       if (!looksLikePaymentReceipt(text)) {
-        onToast("This doesn't look like a payment receipt screenshot. Please attach the actual GCash/bank transfer confirmation.", 'error');
+        onToast("This doesn't look like a payment receipt screenshot. Please attach the actual GCash payment confirmation.", 'error');
         return;
       }
       setReceiptDigitRuns(extractDigitRuns(text));

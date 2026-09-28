@@ -621,7 +621,7 @@ export default function ShareCapitalLedger({
                             <button
                               onClick={() => handleVerifyEntry(entry)}
                               disabled={verifyingId === entry.id}
-                              title="Confirm this GCash/bank reference is legitimate before it counts toward the shareholder's balance"
+                              title="Confirm this GCash reference is legitimate before it counts toward the shareholder's balance"
                               className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 text-[10px] font-bold uppercase cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                               {verifyingId === entry.id ? 'Verifying…' : 'Verify'}
@@ -754,7 +754,7 @@ export default function ShareCapitalLedger({
               <button type="button" onClick={() => setSendingWithdrawal(null)} className="text-slate-400 hover:text-slate-600 text-sm font-semibold p-1">Close</button>
             </div>
             <p className="text-xs text-slate-500">
-              {sendingWithdrawal.memberName} requested ₱{sendingWithdrawal.requestedAmount.toLocaleString()}. Confirm the amount actually sent (GCash/bank) and its reference.
+              {sendingWithdrawal.memberName} requested ₱{sendingWithdrawal.requestedAmount.toLocaleString()}. Confirm the amount actually sent by GCash and its reference.
             </p>
             <div>
               <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Amount Sent (₱)</label>
@@ -1201,7 +1201,7 @@ export default function ShareCapitalLedger({
 
             <div className="flex items-center justify-between text-xs pt-1">
               <span className="text-slate-500">
-                {viewedTxn.status === 'Verified' ? `Recorded: ${formatDate(viewedTxn.verifiedAt)}` : 'Awaiting verification of the GCash/bank reference'}
+                {viewedTxn.status === 'Verified' ? `Recorded: ${formatDate(viewedTxn.verifiedAt)}` : 'Awaiting verification of the GCash reference'}
               </span>
               <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
                 viewedTxn.status === 'Verified' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'

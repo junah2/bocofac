@@ -370,7 +370,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
   // checkout) to reject obviously-unrelated images before they're even
   // attached. This is a content sanity check, not a substitute for the
   // admin's own manual verification of the reference number against the
-  // actual GCash/bank screenshot.
+  // actual GCash screenshot.
   const handleReceiptUpload = async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = ''; // let picking the same file again re-trigger onChange
@@ -385,7 +385,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
     try {
       const text = await recognizeReceiptText(file);
       if (!looksLikePaymentReceipt(text)) {
-        onToast("This doesn't look like a payment receipt screenshot. Please attach the actual GCash/bank transfer confirmation.", 'error');
+        onToast("This doesn't look like a payment receipt screenshot. Please attach the actual GCash payment confirmation.", 'error');
         return;
       }
       setReceiptDigitRuns(extractDigitRuns(text));
@@ -861,7 +861,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       {paymentMethod === 'GCash'
-                        ? 'Due to strict rural banking configurations, BOCOFAC leverages manual verification. Scan or transfer the exact total to the accredited digital deposit value below:'
+                        ? 'Send the exact total by GCash to the cooperative wallet below, then attach the screenshot. An admin verifies every payment manually.'
                         : 'Pay in cash to the rider once your order arrives. No online payment or screenshot needed.'}
                     </p>
                   </div>

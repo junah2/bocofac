@@ -134,7 +134,7 @@ router.get('/', requireRole('admin', 'board'), asyncHandler(async (req, res) => 
 }));
 
 // Admin marks a request Sent once they've actually transferred the money
-// (GCash/bank, outside the system) - sentAmount is recorded independently of
+// (via GCash, outside the system) - sentAmount is recorded independently of
 // requestedAmount since what actually got sent is the source of truth.
 router.patch('/:id/send', requireRole('admin'), asyncHandler(async (req, res) => {
   const sentAmount = Number(req.body.sentAmount);

@@ -33,7 +33,7 @@ function daysAfter(dateStr, days) {
   return toDate(d);
 }
 const gcashReference = () => `${pick(['1', '2', '5', '6', '7', '8', '9'])}${pad(randInt(0, 999999999999), 12)}`;
-const PAYMENT_METHODS = ['GCash', 'GCash', 'GCash', 'Bank Transfer', 'Over-the-Counter'];
+const PAYMENT_METHODS = ['GCash', 'GCash', 'GCash', 'Over-the-Counter'];
 
 async function run() {
   const today = toDate(new Date());

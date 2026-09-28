@@ -234,9 +234,9 @@ export const INITIAL_ORDERS = [
       { productId: 'prod-wre', productName: 'Coir Geo-Textile High-Density EcoRope', price: 850, quantity: 1 }
     ],
     totalAmount: 850,
-    paymentMethod: 'Bank Transfer',
-    referenceNumber: 'BPI-TRANSFER-0041',
-    paymentReceiptName: 'bpi_screenshot.jpg',
+    paymentMethod: 'GCash',
+    referenceNumber: '5031872946105',
+    paymentReceiptName: 'gcash_receipt.jpg',
     status: 'Completed',
     orderedAt: '2026-06-15T09:05:00Z'
   }

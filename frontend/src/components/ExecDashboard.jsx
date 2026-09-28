@@ -908,7 +908,7 @@ export default function ExecDashboard({
             <ClipboardCheck className="w-4.5 h-4.5 text-emerald-800 dark:text-emerald-400" />
             Digital Wallet Receipt auditor
           </h3>
-          <p className="text-xs text-slate-500 mt-1">Review applicant shopping baskets and matching screenshots uploaded from digital wallets (GCash/Bank transfer). Click verification to complete GAAP ledgers.</p>
+          <p className="text-xs text-slate-500 mt-1">Review applicant shopping baskets and matching screenshots uploaded from GCash. Click verification to complete GAAP ledgers.</p>
           {selectedMonth && (
             <button
               onClick={() => setSelectedMonth(null)}

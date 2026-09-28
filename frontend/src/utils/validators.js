@@ -25,11 +25,11 @@ export function extractDigitRuns(ocrText) {
     .flatMap((line) => line.replace(/[ \t]+/g, '').match(/\d+/g) || []);
 }
 
-// Words a GCash/bank confirmation carries. Kept forgiving of common OCR slips
+// Words a GCash confirmation carries. Kept forgiving of common OCR slips
 // ("ransfer" also matches a "Transfer" whose T got misread).
 const RECEIPT_OCR_KEYWORDS = [
   'gcash', 'reference', 'ref no', 'ref.', 'amount', 'transaction', 'payment',
-  'sent', 'ransfer', 'total', 'php', 'bank', 'received', 'date & time',
+  'sent', 'ransfer', 'total', 'php', 'received', 'date & time',
   'successful', 'paid',
 ];
 

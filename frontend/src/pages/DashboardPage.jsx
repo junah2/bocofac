@@ -61,7 +61,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'How is my payment verified?',
-    a: 'Upload a screenshot of your GCash or bank transfer receipt at checkout. A cooperative admin manually matches it to your order, which usually takes 1-2 business hours.',
+    a: 'Upload a screenshot of your GCash receipt at checkout. A cooperative admin manually matches it to your order, which usually takes 1-2 business hours.',
   },
   {
     q: 'How do I track my order status?',
@@ -1471,7 +1471,7 @@ function MembershipContributionPanel({
                   required
                 />
                 <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -10, marginBottom: 18 }}>
-                  The cooperative sends this manually (GCash/bank) once approved.
+                  The cooperative sends this to your GCash once approved.
                 </p>
                 <GreenBtn type="submit" disabled={submittingWithdrawal}>
                   {submittingWithdrawal ? 'Submitting…' : 'Request Withdrawal'}

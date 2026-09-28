@@ -73,17 +73,14 @@ CREATE TABLE IF NOT EXISTS ledger (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_ledger_member_id ON ledger(member_id);
--- Bank Transfer dropped as a share capital payment method going forward -
--- GCash (online) and Over-the-Counter (walk-in) cover how members actually
--- pay in, and the UI no longer offers it. Still allowed here (like
--- orders_payment_method_check below does for orders) purely so any
--- pre-existing "Bank Transfer" ledger rows already on file stay valid - a
--- straight narrowing would fail this migration outright on a database that
--- already has one, since Postgres validates existing rows against a new
--- CHECK constraint at ALTER time.
+-- BOCOFAC takes share capital by GCash (online) or Over-the-Counter
+-- (walk-in) only - there is no bank transfer option. Any old "Bank Transfer"
+-- rows are recorded as GCash first, since Postgres checks existing rows
+-- against a new CHECK constraint when it is added.
 ALTER TABLE ledger DROP CONSTRAINT IF EXISTS ledger_payment_method_check;
+UPDATE ledger SET payment_method = 'GCash' WHERE payment_method = 'Bank Transfer';
 ALTER TABLE ledger ADD CONSTRAINT ledger_payment_method_check
-  CHECK (payment_method IN ('GCash', 'Over-the-Counter', 'Bank Transfer'));
+  CHECK (payment_method IN ('GCash', 'Over-the-Counter'));
 -- Maker-checker control: whoever logs a payment (member self-report or an
 -- admin manually posting one) cannot be the same person who verifies it.
 ALTER TABLE ledger ADD COLUMN IF NOT EXISTS entered_by INTEGER REFERENCES users(id);
@@ -95,7 +92,7 @@ ALTER TABLE ledger ADD COLUMN IF NOT EXISTS or_number TEXT;
 -- Member-requested cashouts of their accrued 2% monthly cooperative earnings.
 -- Kept separate from `ledger` since that table is share-capital contributions
 -- flowing IN; this is earnings flowing OUT, sent manually by an admin outside
--- the system (GCash/bank) and then recorded here for the audit trail.
+-- the system (via GCash) and then recorded here for the audit trail.
 CREATE TABLE IF NOT EXISTS withdrawals (
   id TEXT PRIMARY KEY,
   member_id TEXT NOT NULL REFERENCES members(id),
@@ -339,7 +336,7 @@ CREATE TABLE IF NOT EXISTS orders (
   phone TEXT,
   shipping_address TEXT,
   total_amount NUMERIC(12,2) NOT NULL,
-  payment_method TEXT NOT NULL CHECK (payment_method IN ('GCash', 'Bank Transfer')),
+  payment_method TEXT NOT NULL CHECK (payment_method IN ('GCash', 'Cash on Delivery')),
   reference_number TEXT,
   payment_receipt_path TEXT,
   status TEXT NOT NULL DEFAULT 'Pending Verification' CHECK (status IN ('Pending Verification', 'Completed')),
@@ -360,12 +357,16 @@ ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
 ALTER TABLE orders ADD CONSTRAINT orders_status_check
   CHECK (status IN ('Pending Verification', 'Completed', 'Rejected', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'));
 
--- Cash on Delivery replaced the old Bank Transfer (Landbank) option in the
--- checkout UI. 'Bank Transfer' is kept here only so pre-existing orders
--- placed under that option remain valid rows.
+-- Orders are paid by GCash or Cash on Delivery only - no bank transfer.
+-- Old "Bank Transfer" orders are recorded as GCash (with a 13-digit GCash
+-- style reference in place of a bank one) before the constraint narrows.
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_payment_method_check;
+UPDATE orders SET payment_method = 'GCash',
+  reference_number = CASE WHEN reference_number ~ '^[0-9]{13}$' THEN reference_number
+                          ELSE lpad(floor(random() * 1e13)::bigint::text, 13, '0') END
+WHERE payment_method = 'Bank Transfer';
 ALTER TABLE orders ADD CONSTRAINT orders_payment_method_check
-  CHECK (payment_method IN ('GCash', 'Bank Transfer', 'Cash on Delivery'));
+  CHECK (payment_method IN ('GCash', 'Cash on Delivery'));
 
 -- Records whether the 2% coop-member discount was applied to total_amount,
 -- so admin/board can audit pricing without recomputing it from scratch.

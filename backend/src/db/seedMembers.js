@@ -6,7 +6,7 @@ const pool = require('./pool');
 // analytics have a believable population to work with. Matches the shape of
 // the existing member records (Filipino names, Camarines Sur addresses,
 // NCFRS/RSBSA IDs, ₱300 membership fee) and the app's rules: payments are
-// verified GCash / bank / over-the-counter entries with OR numbers, and
+// verified GCash / over-the-counter entries with OR numbers, and
 // "fully paid" means verified payments reach the member's required share
 // capital. Deterministic (fixed random seed).
 //   usage: npm run seed-members              (preview only, writes nothing)
@@ -56,7 +56,7 @@ const CIVIC_ORGS = [
   'Barangay Agri Council', 'Camarines Sur Coconut Growers Assoc.', null, null, null,
 ];
 const SHARE_CAPITAL_OPTIONS = [4000, 5000, 5000, 6000, 7500, 10000, 10000, 12500, 15000, 20000, 25000];
-const PAYMENT_METHODS = ['GCash', 'GCash', 'GCash', 'Bank Transfer', 'Over-the-Counter'];
+const PAYMENT_METHODS = ['GCash', 'GCash', 'GCash', 'Over-the-Counter'];
 
 function randomDateBetween(start, end) {
   const t = new Date(start).getTime() + rand() * (new Date(end).getTime() - new Date(start).getTime());
