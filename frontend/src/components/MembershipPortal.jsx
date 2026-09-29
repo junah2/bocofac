@@ -22,6 +22,7 @@ import { getPmesDisplayStatus } from '../utils/pmesStatus';
 import { isValidGcashRef13, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt, looksLikePaymentReceipt } from '../utils/validators';
 import { recognizeReceiptText } from '../utils/receiptOcr';
 import RefMatchHint from './RefMatchHint';
+import ImageLightbox from './ImageLightbox';
 import { displayApplicantStatus } from '../utils/applicantStatus';
 import { Field, Section } from './ProfileField';
 
@@ -2206,25 +2207,7 @@ export default function MembershipPortal({
       </>
       )}
 
-      {viewedAttachmentUrl && (
-        <div
-          className="fixed inset-0 z-[70] bg-slate-950/80 flex items-center justify-center p-4 cursor-pointer"
-          onClick={() => setViewedAttachmentUrl(null)}
-        >
-          <button
-            onClick={() => setViewedAttachmentUrl(null)}
-            className="absolute top-4 right-4 p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-          <img
-            src={viewedAttachmentUrl}
-            alt=""
-            className="max-w-[90vw] max-h-[90vh] rounded-2xl object-contain cursor-default"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+      <ImageLightbox url={viewedAttachmentUrl} onClose={() => setViewedAttachmentUrl(null)} />
 
     </div>
   );

@@ -11,6 +11,7 @@ import { displayApplicantStatus } from '../utils/applicantStatus';
 import { isValidPhone11, isValidGcashRef13, digitsOnly, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt, looksLikePaymentReceipt } from '../utils/validators';
 import { recognizeReceiptText } from '../utils/receiptOcr';
 import RefMatchHint from '../components/RefMatchHint';
+import ImageLightbox from '../components/ImageLightbox';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
@@ -1278,6 +1279,7 @@ function MembershipContributionPanel({
   submittingWithdrawal,
   onSubmitWithdrawal,
 }) {
+  const [viewedReceiptUrl, setViewedReceiptUrl] = useState(null);
   const { member, totalContribution = 0, savingsBalance = 0, subscribedShare, paidUpCapital } = membership;
   const { availableBalance = 0, requests: withdrawalRequests = [] } = withdrawalData || {};
   const target = Number(member.requiredShareCapital) || 0;
@@ -1452,7 +1454,8 @@ function MembershipContributionPanel({
                     <img src={payReceipt.preview} alt="Receipt preview" className="h-16 rounded-lg shadow border object-contain" />
                     <div className="min-w-0">
                       <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold truncate">Attached: {payReceipt.name}</p>
-                      <a href={payReceipt.preview} target="_blank" rel="noopener noreferrer" className="relative z-10 text-[11px] text-slate-400 hover:text-emerald-600 underline">View full size</a>
+                      <button type="button" onClick={() => setViewedReceiptUrl(payReceipt.preview)} className="relative z-10 text-[11px] text-slate-400 hover:text-emerald-600 underline cursor-pointer">View full size</button>
+                      <ImageLightbox url={viewedReceiptUrl} alt="GCash receipt" onClose={() => setViewedReceiptUrl(null)} />
                       <p className="text-[11px] text-slate-400">Click to replace</p>
                     </div>
                   </>

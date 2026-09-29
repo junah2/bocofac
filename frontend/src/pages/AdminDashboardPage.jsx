@@ -34,6 +34,7 @@ import ApplicantDetailModal from '../components/ApplicantDetailModal';
 import MemberDetailModal from '../components/MemberDetailModal';
 import MobileScrollHint from '../components/MobileScrollHint';
 import ExecDashboard from '../components/ExecDashboard';
+import ImageLightbox from '../components/ImageLightbox';
 import CoopInsights from '../components/CoopInsights';
 import ShareCapitalLedger from '../components/ShareCapitalLedger';
 import PmesAttendanceModal from '../components/PmesAttendanceModal';
@@ -226,6 +227,7 @@ export default function AdminDashboardPage({
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [sessionEditDraft, setSessionEditDraft] = useState({});
   const [viewingReceiptOrder, setViewingReceiptOrder] = useState(null);
+  const [viewedReceiptUrl, setViewedReceiptUrl] = useState(null);
   const [viewedApplicant, setViewedApplicant] = useState(null);
   const [viewedMember, setViewedMember] = useState(null);
   const [viewedAvatarUrl, setViewedAvatarUrl] = useState(null);
@@ -982,7 +984,9 @@ export default function AdminDashboardPage({
                   <img
                     src={`${API_BASE}/orders/${viewingReceiptOrder.id}/receipt`}
                     alt={`Receipt for ${viewingReceiptOrder.id}`}
-                    className="w-full max-h-56 object-contain rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                    title="Click to view full size"
+                    onClick={(e) => setViewedReceiptUrl(e.currentTarget.src)}
+                    className="w-full max-h-56 object-contain rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 cursor-zoom-in"
                     onError={(e) => {
                       e.target.style.display = 'none';
                       e.target.nextSibling.style.display = 'block';
@@ -991,6 +995,7 @@ export default function AdminDashboardPage({
                   <p className="hidden text-sm text-slate-400 text-center py-8 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
                     No receipt screenshot on file for this order.
                   </p>
+                  <ImageLightbox url={viewedReceiptUrl} alt="GCash receipt" onClose={() => setViewedReceiptUrl(null)} />
                 </div>
 
                 {viewingReceiptOrder.status === 'Rejected' ? (

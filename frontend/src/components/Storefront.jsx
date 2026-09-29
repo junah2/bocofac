@@ -21,6 +21,7 @@ import {
 import { isValidPhone11, isValidGcashRef13, digitsOnly, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt, looksLikePaymentReceipt } from '../utils/validators';
 import { recognizeReceiptText } from '../utils/receiptOcr';
 import RefMatchHint from './RefMatchHint';
+import ImageLightbox from './ImageLightbox';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
@@ -1064,25 +1065,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
         </div>
       )}
 
-      {viewedAttachmentUrl && (
-        <div
-          className="fixed inset-0 z-[70] bg-slate-950/80 flex items-center justify-center p-4 cursor-pointer"
-          onClick={() => setViewedAttachmentUrl(null)}
-        >
-          <button
-            onClick={() => setViewedAttachmentUrl(null)}
-            className="absolute top-4 right-4 p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-          <img
-            src={viewedAttachmentUrl}
-            alt=""
-            className="max-w-[90vw] max-h-[90vh] rounded-2xl object-contain cursor-default"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+      <ImageLightbox url={viewedAttachmentUrl} onClose={() => setViewedAttachmentUrl(null)} />
 
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Check, FileText, AlertTriangle } from 'lucide-react';
 import { displayApplicantStatus } from '../utils/applicantStatus';
 import { Field, Section } from './ProfileField';
+import ImageLightbox from './ImageLightbox';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 
@@ -14,6 +15,8 @@ export default function ApplicantDetailModal({ applicant: a, onClose, onUpdateAp
   const [rejectReasonDraft, setRejectReasonDraft] = useState('');
   const [requiredShareCapitalDraft, setRequiredShareCapitalDraft] = useState('10000');
   const [confirmAction, setConfirmAction] = useState(null);
+  const [viewedDocUrl, setViewedDocUrl] = useState(null);
+  const [pdfDocs, setPdfDocs] = useState({});
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60" onClick={onClose}>
@@ -204,19 +207,18 @@ export default function ApplicantDetailModal({ applicant: a, onClose, onUpdateAp
               }
               const url = `${API_BASE}/applicants/${a.id}/documents/${docType}`;
               return (
-                <a
+                <button
+                  type="button"
                   key={label}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden hover:border-emerald-500 transition"
+                  onClick={() => (pdfDocs[docType] ? window.open(url, '_blank', 'noopener') : setViewedDocUrl(url))}
+                  className="group text-left rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden hover:border-emerald-500 transition cursor-pointer"
                 >
                   <div className="aspect-[4/3] bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden relative">
                     <img
                       src={url}
                       alt={label}
                       className="w-full h-full object-cover"
-                      onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; setPdfDocs(prev => ({ ...prev, [docType]: true })); }}
                     />
                     <div className="hidden absolute inset-0 items-center justify-center text-slate-400">
                       <FileText className="w-8 h-8" />
@@ -225,10 +227,12 @@ export default function ApplicantDetailModal({ applicant: a, onClose, onUpdateAp
                   <p className="px-2 py-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
                     <Check className="w-3 h-3 shrink-0" /> {label}
                   </p>
-                </a>
+                </button>
               );
             })}
           </div>
+
+          <ImageLightbox url={viewedDocUrl} onClose={() => setViewedDocUrl(null)} />
 
           <Section title="PMES & Membership">
             <Field label="PMES Attended" value={a.pmesAttended ? `Yes (${a.pmesDate ? new Date(a.pmesDate).toLocaleDateString() : ''})` : 'Not yet'} />
