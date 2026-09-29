@@ -1374,7 +1374,7 @@ function MembershipContributionPanel({
                   required
                 />
                 <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -10, marginBottom: 18 }}>
-                  The cooperative sends this to your GCash once approved.
+                  Once you submit a request, claim the cash at the BOCOFAC office.
                 </p>
                 <GreenBtn type="submit" disabled={submittingWithdrawal}>
                   {submittingWithdrawal ? 'Submitting…' : 'Request Withdrawal'}
@@ -1588,7 +1588,7 @@ function MembershipContributionPanel({
                   background: req.status === 'Sent' ? '#ebebe0' : req.status === 'Rejected' ? '#fee2e2' : '#fef3c7',
                   color: req.status === 'Sent' ? '#424c34' : req.status === 'Rejected' ? '#991b1b' : '#92400e',
                 }}>
-                  {req.status}
+                  {req.status === 'Sent' ? 'Released' : req.status}
                 </span>
                 {req.status === 'Sent' && (
                   <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>

@@ -600,11 +600,11 @@ export default function App() {
         body: JSON.stringify({ sentAmount, reference }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Failed to record the sent withdrawal.');
+      if (!res.ok) throw new Error(data.error || 'Failed to record the released withdrawal.');
       setWithdrawals(prev => prev.map(w => (w.id === withdrawalId ? { ...w, ...data, memberName: w.memberName } : w)));
-      addToast(`Withdrawal ${withdrawalId} marked as sent.`, 'success');
+      addToast(`Withdrawal ${withdrawalId} marked as released.`, 'success');
     } catch (err) {
-      addToast(err.message || 'Failed to record the sent withdrawal.', 'error');
+      addToast(err.message || 'Failed to record the released withdrawal.', 'error');
     }
   };
 

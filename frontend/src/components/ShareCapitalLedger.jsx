@@ -54,8 +54,11 @@ export default function ShareCapitalLedger({
   const [sentReference, setSentReference] = useState('');
   const [submittingSend, setSubmittingSend] = useState(false);
   const [rejectingId, setRejectingId] = useState(null);
-  const WITHDRAWAL_PREVIEW_COUNT = 10;
-  const [showAllWithdrawals, setShowAllWithdrawals] = useState(false);
+  // [EARNINGS] Pending requests lang ang nasa listahan; ang na-release o na-reject ay nasa History
+  const [showWithdrawalHistory, setShowWithdrawalHistory] = useState(false);
+  const pendingWithdrawals = withdrawals.filter(w => w.status === 'Pending');
+  const processedWithdrawals = withdrawals.filter(w => w.status !== 'Pending');
+  const shownWithdrawals = showWithdrawalHistory ? processedWithdrawals : pendingWithdrawals;
   const LEDGER_PREVIEW_COUNT = 10;
   const [showAllLedger, setShowAllLedger] = useState(false);
 
@@ -229,7 +232,7 @@ export default function ShareCapitalLedger({
     e.preventDefault();
     const amount = Number(sentAmount);
     if (!amount || amount <= 0) {
-      onToast('Please enter a valid sent amount.', 'error');
+      onToast('Please enter a valid released amount.', 'error');
       return;
     }
     setSubmittingSend(true);
@@ -634,20 +637,24 @@ export default function ShareCapitalLedger({
                 <Sparkles className="w-4 h-4 text-emerald-800 dark:text-emerald-400" />
                 Member Earnings Withdrawal Requests
               </h3>
-              <p className="text-[10px] text-slate-500">Members cash out their accrued 10% monthly earnings here - send the money outside the system, then record it below.</p>
+              <p className="text-[10px] text-slate-500">
+                {showWithdrawalHistory
+                  ? 'Withdrawal requests that were already released or rejected.'
+                  : 'Members who requested to withdraw their earnings. The member claims the cash at the BOCOFAC office; click Release once they have received it.'}
+              </p>
             </div>
-            {withdrawals.length > WITHDRAWAL_PREVIEW_COUNT && (
+            {processedWithdrawals.length > 0 && (
               <button
-                onClick={() => setShowAllWithdrawals(v => !v)}
+                onClick={() => setShowWithdrawalHistory(v => !v)}
                 className="shrink-0 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer transition-colors whitespace-nowrap"
               >
-                {showAllWithdrawals ? 'Hide' : `View all (${withdrawals.length})`}
+                {showWithdrawalHistory ? `Back to requests (${pendingWithdrawals.length})` : `History (${processedWithdrawals.length})`}
               </button>
             )}
           </div>
 
           <MobileScrollHint />
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[70vh]">
             <table className="w-full text-left text-xs divide-y divide-slate-200 dark:divide-slate-800">
               <thead className="sticky top-0 z-10 bg-[#fdfbf6] dark:bg-slate-950 text-slate-500 uppercase text-[10px] font-bold">
                 <tr>
@@ -660,10 +667,10 @@ export default function ShareCapitalLedger({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-150 dark:divide-slate-800">
-                {withdrawals.length === 0 && (
-                  <tr><td colSpan={6} className="p-6 text-center text-slate-400">No withdrawal requests yet.</td></tr>
+                {shownWithdrawals.length === 0 && (
+                  <tr><td colSpan={6} className="p-6 text-center text-slate-400">{showWithdrawalHistory ? 'No released or rejected requests yet.' : 'No pending withdrawal requests.'}</td></tr>
                 )}
-                {(showAllWithdrawals ? withdrawals : withdrawals.slice(0, WITHDRAWAL_PREVIEW_COUNT)).map(w => (
+                {shownWithdrawals.map(w => (
                   <tr key={w.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/30 transition-colors">
                     <td className="p-3 font-bold text-[#d97706] font-mono">{w.id}</td>
                     <td className="p-3">
@@ -677,8 +684,8 @@ export default function ShareCapitalLedger({
                     <td className="p-3 text-center">
                       {w.status === 'Sent' ? (
                         <div>
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-emerald-100 text-emerald-800">Sent</span>
-                          <p className="text-[10px] text-slate-400 mt-1">₱{w.sentAmount.toLocaleString()}{w.sentReference ? ` · Ref: ${w.sentReference}` : ''}</p>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-emerald-100 text-emerald-800">Released</span>
+                          <p className="text-[10px] text-slate-400 mt-1">₱{w.sentAmount.toLocaleString()} released{w.sentReference ? ` · Ref: ${w.sentReference}` : ''}</p>
                         </div>
                       ) : w.status === 'Rejected' ? (
                         <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-rose-100 text-rose-800">Rejected</span>
@@ -693,7 +700,7 @@ export default function ShareCapitalLedger({
                             onClick={() => { setSendingWithdrawal(w); setSentAmount(String(w.requestedAmount)); setSentReference(''); }}
                             className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 text-[10px] font-bold uppercase cursor-pointer"
                           >
-                            Send
+                            Release
                           </button>
                           <button
                             onClick={() => handleRejectWithdrawal(w)}
@@ -720,14 +727,14 @@ export default function ShareCapitalLedger({
             className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-4 text-left relative animate-in zoom-in-95 duration-200"
           >
             <div className="flex justify-between items-start border-b pb-3">
-              <h3 className="font-bold text-slate-950 dark:text-white">Send Withdrawal - {sendingWithdrawal.id}</h3>
+              <h3 className="font-bold text-slate-950 dark:text-white">Release Withdrawal - {sendingWithdrawal.id}</h3>
               <button type="button" onClick={() => setSendingWithdrawal(null)} className="text-slate-400 hover:text-slate-600 text-sm font-semibold p-1">Close</button>
             </div>
             <p className="text-xs text-slate-500">
-              {sendingWithdrawal.memberName} requested ₱{sendingWithdrawal.requestedAmount.toLocaleString()}. Confirm the amount actually sent by GCash and its reference.
+              {sendingWithdrawal.memberName} requested ₱{sendingWithdrawal.requestedAmount.toLocaleString()}. Confirm that the member received the cash at the BOCOFAC office.
             </p>
             <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Amount Sent (₱)</label>
+              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Amount Released (₱)</label>
               <input
                 type="number"
                 required
@@ -737,12 +744,12 @@ export default function ShareCapitalLedger({
               />
             </div>
             <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Reference ID</label>
+              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">OR / Voucher No. (optional)</label>
               <input
                 type="text"
                 value={sentReference}
                 onChange={(e) => setSentReference(e.target.value)}
-                placeholder="e.g. GCash Ref 88291..."
+                placeholder="e.g. OR-2026-000123"
                 className="w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-slate-950"
               />
             </div>
@@ -753,7 +760,7 @@ export default function ShareCapitalLedger({
                 disabled={submittingSend}
                 className="px-5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white font-semibold text-xs cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {submittingSend ? 'Recording…' : 'Confirm Sent'}
+                {submittingSend ? 'Recording…' : 'Confirm Released'}
               </button>
             </div>
           </form>

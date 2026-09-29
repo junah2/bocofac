@@ -150,7 +150,7 @@ router.patch('/:id/send', requireRole('admin'), asyncHandler(async (req, res) =>
     await notifyByMemberId(
       client,
       rows[0].member_id,
-      `Your withdrawal request ${rows[0].id} was sent: ₱${Number(sentAmount).toLocaleString()}${reference ? ` (Ref: ${reference})` : ''}.`,
+      `Your withdrawal request ${rows[0].id} was released: ₱${Number(sentAmount).toLocaleString()} received at the BOCOFAC office${reference ? ` (Ref: ${reference})` : ''}.`,
       'success'
     );
     await auditFromRequest(req, 'withdrawal.send', {
