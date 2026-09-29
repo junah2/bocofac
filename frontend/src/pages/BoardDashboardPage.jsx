@@ -68,6 +68,10 @@ export default function BoardDashboardPage({
   const [reportRange, setReportRange] = useState('Monthly');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [viewedApplicant, setViewedApplicant] = useState(null);
+  const APPLICANT_PREVIEW_COUNT = 5;
+  const MEMBER_PREVIEW_COUNT = 10;
+  const [showAllApplicants, setShowAllApplicants] = useState(false);
+  const [showAllMembers, setShowAllMembers] = useState(false);
   const [attendanceSession, setAttendanceSession] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef(null);
@@ -475,7 +479,17 @@ export default function BoardDashboardPage({
 
           {activeTab === 'membership' && (
             <div className="space-y-6">
-              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Membership Management</h2>
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Membership Management</h2>
+                {applicants.length > APPLICANT_PREVIEW_COUNT && (
+                  <button
+                    onClick={() => setShowAllApplicants(v => !v)}
+                    className="shrink-0 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer transition-colors whitespace-nowrap"
+                  >
+                    {showAllApplicants ? 'Hide' : `View all (${applicants.length})`}
+                  </button>
+                )}
+              </div>
 
               <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
@@ -490,7 +504,7 @@ export default function BoardDashboardPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {applicants.map(a => (
+                    {(showAllApplicants ? applicants : applicants.slice(0, APPLICANT_PREVIEW_COUNT)).map(a => (
                       <tr key={a.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
                         <td className="p-4">
                           <p className="font-semibold text-slate-900 dark:text-white">{a.fullName}</p>
@@ -525,7 +539,17 @@ export default function BoardDashboardPage({
                 </table>
               </div>
 
-              <h3 className="font-bold text-slate-900 dark:text-white">Active Shareholders</h3>
+              <div className="flex items-center justify-between gap-4">
+                <h3 className="font-bold text-slate-900 dark:text-white">Active Shareholders</h3>
+                {members.length > MEMBER_PREVIEW_COUNT && (
+                  <button
+                    onClick={() => setShowAllMembers(v => !v)}
+                    className="shrink-0 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer transition-colors whitespace-nowrap"
+                  >
+                    {showAllMembers ? 'Hide' : `View all (${members.length})`}
+                  </button>
+                )}
+              </div>
               <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
                 <table className="w-full text-sm">
@@ -537,7 +561,7 @@ export default function BoardDashboardPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {members.map(m => (
+                    {(showAllMembers ? members : members.slice(0, MEMBER_PREVIEW_COUNT)).map(m => (
                       <tr key={m.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
                         <td className="p-4">
                           <p className="font-semibold text-slate-900 dark:text-white">{m.name}</p>
