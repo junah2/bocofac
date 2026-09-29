@@ -25,6 +25,7 @@ import {
   Eye,
   Camera,
   Truck,
+  ArrowLeft,
 } from 'lucide-react';
 import { formatDate } from '../utils/formatDate';
 import { displayApplicantStatus } from '../utils/applicantStatus';
@@ -33,7 +34,6 @@ import { resolveImageUrl } from '../utils/resolveImageUrl';
 import ApplicantDetailModal from '../components/ApplicantDetailModal';
 import MemberDetailModal from '../components/MemberDetailModal';
 import MobileScrollHint from '../components/MobileScrollHint';
-import bocofacLogo from '../assets/bocofac-logo.jpg';
 import ExecDashboard from '../components/ExecDashboard';
 import CoopInsights from '../components/CoopInsights';
 import ShareCapitalLedger from '../components/ShareCapitalLedger';
@@ -443,12 +443,22 @@ export default function AdminDashboardPage({
   const SidebarNav = ({ onNavigate }) => (
     <>
       <div className="px-6 pt-8 pb-7 flex items-center gap-3.5 border-b border-white/10">
-        <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center shrink-0 shadow-md overflow-hidden">
-          <img src={bocofacLogo} alt="BOCOFAC" className="w-full h-full object-cover" />
-        </div>
+        {admin?.avatarUrl ? (
+          <img
+            src={resolveImageUrl(admin.avatarUrl)}
+            alt=""
+            onClick={() => setViewedAvatarUrl(resolveImageUrl(admin.avatarUrl))}
+            title="View full photo"
+            className="w-14 h-14 rounded-full object-cover shrink-0 shadow-md ring-2 ring-white/70 cursor-pointer hover:opacity-80 transition"
+          />
+        ) : (
+          <div className="w-14 h-14 rounded-full bg-white text-emerald-800 flex items-center justify-center shrink-0 shadow-md font-extrabold text-xl">
+            {(admin?.name || 'AD').slice(0, 1)}
+          </div>
+        )}
         <div className="min-w-0">
-          <h1 className="font-serif text-white font-extrabold tracking-tight text-2xl leading-tight">BOCOFAC</h1>
-          <p className="text-emerald-100/80 text-sm font-semibold uppercase tracking-wider">Admin Panel</p>
+          <h1 className="text-white font-extrabold tracking-tight text-xl leading-tight truncate">{admin?.name || 'Admin User'}</h1>
+          <p className="text-emerald-100/80 text-sm font-semibold uppercase tracking-wider">Administrator</p>
         </div>
       </div>
       <nav className="flex-1 flex flex-col gap-2 px-3.5 py-5 overflow-y-auto">
@@ -542,25 +552,15 @@ export default function AdminDashboardPage({
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2.5">
-              {admin?.avatarUrl ? (
-                <img
-                  src={resolveImageUrl(admin.avatarUrl)}
-                  alt=""
-                  onClick={() => setViewedAvatarUrl(resolveImageUrl(admin.avatarUrl))}
-                  title="View full photo"
-                  className="w-9 h-9 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
-                />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm">
-                  {(admin?.name || 'AD').slice(0, 1)}
-                </div>
-              )}
-              <div className="hidden sm:block text-left">
-                <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{admin?.name || 'Admin User'}</p>
-                <p className="text-xs text-slate-400 leading-tight">Administrator</p>
-              </div>
-            </div>
+            <button
+              onClick={() => setPage('home')}
+              title="Back to Home"
+              aria-label="Back to Home"
+              className="flex items-center gap-2 p-2 sm:px-3.5 sm:py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold cursor-pointer transition-colors"
+            >
+              <ArrowLeft size={18} />
+              <span className="hidden sm:inline">Back to Home</span>
+            </button>
           </div>
         </header>
 
