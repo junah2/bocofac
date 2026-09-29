@@ -139,7 +139,7 @@ export default function ExecDashboard({
     .sort((a, b) => b.ordersCount - a.ordersCount)
     .slice(0, 5);
 
-  // [METRICS] Promo score (0-100): overstock + low conversion + bumabagal na benta
+  // [METRICS] Promo score (0-100): mabagal mabenta (slow-moving) + low conversion + bumabagal na benta
   const promoSuggestions = useMemo(() => {
     const now = new Date();
     const cutoffRecent = new Date(now);
@@ -168,7 +168,7 @@ export default function ExecDashboard({
         const sellThrough = p.ordersCount / (p.ordersCount + p.stock || 1);
         if (p.stock > 5 && sellThrough < 0.25) {
           score += (1 - sellThrough) * 40;
-          reasons.push('Overstocked');
+          reasons.push(`Slow-moving · ${Math.round(sellThrough * 100)}% of stock sold`);
         }
 
         if (p.views >= 10) {
