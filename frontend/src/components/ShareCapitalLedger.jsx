@@ -34,6 +34,7 @@ export default function ShareCapitalLedger({
   onAddLedgerEntry,
   onVerifyLedgerEntry,
   withdrawals = [],
+  onApproveWithdrawal,
   onSendWithdrawal,
   onRejectWithdrawal,
   onToast,
@@ -56,8 +57,10 @@ export default function ShareCapitalLedger({
   const [rejectingId, setRejectingId] = useState(null);
   // [EARNINGS] Pending requests lang ang nasa listahan; ang na-release o na-reject ay nasa History
   const [showWithdrawalHistory, setShowWithdrawalHistory] = useState(false);
-  const pendingWithdrawals = withdrawals.filter(w => w.status === 'Pending');
-  const processedWithdrawals = withdrawals.filter(w => w.status !== 'Pending');
+  const [approvingId, setApprovingId] = useState(null);
+  const isActiveWithdrawal = (w) => w.status === 'Pending' || w.status === 'Approved';
+  const pendingWithdrawals = withdrawals.filter(isActiveWithdrawal);
+  const processedWithdrawals = withdrawals.filter(w => !isActiveWithdrawal(w));
   const shownWithdrawals = showWithdrawalHistory ? processedWithdrawals : pendingWithdrawals;
   const LEDGER_PREVIEW_COUNT = 10;
   const [showAllLedger, setShowAllLedger] = useState(false);
@@ -243,6 +246,15 @@ export default function ShareCapitalLedger({
       setSentReference('');
     } finally {
       setSubmittingSend(false);
+    }
+  };
+
+  const handleApproveWithdrawal = async (withdrawal) => {
+    setApprovingId(withdrawal.id);
+    try {
+      await onApproveWithdrawal(withdrawal.id);
+    } finally {
+      setApprovingId(null);
     }
   };
 
@@ -640,7 +652,7 @@ export default function ShareCapitalLedger({
               <p className="text-[10px] text-slate-500">
                 {showWithdrawalHistory
                   ? 'Withdrawal requests that were already released or rejected.'
-                  : 'Members who requested to withdraw their earnings. The member claims the cash at the BOCOFAC office; click Release once they have received it.'}
+                  : 'Members who requested to withdraw their earnings. Approve the request so the member can claim the cash at the BOCOFAC office, then click Release once they have received it.'}
               </p>
             </div>
             {processedWithdrawals.length > 0 && (
@@ -689,19 +701,34 @@ export default function ShareCapitalLedger({
                         </div>
                       ) : w.status === 'Rejected' ? (
                         <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-rose-100 text-rose-800">Rejected</span>
+                      ) : w.status === 'Approved' ? (
+                        <div>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-sky-100 text-sky-800">Approved</span>
+                          <p className="text-[10px] text-slate-400 mt-1">Waiting for claim at office</p>
+                        </div>
                       ) : (
                         <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-100 text-amber-800">Pending</span>
                       )}
                     </td>
                     <td className="p-3 text-right">
-                      {w.status === 'Pending' && canManage && (
+                      {isActiveWithdrawal(w) && canManage && (
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => { setSendingWithdrawal(w); setSentAmount(String(w.requestedAmount)); setSentReference(''); }}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 text-[10px] font-bold uppercase cursor-pointer"
-                          >
-                            Release
-                          </button>
+                          {w.status === 'Pending' ? (
+                            <button
+                              onClick={() => handleApproveWithdrawal(w)}
+                              disabled={approvingId === w.id}
+                              className="px-2.5 py-1 rounded-lg bg-sky-100 text-sky-800 hover:bg-sky-200 text-[10px] font-bold uppercase cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                              {approvingId === w.id ? 'Approving…' : 'Approve'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => { setSendingWithdrawal(w); setSentAmount(String(w.requestedAmount)); setSentReference(''); }}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 text-[10px] font-bold uppercase cursor-pointer"
+                            >
+                              Release
+                            </button>
+                          )}
                           <button
                             onClick={() => handleRejectWithdrawal(w)}
                             disabled={rejectingId === w.id}

@@ -87,6 +87,10 @@ CREATE TABLE IF NOT EXISTS withdrawals (
   processed_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_withdrawals_member_id ON withdrawals(member_id);
+-- [DATABASE] Withdrawal flow: Pending (request) -> Approved (claim sa office) -> Sent (released) / Rejected
+ALTER TABLE withdrawals DROP CONSTRAINT IF EXISTS withdrawals_status_check;
+ALTER TABLE withdrawals ADD CONSTRAINT withdrawals_status_check
+  CHECK (status IN ('Pending', 'Approved', 'Sent', 'Rejected'));
 
 CREATE TABLE IF NOT EXISTS notifications (
   id TEXT PRIMARY KEY,

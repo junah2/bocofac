@@ -92,7 +92,7 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
 
     const sent = withdrawals.filter(w => w.status === 'Sent');
     const rejected = withdrawals.filter(w => w.status === 'Rejected');
-    const pending = withdrawals.filter(w => w.status === 'Pending');
+    const pending = withdrawals.filter(w => w.status === 'Pending' || w.status === 'Approved');
     return {
       count: amounts.length,
       bands,

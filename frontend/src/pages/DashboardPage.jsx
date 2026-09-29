@@ -1282,6 +1282,7 @@ function MembershipContributionPanel({
   const [viewedReceiptUrl, setViewedReceiptUrl] = useState(null);
   const { member, totalContribution = 0, savingsBalance = 0, subscribedShare, paidUpCapital } = membership;
   const { availableBalance = 0, requests: withdrawalRequests = [] } = withdrawalData || {};
+  const activeWithdrawal = withdrawalRequests.find(r => r.status === 'Pending' || r.status === 'Approved');
   const target = Number(member.requiredShareCapital) || 0;
   const remainingMin = Math.max(MIN_REQUIRED_SHARE_CAPITAL - totalContribution, 0);
   const remainingMax = Math.max(MAX_REQUIRED_SHARE_CAPITAL - totalContribution, 0);
@@ -1342,31 +1343,43 @@ function MembershipContributionPanel({
             background: 'var(--tile-green-bg)', border: '1.5px solid #bbf7d0', borderRadius: 12,
             padding: '14px 18px', marginBottom: 18,
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--green)', marginBottom: 2 }}>Monthly Earning (10%)</p>
-                <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Estimated share of BOCOFAC's monthly cooperative earnings.</p>
-              </div>
-              <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--green)' }}>₱{monthlyEarning.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--green)', marginBottom: 2 }}>Request for Withdrawal</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                Request to withdraw your earnings (₱{monthlyEarning.toLocaleString(undefined, { maximumFractionDigits: 2 })} per month, 10% of your share capital). Once the admin approves it, claim the cash at the BOCOFAC office.
+              </p>
             </div>
+
+            {activeWithdrawal && (
+              <div style={{
+                marginTop: 12, padding: '10px 12px', borderRadius: 10,
+                background: activeWithdrawal.status === 'Approved' ? '#e0f2fe' : '#fef3c7',
+                color: activeWithdrawal.status === 'Approved' ? '#075985' : '#92400e',
+                fontSize: 12, fontWeight: 600,
+              }}>
+                {activeWithdrawal.status === 'Approved'
+                  ? `Approved: please claim ₱${activeWithdrawal.requestedAmount.toLocaleString()} at the BOCOFAC office (request ${activeWithdrawal.id}).`
+                  : `Your request ${activeWithdrawal.id} for ₱${activeWithdrawal.requestedAmount.toLocaleString()} is waiting for approval.`}
+              </div>
+            )}
 
             <div style={{
               marginTop: 14, paddingTop: 14, borderTop: '1px solid #bbf7d0',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
             }}>
               <div>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>Available to Withdraw</p>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>Available to Request</p>
                 <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>₱{availableBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
               </div>
-              <GreenBtn onClick={() => setShowWithdrawForm(v => !v)} disabled={availableBalance <= 0}>
-                {showWithdrawForm ? 'Cancel' : 'Withdraw'}
+              <GreenBtn onClick={() => setShowWithdrawForm(v => !v)} disabled={availableBalance <= 0 || !!activeWithdrawal}>
+                {showWithdrawForm ? 'Cancel' : 'Request Withdrawal'}
               </GreenBtn>
             </div>
 
             {showWithdrawForm && (
               <form onSubmit={onSubmitWithdrawal} style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #bbf7d0' }}>
                 <FormInput
-                  label={`Amount to Withdraw (₱) - max ₱${availableBalance.toLocaleString()}`}
+                  label={`Amount to Request (₱) - max ₱${availableBalance.toLocaleString()}`}
                   type="number"
                   placeholder="e.g. 100"
                   value={withdrawAmount}
@@ -1374,7 +1387,7 @@ function MembershipContributionPanel({
                   required
                 />
                 <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -10, marginBottom: 18 }}>
-                  Once you submit a request, claim the cash at the BOCOFAC office.
+                  The admin will review your request. Once approved, claim the cash at the BOCOFAC office.
                 </p>
                 <GreenBtn type="submit" disabled={submittingWithdrawal}>
                   {submittingWithdrawal ? 'Submitting…' : 'Request Withdrawal'}
@@ -1585,10 +1598,10 @@ function MembershipContributionPanel({
                 <span style={{
                   display: 'inline-block', padding: '2px 10px', borderRadius: 999,
                   fontSize: 11, fontWeight: 700,
-                  background: req.status === 'Sent' ? '#ebebe0' : req.status === 'Rejected' ? '#fee2e2' : '#fef3c7',
-                  color: req.status === 'Sent' ? '#424c34' : req.status === 'Rejected' ? '#991b1b' : '#92400e',
+                  background: req.status === 'Sent' ? '#ebebe0' : req.status === 'Rejected' ? '#fee2e2' : req.status === 'Approved' ? '#e0f2fe' : '#fef3c7',
+                  color: req.status === 'Sent' ? '#424c34' : req.status === 'Rejected' ? '#991b1b' : req.status === 'Approved' ? '#075985' : '#92400e',
                 }}>
-                  {req.status === 'Sent' ? 'Released' : req.status}
+                  {req.status === 'Sent' ? 'Released' : req.status === 'Approved' ? 'Approved - claim at office' : req.status}
                 </span>
                 {req.status === 'Sent' && (
                   <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>

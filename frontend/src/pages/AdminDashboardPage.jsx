@@ -205,6 +205,7 @@ export default function AdminDashboardPage({
   onAddLedgerEntry,
   onVerifyLedgerEntry,
   withdrawals,
+  onApproveWithdrawal,
   onSendWithdrawal,
   onRejectWithdrawal,
   applicants,
@@ -1463,6 +1464,7 @@ export default function AdminDashboardPage({
               onAddLedgerEntry={onAddLedgerEntry}
               onVerifyLedgerEntry={onVerifyLedgerEntry}
               withdrawals={withdrawals}
+              onApproveWithdrawal={onApproveWithdrawal}
               onSendWithdrawal={onSendWithdrawal}
               onRejectWithdrawal={onRejectWithdrawal}
               onToast={onToast}

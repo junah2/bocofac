@@ -42,7 +42,8 @@ async function getEarningsSummary(client, memberId) {
   const { rows } = await client.query(
     `SELECT m.required_share_capital, m.joined_date,
             COALESCE((SELECT SUM(amount) FROM ledger WHERE member_id = m.id AND status = 'Verified'), 0) AS total_contribution,
-            COALESCE((SELECT SUM(sent_amount) FROM withdrawals WHERE member_id = m.id AND status = 'Sent'), 0) AS total_sent
+            COALESCE((SELECT SUM(sent_amount) FROM withdrawals WHERE member_id = m.id AND status = 'Sent'), 0) AS total_sent,
+            COALESCE((SELECT SUM(requested_amount) FROM withdrawals WHERE member_id = m.id AND status IN ('Pending', 'Approved')), 0) AS total_in_progress
      FROM members m WHERE m.id = $1`,
     [memberId]
   );
@@ -54,9 +55,10 @@ async function getEarningsSummary(client, memberId) {
   // [EARNINGS] Lifetime Earnings = Share Capital x 10% x Months Elapsed
   const lifetimeAccrued = isFullyPaid ? shareCapitalContribution * MONTHLY_RATE * monthsElapsed(row.joined_date) : 0;
   const totalSent = Number(row.total_sent);
-  // [EARNINGS] Available Balance = Lifetime Earnings - Nai-release na
-  const availableBalance = Math.max(0, lifetimeAccrued - totalSent);
-  return { lifetimeAccrued, totalSent, availableBalance };
+  const totalInProgress = Number(row.total_in_progress);
+  // [EARNINGS] Available Balance = Lifetime Earnings - Nai-release na - Naka-request pa (pending/approved)
+  const availableBalance = Math.max(0, lifetimeAccrued - totalSent - totalInProgress);
+  return { lifetimeAccrued, totalSent, totalInProgress, availableBalance };
 }
 
 async function currentMemberId(req) {
@@ -89,6 +91,16 @@ router.post('/mine', requireAuth, asyncHandler(async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT id FROM members WHERE id = $1 FOR UPDATE', [memberId]);
+    // [VALIDATION] Isang active na request lang (pending o approved) bawat member
+    const { rows: active } = await client.query(
+      "SELECT id FROM withdrawals WHERE member_id = $1 AND status IN ('Pending', 'Approved') LIMIT 1",
+      [memberId]
+    );
+    if (active[0]) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `You still have a withdrawal request in progress (${active[0].id}). Please wait until it is released or rejected.` });
+    }
     const { availableBalance } = await getEarningsSummary(client, memberId);
     // [VALIDATION] Bawal mag-withdraw nang higit sa available balance
     if (amount > availableBalance) {
@@ -122,6 +134,45 @@ router.get('/', requireRole('admin', 'board'), asyncHandler(async (req, res) => 
   res.json(rows.map(toClient));
 }));
 
+// [EARNINGS] Admin: i-approve ang request; ang member ay pupunta sa office para i-claim ang cash
+router.patch('/:id/approve', requireRole('admin'), asyncHandler(async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: existing } = await client.query('SELECT status FROM withdrawals WHERE id = $1 FOR UPDATE', [req.params.id]);
+    if (!existing[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Withdrawal request not found.' });
+    }
+    if (existing[0].status !== 'Pending') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Only pending requests can be approved.' });
+    }
+    const { rows } = await client.query(
+      "UPDATE withdrawals SET status = 'Approved' WHERE id = $1 RETURNING *",
+      [req.params.id]
+    );
+    await notifyByMemberId(
+      client,
+      rows[0].member_id,
+      `Your withdrawal request ${rows[0].id} for ₱${Number(rows[0].requested_amount).toLocaleString()} was approved. Please claim the cash at the BOCOFAC office.`,
+      'success'
+    );
+    await auditFromRequest(req, 'withdrawal.approve', {
+      db: client, entityType: 'withdrawal', entityId: rows[0].id,
+      metadata: { memberId: rows[0].member_id },
+    });
+    await client.query('COMMIT');
+    broadcast('withdrawals');
+    res.json(toClient(rows[0]));
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}));
+
 router.patch('/:id/send', requireRole('admin'), asyncHandler(async (req, res) => {
   const sentAmount = Number(req.body.sentAmount);
   const { reference } = req.body;
@@ -137,7 +188,7 @@ router.patch('/:id/send', requireRole('admin'), asyncHandler(async (req, res) =>
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Withdrawal request not found.' });
     }
-    if (existing[0].status !== 'Pending') {
+    if (!['Pending', 'Approved'].includes(existing[0].status)) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'This request has already been processed.' });
     }
@@ -177,7 +228,7 @@ router.patch('/:id/reject', requireRole('admin'), asyncHandler(async (req, res) 
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Withdrawal request not found.' });
     }
-    if (existing[0].status !== 'Pending') {
+    if (!['Pending', 'Approved'].includes(existing[0].status)) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'This request has already been processed.' });
     }

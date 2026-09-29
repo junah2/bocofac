@@ -608,6 +608,21 @@ export default function App() {
     }
   };
 
+  const handleApproveWithdrawal = async (withdrawalId) => {
+    try {
+      const res = await fetch(`${API_BASE}/withdrawals/${withdrawalId}/approve`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to approve the withdrawal request.');
+      setWithdrawals(prev => prev.map(w => (w.id === withdrawalId ? { ...w, ...data, memberName: w.memberName } : w)));
+      addToast(`Withdrawal ${withdrawalId} approved. The member can now claim it at the office.`, 'success');
+    } catch (err) {
+      addToast(err.message || 'Failed to approve the withdrawal request.', 'error');
+    }
+  };
+
   const handleRejectWithdrawal = async (withdrawalId) => {
     try {
       const res = await fetch(`${API_BASE}/withdrawals/${withdrawalId}/reject`, {
@@ -853,6 +868,7 @@ export default function App() {
           onAddLedgerEntry={handleAddLedgerEntry}
           onVerifyLedgerEntry={handleVerifyLedgerEntry}
           withdrawals={withdrawals}
+          onApproveWithdrawal={handleApproveWithdrawal}
           onSendWithdrawal={handleSendWithdrawal}
           onRejectWithdrawal={handleRejectWithdrawal}
           applicants={applicants}
