@@ -20,6 +20,7 @@ import { formatDate } from '../utils/formatDate';
 import { downloadFile } from '../utils/downloadFile';
 import { printOfficialReceipt } from '../utils/printDocument';
 import MobileScrollHint from './MobileScrollHint';
+import ConfirmDialog from './ConfirmDialog';
 import { isValidPhone11, isValidGcashRef13, digitsOnly, validationBorderClass } from '../utils/validators';
 
 const MIN_SHARE_CAPITAL = 4000;
@@ -58,6 +59,7 @@ export default function ShareCapitalLedger({
   // [EARNINGS] Pending requests lang ang nasa listahan; ang na-release o na-reject ay nasa History
   const [showWithdrawalHistory, setShowWithdrawalHistory] = useState(false);
   const [approvingId, setApprovingId] = useState(null);
+  const [confirmPrompt, setConfirmPrompt] = useState(null);
   const isActiveWithdrawal = (w) => w.status === 'Pending' || w.status === 'Approved';
   const pendingWithdrawals = withdrawals.filter(isActiveWithdrawal);
   const processedWithdrawals = withdrawals.filter(w => !isActiveWithdrawal(w));
@@ -249,23 +251,39 @@ export default function ShareCapitalLedger({
     }
   };
 
-  const handleApproveWithdrawal = async (withdrawal) => {
-    setApprovingId(withdrawal.id);
-    try {
-      await onApproveWithdrawal(withdrawal.id);
-    } finally {
-      setApprovingId(null);
-    }
+  const handleApproveWithdrawal = (withdrawal) => {
+    setConfirmPrompt({
+      title: 'Approve this withdrawal?',
+      message: `${withdrawal.memberName} requested ₱${withdrawal.requestedAmount.toLocaleString()}. Once approved, the member will be notified to claim the cash at the BOCOFAC office.`,
+      confirmLabel: 'Approve',
+      onConfirm: async () => {
+        setApprovingId(withdrawal.id);
+        try {
+          await onApproveWithdrawal(withdrawal.id);
+        } finally {
+          setApprovingId(null);
+        }
+      },
+    });
   };
 
-  const handleRejectWithdrawal = async (withdrawal) => {
-    if (!window.confirm(`Reject the withdrawal request from ${withdrawal.memberName}?`)) return;
-    setRejectingId(withdrawal.id);
-    try {
-      await onRejectWithdrawal(withdrawal.id);
-    } finally {
-      setRejectingId(null);
-    }
+  const handleRejectWithdrawal = (withdrawal) => {
+    setConfirmPrompt({
+      tone: 'danger',
+      title: 'Reject this withdrawal?',
+      message: `${withdrawal.memberName}'s request for ₱${withdrawal.requestedAmount.toLocaleString()} will be rejected and the member will be notified.`,
+      noteLabel: 'Reason (optional, shown to the member)',
+      notePlaceholder: 'e.g. Please update your membership records first.',
+      confirmLabel: 'Reject',
+      onConfirm: async (note) => {
+        setRejectingId(withdrawal.id);
+        try {
+          await onRejectWithdrawal(withdrawal.id, note);
+        } finally {
+          setRejectingId(null);
+        }
+      },
+    });
   };
 
   const csvCell = (value) => {
@@ -746,6 +764,8 @@ export default function ShareCapitalLedger({
           </div>
         </div>
       )}
+
+      <ConfirmDialog prompt={confirmPrompt} onClose={() => setConfirmPrompt(null)} />
 
       {sendingWithdrawal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">

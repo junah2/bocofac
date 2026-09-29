@@ -242,7 +242,7 @@ router.patch('/:id/reject', requireRole('admin'), asyncHandler(async (req, res) 
     await notifyByMemberId(
       client,
       rows[0].member_id,
-      `Your withdrawal request ${rows[0].id} for ₱${Number(rows[0].requested_amount).toLocaleString()} was rejected.`,
+      `Your withdrawal request ${rows[0].id} for ₱${Number(rows[0].requested_amount).toLocaleString()} was rejected.${req.body.note ? ` Reason: ${req.body.note}` : ''}`,
       'error'
     );
     await auditFromRequest(req, 'withdrawal.reject', {

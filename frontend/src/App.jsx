@@ -623,11 +623,13 @@ export default function App() {
     }
   };
 
-  const handleRejectWithdrawal = async (withdrawalId) => {
+  const handleRejectWithdrawal = async (withdrawalId, note) => {
     try {
       const res = await fetch(`${API_BASE}/withdrawals/${withdrawalId}/reject`, {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({ note: note || null }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to reject the withdrawal request.');

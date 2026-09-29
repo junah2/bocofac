@@ -395,8 +395,13 @@ export default function AdminDashboardPage({
     }
   };
   const handleDeleteProduct = (product) => {
-    if (!window.confirm(`Delete "${product.name}"? This cannot be undone.`)) return;
-    onDeleteProduct(product.id);
+    setConfirmPrompt({
+      tone: 'danger',
+      title: 'Delete this product?',
+      message: `"${product.name}" will be removed from the store. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      onConfirm: () => onDeleteProduct(product.id),
+    });
   };
 
   const TAB_TITLES = {
