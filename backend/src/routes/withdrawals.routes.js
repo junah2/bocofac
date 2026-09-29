@@ -52,8 +52,10 @@ async function getEarningsSummary(client, memberId) {
 
   const shareCapitalContribution = Math.min(Number(row.total_contribution), SHARE_CAPITAL_CAP);
   const isFullyPaid = Number(row.required_share_capital) > 0 && shareCapitalContribution >= Number(row.required_share_capital);
-  // [EARNINGS] Lifetime Earnings = Share Capital x 10% x Months Elapsed
-  const lifetimeAccrued = isFullyPaid ? shareCapitalContribution * MONTHLY_RATE * monthsElapsed(row.joined_date) : 0;
+  // [EARNINGS] Lifetime Earnings = Share Capital x 10% x Months Earned
+  // Kasama na ang kasalukuyang buwan: kapag fully paid, may ma-wi-withdraw na agad (1 buwan na kita)
+  const monthsEarned = monthsElapsed(row.joined_date) + 1;
+  const lifetimeAccrued = isFullyPaid ? shareCapitalContribution * MONTHLY_RATE * monthsEarned : 0;
   const totalSent = Number(row.total_sent);
   const totalInProgress = Number(row.total_in_progress);
   // [EARNINGS] Available Balance = Lifetime Earnings - Nai-release na - Naka-request pa (pending/approved)
