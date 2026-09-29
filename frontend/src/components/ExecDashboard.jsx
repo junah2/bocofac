@@ -195,8 +195,8 @@ export default function ExecDashboard({
           }
         }
 
-        // [METRICS] Suggested discount = score ÷ 5, naka-round sa 5% (25→5%, 50→10%, 75→15%, 100→20%); max 25%
-        const suggestedDiscount = score > 0 ? Math.min(25, Math.max(5, Math.round(score / 25) * 5)) : 0;
+        // [METRICS] Fixed na 10% ang suggested discount; recommendation lang, ang admin ang magde-decide kung ia-apply
+        const suggestedDiscount = score > 0 ? 10 : 0;
         return { ...p, reasons, score, suggestedDiscount };
       })
       .filter(p => p.score >= 25 && !(p.discountPercent > 0))
