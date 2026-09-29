@@ -25,7 +25,6 @@ import {
   Eye,
   Camera,
   Truck,
-  ArrowLeft,
 } from 'lucide-react';
 import { formatDate } from '../utils/formatDate';
 import { displayApplicantStatus } from '../utils/applicantStatus';
@@ -556,9 +555,9 @@ export default function AdminDashboardPage({
               onClick={() => setPage('home')}
               title="Back to Home"
               aria-label="Back to Home"
-              className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+              className="px-3 py-2 sm:px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold whitespace-nowrap cursor-pointer transition-colors"
             >
-              <ArrowLeft size={20} />
+              Back to Home
             </button>
           </div>
         </header>
