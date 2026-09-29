@@ -40,6 +40,7 @@ import ApplicantDetailModal from '../components/ApplicantDetailModal';
 import MobileScrollHint from '../components/MobileScrollHint';
 import Footer from '../components/Footer';
 import CoopInsights from '../components/CoopInsights';
+import SearchBar, { matchesSearch } from '../components/SearchBar';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import bocofacLogo from '../assets/bocofac-logo.jpg';
 
@@ -72,6 +73,11 @@ export default function BoardDashboardPage({
   const MEMBER_PREVIEW_COUNT = 10;
   const [showAllApplicants, setShowAllApplicants] = useState(false);
   const [showAllMembers, setShowAllMembers] = useState(false);
+  // [SEARCH] Pag-filter ng applicants at members base sa hinahanap
+  const [memberSearch, setMemberSearch] = useState('');
+  const filteredApplicants = useMemo(() => applicants.filter(a => matchesSearch(memberSearch, a.fullName, a.email, a.id, a.phone, a.cpNumber)), [applicants, memberSearch]);
+  const filteredMembers = useMemo(() => members.filter(m => matchesSearch(memberSearch, m.name, m.email, m.id, m.mobileNumber)), [members, memberSearch]);
+
   const [attendanceSession, setAttendanceSession] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef(null);
@@ -490,6 +496,7 @@ export default function BoardDashboardPage({
                   </button>
                 )}
               </div>
+              <SearchBar value={memberSearch} onChange={setMemberSearch} placeholder="Search by name, email, ID, or mobile number" />
 
               <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
@@ -504,7 +511,10 @@ export default function BoardDashboardPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {(showAllApplicants ? applicants : applicants.slice(0, APPLICANT_PREVIEW_COUNT)).map(a => (
+                    {memberSearch && filteredApplicants.length === 0 && (
+                      <tr><td colSpan={6} className="p-6 text-center text-sm text-slate-400">No applicants match "{memberSearch}".</td></tr>
+                    )}
+                    {(showAllApplicants || memberSearch ? filteredApplicants : filteredApplicants.slice(0, APPLICANT_PREVIEW_COUNT)).map(a => (
                       <tr key={a.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
                         <td className="p-4">
                           <p className="font-semibold text-slate-900 dark:text-white">{a.fullName}</p>
@@ -561,7 +571,10 @@ export default function BoardDashboardPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {(showAllMembers ? members : members.slice(0, MEMBER_PREVIEW_COUNT)).map(m => (
+                    {memberSearch && filteredMembers.length === 0 && (
+                      <tr><td colSpan={6} className="p-6 text-center text-sm text-slate-400">No members match "{memberSearch}".</td></tr>
+                    )}
+                    {(showAllMembers || memberSearch ? filteredMembers : filteredMembers.slice(0, MEMBER_PREVIEW_COUNT)).map(m => (
                       <tr key={m.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
                         <td className="p-4">
                           <p className="font-semibold text-slate-900 dark:text-white">{m.name}</p>

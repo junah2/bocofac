@@ -35,6 +35,7 @@ import MemberDetailModal from '../components/MemberDetailModal';
 import MobileScrollHint from '../components/MobileScrollHint';
 import ExecDashboard from '../components/ExecDashboard';
 import ImageLightbox from '../components/ImageLightbox';
+import SearchBar, { matchesSearch } from '../components/SearchBar';
 import CoopInsights from '../components/CoopInsights';
 import ShareCapitalLedger from '../components/ShareCapitalLedger';
 import PmesAttendanceModal from '../components/PmesAttendanceModal';
@@ -228,6 +229,11 @@ export default function AdminDashboardPage({
   const [sessionEditDraft, setSessionEditDraft] = useState({});
   const [viewingReceiptOrder, setViewingReceiptOrder] = useState(null);
   const [viewedReceiptUrl, setViewedReceiptUrl] = useState(null);
+  // [SEARCH] Pag-filter ng applicants at members base sa hinahanap
+  const [memberSearch, setMemberSearch] = useState('');
+  const filteredApplicants = useMemo(() => applicants.filter(a => matchesSearch(memberSearch, a.fullName, a.email, a.id, a.phone, a.cpNumber)), [applicants, memberSearch]);
+  const filteredMembers = useMemo(() => members.filter(m => matchesSearch(memberSearch, m.name, m.email, m.id, m.mobileNumber)), [members, memberSearch]);
+
   const [viewedApplicant, setViewedApplicant] = useState(null);
   const [viewedMember, setViewedMember] = useState(null);
   const [viewedAvatarUrl, setViewedAvatarUrl] = useState(null);
@@ -1163,6 +1169,7 @@ export default function AdminDashboardPage({
                 <Users className="w-4 h-4 shrink-0" />
                 <p>View-only. Applications are reviewed and approved by the Board of Directors.</p>
               </div>
+              <SearchBar value={memberSearch} onChange={setMemberSearch} placeholder="Search by name, email, ID, or mobile number" />
               <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
                 <table className="w-full text-sm">
@@ -1175,7 +1182,10 @@ export default function AdminDashboardPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {applicants.map(a => (
+                    {memberSearch && filteredApplicants.length === 0 && (
+                      <tr><td colSpan={4} className="p-6 text-center text-sm text-slate-400">No applicants match "{memberSearch}".</td></tr>
+                    )}
+                    {filteredApplicants.map(a => (
                       <tr key={a.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
                         <td className="p-4">
                           <p className="font-semibold text-slate-900 dark:text-white">{a.fullName}</p>
@@ -1218,7 +1228,10 @@ export default function AdminDashboardPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {members.map(m => (
+                    {memberSearch && filteredMembers.length === 0 && (
+                      <tr><td colSpan={4} className="p-6 text-center text-sm text-slate-400">No members match "{memberSearch}".</td></tr>
+                    )}
+                    {filteredMembers.map(m => (
                       <tr key={m.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
                         <td className="p-4">
                           <p className="font-semibold text-slate-900 dark:text-white">{m.name}</p>
