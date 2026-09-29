@@ -457,8 +457,8 @@ export default function AdminDashboardPage({
           </div>
         )}
         <div className="min-w-0">
-          <h1 className="text-white font-extrabold tracking-tight text-xl leading-tight truncate">{admin?.name || 'Admin User'}</h1>
-          <p className="text-emerald-100/80 text-sm font-semibold uppercase tracking-wider">Administrator</p>
+          <h1 className="font-serif text-white font-extrabold tracking-tight text-2xl leading-tight">BOCOFAC</h1>
+          <p className="text-emerald-100/80 text-sm font-semibold uppercase tracking-wider truncate">{admin?.name || 'Admin User'}</p>
         </div>
       </div>
       <nav className="flex-1 flex flex-col gap-2 px-3.5 py-5 overflow-y-auto">
@@ -556,10 +556,9 @@ export default function AdminDashboardPage({
               onClick={() => setPage('home')}
               title="Back to Home"
               aria-label="Back to Home"
-              className="flex items-center gap-2 p-2 sm:px-3.5 sm:py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold cursor-pointer transition-colors"
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
             >
-              <ArrowLeft size={18} />
-              <span className="hidden sm:inline">Back to Home</span>
+              <ArrowLeft size={20} />
             </button>
           </div>
         </header>
