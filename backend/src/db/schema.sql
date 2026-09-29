@@ -372,3 +372,13 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
+
+-- [DATABASE] Petsa kung kailan idinagdag ang product (para hindi ma-flag na slow-moving ang bagong product).
+-- Sa mga lumang product: petsa ng unang order nila; kung wala pang order, ngayong araw.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ;
+UPDATE products p SET created_at = COALESCE(
+  (SELECT MIN(o.ordered_at) FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.product_id = p.id),
+  now()
+) WHERE created_at IS NULL;
+ALTER TABLE products ALTER COLUMN created_at SET DEFAULT now();
+ALTER TABLE products ALTER COLUMN created_at SET NOT NULL;

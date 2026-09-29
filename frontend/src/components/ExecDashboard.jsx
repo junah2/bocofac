@@ -160,7 +160,12 @@ export default function ExecDashboard({
       });
     });
 
+    // [METRICS] Hindi kasama: bagong product (wala pang 30 days) at product na walang stock
+    const NEW_PRODUCT_DAYS = 30;
+    const isNewProduct = (p) => p.createdAt && (now - new Date(p.createdAt)) / 86400000 < NEW_PRODUCT_DAYS;
+
     return products
+      .filter(p => !isNewProduct(p) && p.stock > 0)
       .map(p => {
         const reasons = [];
         let score = 0;
@@ -190,8 +195,8 @@ export default function ExecDashboard({
           }
         }
 
-        // [METRICS] Suggested discount: 5% hanggang 25%, naka-round sa 5%
-        const suggestedDiscount = score > 0 ? Math.min(25, Math.max(5, Math.round(score / 5) * 5)) : 0;
+        // [METRICS] Suggested discount = score ÷ 5, naka-round sa 5% (25→5%, 50→10%, 75→15%, 100→20%); max 25%
+        const suggestedDiscount = score > 0 ? Math.min(25, Math.max(5, Math.round(score / 25) * 5)) : 0;
         return { ...p, reasons, score, suggestedDiscount };
       })
       .filter(p => p.score >= 25 && !(p.discountPercent > 0))

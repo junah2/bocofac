@@ -44,6 +44,7 @@ function toClient(row) {
     specifications: row.specifications || [],
     variantGroup: row.variant_group || undefined,
     variantLabel: row.variant_label || undefined,
+    createdAt: row.created_at || undefined,
   };
 }
 
