@@ -7,7 +7,8 @@ export default function SearchBar({ value, onChange, placeholder = 'Search…' }
     <div className="relative w-full sm:max-w-sm">
       <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
       <input
-        type="search"
+        type="text"
+        enterKeyHint="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
