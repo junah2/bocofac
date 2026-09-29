@@ -17,10 +17,8 @@ import {
   BarChart3,
   RefreshCw,
   PhilippinePeso,
-  Check,
   Eye,
   ClipboardCheck,
-  Package,
   Upload,
   PieChart,
   Sparkles,
@@ -30,7 +28,6 @@ import {
   Lightbulb,
   Percent,
 } from 'lucide-react';
-import MobileScrollHint from './MobileScrollHint';
 
 const CHART_PALETTE = {
   light: {
@@ -82,13 +79,10 @@ export default function ExecDashboard({
   members = [],
   ledger = [],
   onVerifyOrder,
-  onUpdateProductStock,
   onApplyPromo,
   onToast,
   isDarkMode,
 }) {
-  const [editingProductId, setEditingProductId] = useState(null);
-  const [restockValue, setRestockValue] = useState(0);
   const [selectedChartType, setSelectedChartType] = useState('sales');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedProductId, setSelectedProductId] = useState(null);
@@ -294,16 +288,6 @@ export default function ExecDashboard({
     } finally {
       setApplyingPromoId(null);
     }
-  };
-
-  const handleRestockSubmit = (e, productId) => {
-    e.preventDefault();
-    if (restockValue < 0) {
-      onToast('Restock values cannot be negative.', 'error');
-      return;
-    }
-    onUpdateProductStock(productId, restockValue);
-    setEditingProductId(null);
   };
 
   return (
@@ -755,79 +739,6 @@ export default function ExecDashboard({
               })}
             </div>
           )}
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 space-y-4 text-left">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-          <Package className="w-4.5 h-4.5 text-emerald-800 dark:text-emerald-400" />
-          Cooperative Warehouse Inventory Cabinet (Dynamic Deductions)
-        </h3>
-        <p className="text-xs text-slate-500">
-          The physical catalog operates on strict state deductions.
-          Formula: <span className="p-1 px-1.5 rounded font-mono bg-slate-100 dark:bg-slate-950 text-emerald-700 dark:text-emerald-400 font-semibold">Remaining Stock = Current Stock - Quantity Sold</span>
-        </p>
-
-        <MobileScrollHint />
-        <div className="overflow-auto max-h-[70vh]">
-          <table className="w-full text-left text-xs divide-y divide-slate-200 dark:divide-slate-800">
-            <thead className="sticky top-0 z-10 bg-[#fdfbf7] dark:bg-slate-950 text-slate-500 uppercase text-[10px] font-bold">
-              <tr>
-                <th className="p-3">Product Name</th>
-                <th className="p-3">Category</th>
-                <th className="p-3 font-mono text-right">Unit Price</th>
-                <th className="p-3 font-mono text-right">Sold Count</th>
-                <th className="p-3 font-mono text-right">Remaining Stock</th>
-                <th className="p-3 text-center">Warehouse Control</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-150 dark:divide-slate-800">
-              {products.map(product => {
-                const isEditing = editingProductId === product.id;
-                return (
-                  <tr key={product.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/30 transition-colors">
-                    <td className="p-3 font-semibold text-slate-900 dark:text-white">{product.name}</td>
-                    <td className="p-3 text-slate-500">{product.category}</td>
-                    <td className="p-3 font-mono text-right">₱{product.price.toLocaleString()}</td>
-                    <td className="p-3 font-mono text-right text-amber-700 dark:text-amber-400 font-bold">{product.ordersCount} sold</td>
-                    <td className="p-3 font-mono text-right font-bold">
-                      <span className={`${product.stock <= 10 ? 'text-rose-600 bg-rose-50 dark:bg-rose-950/20 px-2 py-0.5 rounded' : 'text-slate-800 dark:text-slate-200'}`}>
-                        {product.stock} {product.unit}
-                      </span>
-                    </td>
-                    <td className="p-3 text-center">
-                      {isEditing ? (
-                        <form onSubmit={(e) => handleRestockSubmit(e, product.id)} className="flex items-center justify-center gap-2">
-                          <input
-                            type="number"
-                            value={restockValue}
-                            onChange={(e) => setRestockValue(Number(e.target.value))}
-                            className="w-16 px-2 py-1 rounded border text-center dark:bg-slate-950"
-                          />
-                          <button
-                            type="submit"
-                            className="bg-emerald-800 text-white p-1 rounded-lg hover:bg-emerald-700 cursor-pointer"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                          </button>
-                        </form>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setEditingProductId(product.id);
-                            setRestockValue(product.stock);
-                          }}
-                          className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
-                        >
-                          Restock / Edit
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
         </div>
       </div>
 
