@@ -14,9 +14,12 @@ import {
   AlertTriangle,
   X,
   Save,
+  Printer,
 } from 'lucide-react';
 
+import bocofacLogo from '../assets/bocofac-logo.jpg';
 import { downloadFile } from '../utils/downloadFile';
+import { printMembershipApplication } from '../utils/printDocument';
 import { formatDate } from '../utils/formatDate';
 import { getPmesDisplayStatus } from '../utils/pmesStatus';
 import { isValidGcashRef13, validationBorderClass, extractDigitRuns, refNumberMatchesReceipt, looksLikePaymentReceipt } from '../utils/validators';
@@ -1040,6 +1043,29 @@ export default function MembershipPortal({
             >
               <Save className="w-4 h-4" /> Save as Draft
             </button>
+
+            {/* [MEMBERSHIP] I-print ang application form: blangko (susulatan sa papel) o may laman na */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => printMembershipApplication(null, new URL(bocofacLogo, window.location.href).href)}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                <Printer className="w-4 h-4" /> Print Blank Form
+              </button>
+              <button
+                type="button"
+                onClick={() => printMembershipApplication({
+                  firstName, middleName, lastName, suffix, birthdate, age: computeAge(birthdate), birthplace, gender, civilStatus, email, phone,
+                  addressNumber, street, zone, barangay, munCity, facebook, occupation, employer, annualIncome, businessOwned, tin, religion,
+                  spouseContactPerson, spouseCpNumber, dependents, eduAttainment, farmProfile, otherCrops,
+                  idType, idNumber, idDateIssued, idPlaceIssued, educomChairperson, refNum,
+                }, new URL(bocofacLogo, window.location.href).href)}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                <Printer className="w-4 h-4" /> Print My Application
+              </button>
+            </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-7 gap-2 text-center text-[10px] font-bold">
               <div onClick={() => setWizardStep(1)} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 1 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Personal</div>

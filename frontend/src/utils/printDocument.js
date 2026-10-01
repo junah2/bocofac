@@ -226,3 +226,163 @@ export function printInventoryReport(products, lowStockThreshold = 20) {
   `;
   openPrintWindow('Inventory Report', bodyHtml, { width: 640, height: 800 });
 }
+
+// [MEMBERSHIP] Membership Application Form (A4). Walang data = blangkong form na susulatan sa papel;
+// may data = ang form na may impormasyong inilagay ng applicant.
+const APPLICATION_GENDERS = ['Male', 'Female'];
+const APPLICATION_CIVIL_STATUSES = ['Single', 'Married', 'Widowed', 'Separated'];
+const APPLICATION_EDUCATION = [
+  'No Formal Education', 'Elementary Level', 'Elementary Graduate',
+  'High School Level', 'High School Graduate', 'Vocational',
+  'College Level', 'College Graduate', 'Post Graduate',
+];
+const MEMBERSHIP_FEE = 300;
+
+const APPLICATION_STYLES = `
+  <style>
+    @page { size: A4; margin: 14mm; }
+    body { padding: 0; font-size: 11px; }
+    .form-head { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #1e2318; padding-bottom: 10px; }
+    .form-head img { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; }
+    .form-head h1 { font-size: 17px; }
+    .form-head .sub { margin: 0; }
+    .form-title { font-size: 14px; font-weight: 800; letter-spacing: .06em; text-align: center; margin: 12px 0 4px; }
+    .form-meta { display: flex; justify-content: space-between; font-size: 10.5px; color: #475569; margin-bottom: 6px; }
+    h2 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; background: #eef1e8; color: #1e2318; padding: 4px 6px; margin: 12px 0 0; }
+    .grid { display: grid; border-left: 1px solid #94a3b8; border-top: 1px solid #94a3b8; }
+    .cell { border-right: 1px solid #94a3b8; border-bottom: 1px solid #94a3b8; padding: 3px 6px 4px; min-height: 34px; }
+    .cell .k { font-size: 8.5px; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }
+    .cell .v { font-size: 12px; font-weight: 600; margin-top: 2px; min-height: 15px; word-break: break-word; }
+    .opts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 3px; font-size: 11px; }
+    .box { display: inline-block; width: 10px; height: 10px; border: 1px solid #334155; margin-right: 4px; vertical-align: -1px; text-align: center; line-height: 9px; font-size: 9px; font-weight: 800; }
+    table.lined { width: 100%; border-collapse: collapse; margin-top: 0; }
+    table.lined th, table.lined td { border: 1px solid #94a3b8; padding: 4px 6px; font-size: 11px; text-align: left; }
+    table.lined th { font-size: 8.5px; text-transform: uppercase; color: #64748b; background: #f8fafc; }
+    table.lined td { height: 22px; font-weight: 600; }
+    .declaration { font-size: 10.5px; line-height: 1.5; margin-top: 12px; }
+    .signs { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 30px; }
+    .sign { text-align: center; font-size: 10px; color: #475569; }
+    .sign b { display: block; min-height: 18px; color: #0f172a; font-size: 12px; border-bottom: 1px solid #0f172a; padding-bottom: 2px; margin-bottom: 3px; }
+    .office { margin-top: 14px; border: 1.5px dashed #94a3b8; padding: 8px; }
+    .office h3 { margin: 0 0 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+    .office .grid { border: 0; gap: 10px; }
+    .office .cell { border: 0; border-bottom: 1px solid #94a3b8; }
+    .page-break { break-before: page; }
+  </style>
+`;
+
+export function printMembershipApplication(application, logoUrl) {
+  const a = application || {};
+  const blank = !application;
+  const v = (value) => (blank || value === undefined || value === null || value === '' ? '' : escapeHtml(value));
+  const cell = (label, value, span = 1) => `<div class="cell" style="grid-column: span ${span}"><div class="k">${label}</div><div class="v">${v(value)}</div></div>`;
+  const choices = (label, options, selected, span = 1) => `
+    <div class="cell" style="grid-column: span ${span}"><div class="k">${label}</div>
+      <div class="opts">${options.map((o) => `<span><span class="box">${!blank && selected === o ? '✓' : ''}</span>${escapeHtml(o)}</span>`).join('')}</div>
+    </div>`;
+  const grid = (cols, cells) => `<div class="grid" style="grid-template-columns: repeat(${cols}, 1fr)">${cells.join('')}</div>`;
+  const date = (d) => (d ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '');
+  const farm = a.farmProfile || {};
+  const f = (group, key) => (farm[group] || {})[key];
+  const padRows = (rows, min) => rows.concat(Array(Math.max(0, min - rows.length)).fill(null));
+
+  const fullName = [a.firstName, a.middleName, a.lastName, a.suffix].filter(Boolean).join(' ');
+  const dependents = padRows((a.dependents || []).filter((d) => d.name), 4);
+  const crops = padRows((a.otherCrops || []).filter((c) => c.crop), 3);
+  const line = '______________';
+
+  const bodyHtml = `
+    ${APPLICATION_STYLES}
+    <div class="form-head">
+      ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="">` : ''}
+      <div>
+        <h1>${COOP_NAME}</h1>
+        <p class="sub">Sitio Torens, North Villazar, Sipocot, Camarines Sur</p>
+      </div>
+    </div>
+    <div class="form-title">MEMBERSHIP APPLICATION FORM</div>
+    <div class="form-meta">
+      <span>Application No.: ${line}</span>
+      <span>Date Filed: ${blank ? line : date(new Date())}</span>
+    </div>
+
+    <h2>I. Personal Data Sheet</h2>
+    ${grid(4, [
+      cell('First Name', a.firstName), cell('Middle Name', a.middleName), cell('Family Name', a.lastName), cell('Suffix', a.suffix),
+      cell('Birthday', date(a.birthdate)), cell('Age', a.age), cell('Birthplace', a.birthplace, 2),
+      choices('Gender', APPLICATION_GENDERS, a.gender), choices('Civil Status', APPLICATION_CIVIL_STATUSES, a.civilStatus, 3),
+      cell('CP # / Mobile Number', a.phone, 2), cell('Email Address', a.email, 2),
+    ])}
+
+    <h2>II. Address &amp; Background</h2>
+    ${grid(5, [
+      cell('House No.', a.addressNumber), cell('Street', a.street), cell('Zone / Purok', a.zone), cell('Barangay', a.barangay), cell('Municipality / City', a.munCity),
+    ])}
+    ${grid(4, [
+      cell('Facebook', a.facebook), cell('Occupation', a.occupation), cell('Employer', a.employer),
+      cell('Annual Income', a.annualIncome !== undefined && a.annualIncome !== '' ? `₱${Number(a.annualIncome).toLocaleString()}` : ''),
+      cell('Business Owned / Connected', a.businessOwned, 2), cell('TIN', a.tin), cell('Religion', a.religion),
+    ])}
+
+    <h2>III. Family &amp; Dependents</h2>
+    ${grid(2, [cell('Spouse / Contact Person', a.spouseContactPerson), cell('Contact Person CP #', a.spouseCpNumber)])}
+    <table class="lined">
+      <thead><tr><th style="width:52%">Name of Dependent</th><th>Birthday</th><th style="width:16%">Sex</th></tr></thead>
+      <tbody>${dependents.map((d) => `<tr><td>${d ? v(d.name) : ''}</td><td>${d ? v(date(d.birthdate)) : ''}</td><td>${d ? v(d.sex) : ''}</td></tr>`).join('')}</tbody>
+    </table>
+
+    <h2>IV. Education</h2>
+    ${grid(1, [choices('Highest Educational Attainment', APPLICATION_EDUCATION, a.eduAttainment)])}
+
+    <h2 class="page-break">V. Farm Profile</h2>
+    ${grid(4, [
+      cell('Coconut Area (ha)', f('coconut', 'areaHa')), cell('Bearing', f('coconut', 'bearing')), cell('Non-Bearing', f('coconut', 'nonBearing')), cell('Months / Harvest', f('coconut', 'monthsPerHarvest')),
+      cell('Ave. Nuts / Harvest', f('coconut', 'aveNutsHarvest')), cell('Last Harvest', date(f('coconut', 'lastHarvest'))), cell('Ave. Kopra Sold (kg)', f('coconut', 'aveKopraSoldKg')), cell('Ave. Harvest Charcoal', f('coconut', 'aveHarvestCharcoal')),
+    ])}
+    ${grid(4, [
+      cell('Swine - Sow', f('swine', 'sow')), cell('Piglets', f('swine', 'piglets')), cell('Farrowing Date', date(f('swine', 'farrowingDate'))), cell('Fattening', f('swine', 'fattening')),
+      cell('Cow - Male', f('livestock', 'cowMale')), cell('Cow - Female', f('livestock', 'cowFemale')), cell('Carabao - Male', f('livestock', 'carabaoMale')), cell('Carabao - Female', f('livestock', 'carabaoFemale')),
+      cell('Goat', f('livestock', 'goat')), cell('Other Livestock', f('livestock', 'others'), 3),
+    ])}
+    ${grid(4, [
+      cell('Cacao Area (ha/sqm)', f('cacao', 'areaHaSqm')), cell('Bearing', f('cacao', 'bearing')), cell('Non-Bearing', f('cacao', 'nonBearing')), cell('Harvest Cycle', f('cacao', 'harvestCycle')),
+      cell('Ave. Nuts / Harvest', f('cacao', 'aveNutsHarvest')), cell('Last Harvest', date(f('cacao', 'lastHarvest'))), cell('Total / Harvest', f('cacao', 'totalHarvest')), cell('Unit Price', f('cacao', 'unitPrice')),
+      cell('Ave. Beans Sold (kg)', f('cacao', 'aveBeansSoldKg'), 4),
+    ])}
+    ${grid(4, [
+      cell('Rice Area (ha/sqm)', f('rice', 'areaHaSqm')), cell('Rice Location', f('rice', 'location')), cell('Corn Area (ha/sqm)', f('corn', 'areaHaSqm')), cell('Corn Location', f('corn', 'location')),
+    ])}
+    <table class="lined">
+      <thead><tr><th style="width:60%">Vegetables &amp; Other Crops</th><th>Area (ha/sqm)</th></tr></thead>
+      <tbody>${crops.map((c) => `<tr><td>${c ? v(c.crop === 'Others' ? c.cropOther || 'Others' : c.crop) : ''}</td><td>${c ? v(c.areaHaSqm) : ''}</td></tr>`).join('')}</tbody>
+    </table>
+    ${grid(1, [cell('Other Remarks', farm.otherRemarks)])}
+
+    <h2>VI. Requirements &amp; Payment</h2>
+    ${grid(4, [
+      cell('Valid ID Type', a.idType), cell('ID Number', a.idNumber), cell('Date Issued', date(a.idDateIssued)), cell('Place Issued', a.idPlaceIssued),
+      cell('EDUCOM Chairperson', a.educomChairperson, 2),
+      `<div class="cell"><div class="k">Membership Fee</div><div class="v">₱${MEMBERSHIP_FEE.toFixed(2)}</div></div>`,
+      cell('GCash Reference No.', a.refNum),
+    ])}
+
+    <p class="declaration">
+      I hereby apply for membership in the ${COOP_NAME}. I certify that the information above is true and correct,
+      that I have attended the Pre-Membership Education Seminar (PMES), and that I will abide by the Articles of
+      Cooperation, By-Laws, and policies of the cooperative.
+    </p>
+    <div class="signs">
+      <div class="sign"><b>${blank ? '&nbsp;' : escapeHtml(fullName)}</b>Signature over Printed Name of Applicant</div>
+      <div class="sign"><b>&nbsp;</b>Date</div>
+    </div>
+
+    <div class="office">
+      <h3>For BOCOFAC Use Only</h3>
+      <div class="grid" style="grid-template-columns: repeat(4, 1fr)">
+        ${['Received By', 'Date Received', 'BOD Resolution No.', 'Member ID'].map((k) => `<div class="cell"><div class="k">${k}</div><div class="v"></div></div>`).join('')}
+      </div>
+      <div class="opts" style="margin-top:8px"><span><span class="box"></span>Approved</span><span><span class="box"></span>Disapproved</span><span>Remarks: ____________________________________________</span></div>
+    </div>
+  `;
+  openPrintWindow(blank ? 'BOCOFAC Membership Application Form' : `Membership Application - ${fullName}`, bodyHtml, { width: 900, height: 1000 });
+}
