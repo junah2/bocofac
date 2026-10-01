@@ -12,6 +12,7 @@
     "migrate": "node src/db/migrate.js",
     "seed": "node src/db/seed.js",
     "sync-products": "node src/db/syncProducts.js",
+    "import-sales": "node src/db/importSales.js",
     "set-password": "node src/db/setPassword.js"
   },
   "dependencies": {
