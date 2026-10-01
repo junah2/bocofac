@@ -30,6 +30,7 @@ import { formatDate } from '../utils/formatDate';
 import { displayApplicantStatus } from '../utils/applicantStatus';
 import { printSalesReport, printMembershipReport, printInventoryReport } from '../utils/printDocument';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
+import { productCode } from '../utils/productCode';
 import ApplicantDetailModal from '../components/ApplicantDetailModal';
 import MemberDetailModal from '../components/MemberDetailModal';
 import MobileScrollHint from '../components/MobileScrollHint';
@@ -99,7 +100,7 @@ function ProductRow({ variants, restockDrafts, setRestockDrafts, startRestock, s
 
   return (
     <tr className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
-      <td className="p-4 whitespace-nowrap"><span className="font-mono text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{p.id}</span></td>
+      <td className="p-4 whitespace-nowrap"><span className="font-mono text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{productCode(p)}</span></td>
       <td className="p-4 font-semibold text-slate-900 dark:text-white">
         <div className="flex items-center gap-3">
           <img src={resolveImageUrl(p.image)} alt={baseName} className="w-10 h-10 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0" />
@@ -321,7 +322,7 @@ export default function AdminDashboardPage({
       category: (a, b) => a.category.localeCompare(b.category) || a.stock - b.stock,
     }[inventorySort];
     return products
-      .filter(p => matchesFilter(p) && matchesSearch(inventorySearch, p.id, p.name, p.category, p.unit))
+      .filter(p => matchesFilter(p) && matchesSearch(inventorySearch, productCode(p), p.id, p.name, p.category, p.unit))
       .sort(compare);
   }, [products, inventoryFilter, inventorySearch, inventorySort]);
 
@@ -1228,7 +1229,7 @@ export default function AdminDashboardPage({
                   )}
                   {inventoryRows.map(p => (
                     <tr key={p.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
-                      <td className="p-4 whitespace-nowrap"><span className="font-mono text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{p.id}</span></td>
+                      <td className="p-4 whitespace-nowrap"><span className="font-mono text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{productCode(p)}</span></td>
                       <td className="p-4">
                         <p className="font-semibold text-slate-900 dark:text-white">{p.name}</p>
                         <p className="text-xs text-slate-400">{p.category}</p>

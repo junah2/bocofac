@@ -386,3 +386,25 @@ UPDATE products p SET created_at = COALESCE(
 ) WHERE created_at IS NULL;
 ALTER TABLE products ALTER COLUMN created_at SET DEFAULT now();
 ALTER TABLE products ALTER COLUMN created_at SET NOT NULL;
+
+-- [DATABASE] Product ID na makikita ng admin (PRD-0001, PRD-0002...), nagsisimula sa 1.
+-- Hiwalay sa internal na id (prod-05) na nakakabit sa orders, kaya hindi nagagalaw ang mga order.
+-- Ang mga lumang product ay binibigyan ng numero: mga aktibo muna, saka ayon sa ayos ng internal id.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS product_no INTEGER;
+WITH numbered AS (
+  SELECT id,
+         (SELECT COALESCE(MAX(product_no), 0) FROM products)
+           + ROW_NUMBER() OVER (ORDER BY is_active DESC, NULLIF(regexp_replace(id, '\D', '', 'g'), '')::int NULLS LAST, id) AS n
+  FROM products
+  WHERE product_no IS NULL
+)
+UPDATE products p SET product_no = numbered.n FROM numbered WHERE p.id = numbered.id;
+CREATE SEQUENCE IF NOT EXISTS product_no_seq;
+-- Hindi bumababa ang sequence, kaya hindi nauulit ang numero ng na-delete na product
+SELECT setval('product_no_seq', GREATEST(
+  (SELECT COALESCE(MAX(product_no), 0) FROM products) + 1,
+  (SELECT CASE WHEN is_called THEN last_value + 1 ELSE last_value END FROM product_no_seq)
+), false);
+ALTER TABLE products ALTER COLUMN product_no SET DEFAULT nextval('product_no_seq');
+ALTER TABLE products ALTER COLUMN product_no SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_products_product_no ON products(product_no);

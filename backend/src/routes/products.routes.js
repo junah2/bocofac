@@ -29,6 +29,7 @@ function toClient(row) {
   const salePrice = discountPercent > 0 ? Math.round(price * (1 - discountPercent / 100) * 100) / 100 : price;
   return {
     id: row.id,
+    productNo: row.product_no ?? undefined,
     name: row.name,
     category: row.category,
     description: row.description,
