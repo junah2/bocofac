@@ -111,18 +111,8 @@ async function importSales() {
       throw new Error(`No matching product in the database for: ${[...unmatched].join(', ')}`);
     }
 
-    // [DATABASE] Bawasan muna ang orders_count ng mga lumang HIST order bago burahin
-    const { rows: oldTotals } = await client.query(
-      `SELECT i.product_id, SUM(i.quantity)::int AS qty, COUNT(DISTINCT o.id)::int AS orders
-       FROM orders o JOIN order_items i ON i.order_id = o.id
-       WHERE o.id LIKE 'HIST-%' GROUP BY i.product_id`
-    );
-    for (const t of oldTotals) {
-      await client.query('UPDATE products SET orders_count = GREATEST(orders_count - $1, 0) WHERE id = $2', [t.qty, t.product_id]);
-    }
     const { rowCount: deleted } = await client.query("DELETE FROM orders WHERE id LIKE 'HIST-%'");
 
-    const newTotals = new Map();
     for (const [i, s] of resolved.entries()) {
       const id = `HIST-${String(i + 1).padStart(6, '0')}`;
       // Tanghali (PH time) para hindi lumipat ng araw/buwan kahit anong timezone ang browser
@@ -136,11 +126,16 @@ async function importSales() {
         'INSERT INTO order_items (order_id, product_id, product_name, price, quantity) VALUES ($1,$2,$3,$4,$5)',
         [id, s.product.id, s.product.name.trim(), s.unitPrice, s.quantity]
       );
-      newTotals.set(s.product.id, (newTotals.get(s.product.id) || 0) + s.quantity);
     }
-    for (const [productId, qty] of newTotals) {
-      await client.query('UPDATE products SET orders_count = orders_count + $1 WHERE id = $2', [qty, productId]);
-    }
+
+    // [DATABASE] Bilangin ulit ang "sold" ng bawat product mula sa mismong mga order
+    // (hindi kasama ang Rejected/Cancelled, gaya ng sa orders.routes.js)
+    await client.query(
+      `UPDATE products p SET orders_count = COALESCE((
+         SELECT SUM(i.quantity) FROM order_items i JOIN orders o ON o.id = i.order_id
+         WHERE i.product_id = p.id AND o.status NOT IN ('Rejected', 'Cancelled')
+       ), 0)`
+    );
 
     const total = resolved.reduce((sum, s) => sum + s.totalAmount, 0);
     console.log(`Removed ${deleted} old historical orders.`);
