@@ -111,36 +111,47 @@ const STOCK_SORTS = {
   category: (a, b) => a.category.localeCompare(b.category) || a.stock - b.stock,
 };
 
+// [UI] Hanay ng filter buttons na may bilang; pula ang bilang ng mga kailangang asikasuhin
+function FilterChips({ options, value, onChange, label }) {
+  return (
+    <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
+      {options.map(f => {
+        const active = value === f.key;
+        return (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => onChange(f.key)}
+            aria-pressed={active}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border cursor-pointer transition-colors ${
+              active
+                ? 'bg-emerald-600 border-emerald-600 text-white'
+                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+            }`}
+          >
+            {f.label}
+            <span className={`px-1.5 rounded-full text-[10px] tabular-nums ${
+              active ? 'bg-white/25 text-white' : f.alert && f.count > 0 ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+            }`}>
+              {f.count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // [INVENTORY] Filter ayon sa stock + search + sort (Products at Inventory tabs)
 function StockFilterBar({ filter, onFilter, counts, search, onSearch, sort, onSort }) {
   return (
     <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by stock status">
-        {STOCK_FILTERS.map(f => {
-          const active = filter === f.key;
-          const alert = (f.key === 'low' || f.key === 'out') && counts[f.key] > 0;
-          return (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => onFilter(f.key)}
-              aria-pressed={active}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border cursor-pointer transition-colors ${
-                active
-                  ? 'bg-emerald-600 border-emerald-600 text-white'
-                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              {f.label}
-              <span className={`px-1.5 rounded-full text-[10px] tabular-nums ${
-                active ? 'bg-white/25 text-white' : alert ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-              }`}>
-                {counts[f.key]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <FilterChips
+        label="Filter by stock status"
+        value={filter}
+        onChange={onFilter}
+        options={STOCK_FILTERS.map(f => ({ ...f, count: counts[f.key], alert: f.key === 'low' || f.key === 'out' }))}
+      />
       <div className="flex flex-col sm:flex-row gap-2 lg:ml-auto lg:w-auto">
         <SearchBar value={search} onChange={onSearch} placeholder="Search ID or product" />
         <select
@@ -296,6 +307,24 @@ export default function AdminDashboardPage({
   const [memberSearch, setMemberSearch] = useState('');
   const filteredApplicants = useMemo(() => applicants.filter(a => matchesSearch(memberSearch, a.fullName, a.email, a.id, a.phone, a.cpNumber)), [applicants, memberSearch]);
   const filteredMembers = useMemo(() => members.filter(m => matchesSearch(memberSearch, m.name, m.email, m.id, m.mobileNumber)), [members, memberSearch]);
+
+  // [MEMBERSHIP] Ang na-approve na applicant ay nasa Members na, kaya wala na sa listahan ng applications
+  const [applicantFilter, setApplicantFilter] = useState('all');
+  const [memberFilter, setMemberFilter] = useState('all');
+  const openApplicants = useMemo(() => filteredApplicants.filter(a => a.status !== 'Approved'), [filteredApplicants]);
+  const applicantFilters = useMemo(() => [
+    { key: 'all', label: 'All', test: () => true },
+    { key: 'pending', label: 'Pending Review', test: a => a.status !== 'Rejected', alert: true },
+    { key: 'rejected', label: 'Rejected', test: a => a.status === 'Rejected' },
+  ].map(f => ({ ...f, count: openApplicants.filter(f.test).length })), [openApplicants]);
+  const applicantRows = openApplicants.filter(applicantFilters.find(f => f.key === applicantFilter).test);
+  const memberFilters = useMemo(() => [
+    { key: 'all', label: 'All', test: () => true },
+    { key: 'Active', label: 'Active', test: m => m.status === 'Active' },
+    { key: 'Delinquent', label: 'Delinquent', test: m => m.status === 'Delinquent', alert: true },
+    { key: 'Removed', label: 'Removed', test: m => m.status === 'Removed' },
+  ].map(f => ({ ...f, count: filteredMembers.filter(f.test).length })), [filteredMembers]);
+  const memberRows = filteredMembers.filter(memberFilters.find(f => f.key === memberFilter).test);
 
   const [viewedApplicant, setViewedApplicant] = useState(null);
   const [viewedMember, setViewedMember] = useState(null);
@@ -1306,6 +1335,11 @@ export default function AdminDashboardPage({
                 <p>View-only. Applications are reviewed and approved by the Board of Directors.</p>
               </div>
               <SearchBar value={memberSearch} onChange={setMemberSearch} placeholder="Search by name, email, ID, or mobile number" />
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <h3 className="font-bold text-slate-900 dark:text-white">Applications</h3>
+                <FilterChips label="Filter applications" value={applicantFilter} onChange={setApplicantFilter} options={applicantFilters} />
+              </div>
+              <p className="text-xs text-slate-400 -mt-3">Approved applicants move to Members below.</p>
               <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
                 <table className="w-full text-sm">
@@ -1318,10 +1352,12 @@ export default function AdminDashboardPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {memberSearch && filteredApplicants.length === 0 && (
-                      <tr><td colSpan={4} className="p-6 text-center text-sm text-slate-400">No applicants match "{memberSearch}".</td></tr>
+                    {applicantRows.length === 0 && (
+                      <tr><td colSpan={4} className="p-6 text-center text-sm text-slate-400">
+                        {memberSearch ? `No applicants match "${memberSearch}".` : 'No applications here.'}
+                      </td></tr>
                     )}
-                    {filteredApplicants.map(a => (
+                    {applicantRows.map(a => (
                       <tr key={a.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
                         <td className="p-4">
                           <p className="font-semibold text-slate-900 dark:text-white">{a.fullName}</p>
@@ -1329,10 +1365,10 @@ export default function AdminDashboardPage({
                         </td>
                         <td className="p-4 text-slate-600 dark:text-slate-300">{a.agriculturalType}</td>
                         <td className="p-4">
-                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                            a.status === 'Approved' ? 'bg-emerald-600 text-white' :
-                            a.status === 'Rejected' ? 'bg-rose-100 text-rose-800' :
-                            'bg-amber-100 text-amber-800'
+                          <span className={`text-xs font-bold whitespace-nowrap ${
+                            a.status === 'Approved' ? 'text-emerald-700 dark:text-emerald-400' :
+                            a.status === 'Rejected' ? 'text-rose-600 dark:text-rose-400' :
+                            'text-amber-600 dark:text-amber-400'
                           }`}>{displayApplicantStatus(a.status)}</span>
                         </td>
                         <td className="p-4 text-right">
@@ -1351,7 +1387,10 @@ export default function AdminDashboardPage({
                 </table>
               </div>
 
-              <h3 className="font-bold text-slate-900 dark:text-white">Active Shareholders</h3>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2">
+                <h3 className="font-bold text-slate-900 dark:text-white">Members</h3>
+                <FilterChips label="Filter members" value={memberFilter} onChange={setMemberFilter} options={memberFilters} />
+              </div>
               <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
                 <table className="w-full text-sm">
@@ -1364,10 +1403,12 @@ export default function AdminDashboardPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {memberSearch && filteredMembers.length === 0 && (
-                      <tr><td colSpan={4} className="p-6 text-center text-sm text-slate-400">No members match "{memberSearch}".</td></tr>
+                    {memberRows.length === 0 && (
+                      <tr><td colSpan={4} className="p-6 text-center text-sm text-slate-400">
+                        {memberSearch ? `No members match "${memberSearch}".` : 'No members here.'}
+                      </td></tr>
                     )}
-                    {filteredMembers.map(m => (
+                    {memberRows.map(m => (
                       <tr key={m.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
                         <td className="p-4">
                           <p className="font-semibold text-slate-900 dark:text-white">{m.name}</p>
@@ -1375,8 +1416,10 @@ export default function AdminDashboardPage({
                         </td>
                         <td className="p-4 text-slate-600 dark:text-slate-300">{formatDate(m.joinedDate)}</td>
                         <td className="p-4">
-                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                            m.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                          <span className={`text-xs font-bold whitespace-nowrap ${
+                            m.status === 'Active' ? 'text-emerald-700 dark:text-emerald-400' :
+                            m.status === 'Delinquent' ? 'text-amber-600 dark:text-amber-400' :
+                            'text-rose-600 dark:text-rose-400'
                           }`}>{m.status}</span>
                         </td>
                         <td className="p-4 text-right">
