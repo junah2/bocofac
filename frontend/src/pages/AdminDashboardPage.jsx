@@ -99,6 +99,7 @@ function ProductRow({ variants, restockDrafts, setRestockDrafts, startRestock, s
 
   return (
     <tr className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
+      <td className="p-4 whitespace-nowrap"><span className="font-mono text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{p.id}</span></td>
       <td className="p-4 font-semibold text-slate-900 dark:text-white">
         <div className="flex items-center gap-3">
           <img src={resolveImageUrl(p.image)} alt={baseName} className="w-10 h-10 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0" />
@@ -295,6 +296,34 @@ export default function AdminDashboardPage({
   );
   const pendingApplicants = useMemo(() => applicants.filter(a => a.status !== 'Approved' && a.status !== 'Rejected').length, [applicants]);
   const lowStockProducts = useMemo(() => products.filter(p => p.stock < LOW_STOCK_THRESHOLD), [products]);
+
+  // [INVENTORY] Filter + search + sort; default: pinakamababang stock muna para magkakasunod ang low stock
+  const [inventoryFilter, setInventoryFilter] = useState('all');
+  const [inventorySearch, setInventorySearch] = useState('');
+  const [inventorySort, setInventorySort] = useState('stock-asc');
+  const inventoryCounts = useMemo(() => ({
+    all: products.length,
+    low: lowStockProducts.length,
+    out: products.filter(p => p.stock === 0).length,
+    in: products.length - lowStockProducts.length,
+  }), [products, lowStockProducts]);
+  const inventoryRows = useMemo(() => {
+    const matchesFilter = {
+      all: () => true,
+      low: p => p.stock < LOW_STOCK_THRESHOLD,
+      out: p => p.stock === 0,
+      in: p => p.stock >= LOW_STOCK_THRESHOLD,
+    }[inventoryFilter];
+    const compare = {
+      'stock-asc': (a, b) => a.stock - b.stock || a.name.localeCompare(b.name),
+      'stock-desc': (a, b) => b.stock - a.stock || a.name.localeCompare(b.name),
+      name: (a, b) => a.name.trim().localeCompare(b.name.trim()),
+      category: (a, b) => a.category.localeCompare(b.category) || a.stock - b.stock,
+    }[inventorySort];
+    return products
+      .filter(p => matchesFilter(p) && matchesSearch(inventorySearch, p.id, p.name, p.category, p.unit))
+      .sort(compare);
+  }, [products, inventoryFilter, inventorySearch, inventorySort]);
 
   const navBadgeCounts = useMemo(() => ({
     orders: pendingOrders,
@@ -798,6 +827,7 @@ export default function AdminDashboardPage({
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
                     <tr className="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase text-slate-400">
+                      <th className="p-4 font-bold">ID</th>
                       <th className="p-4 font-bold">Product</th>
                       <th className="p-4 font-bold">Category</th>
                       <th className="p-4 font-bold">Price</th>
@@ -1129,11 +1159,59 @@ export default function AdminDashboardPage({
 
           {adminTab === 'inventory' && (
             <>
+              <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by stock status">
+                  {[
+                    { key: 'all', label: 'All' },
+                    { key: 'low', label: 'Low Stock' },
+                    { key: 'out', label: 'Out of Stock' },
+                    { key: 'in', label: 'In Stock' },
+                  ].map(f => {
+                    const active = inventoryFilter === f.key;
+                    const alert = (f.key === 'low' || f.key === 'out') && inventoryCounts[f.key] > 0;
+                    return (
+                      <button
+                        key={f.key}
+                        type="button"
+                        onClick={() => setInventoryFilter(f.key)}
+                        aria-pressed={active}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border cursor-pointer transition-colors ${
+                          active
+                            ? 'bg-emerald-600 border-emerald-600 text-white'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        {f.label}
+                        <span className={`px-1.5 rounded-full text-[10px] tabular-nums ${
+                          active ? 'bg-white/25 text-white' : alert ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                        }`}>
+                          {inventoryCounts[f.key]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 lg:ml-auto lg:w-auto">
+                  <SearchBar value={inventorySearch} onChange={setInventorySearch} placeholder="Search ID or product" />
+                  <select
+                    value={inventorySort}
+                    onChange={(e) => setInventorySort(e.target.value)}
+                    aria-label="Sort products"
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="stock-asc">Lowest stock first</option>
+                    <option value="stock-desc">Highest stock first</option>
+                    <option value="name">Name (A–Z)</option>
+                    <option value="category">Category</option>
+                  </select>
+                </div>
+              </div>
               <MobileScrollHint />
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto min-h-[calc(100vh-11rem)]">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto min-h-[calc(100vh-15rem)]">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
                   <tr className="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase text-slate-400">
+                    <th className="p-4 font-bold">ID</th>
                     <th className="p-4 font-bold">Product</th>
                     <th className="p-4 font-bold">Unit</th>
                     <th className="p-4 font-bold">Stock Level</th>
@@ -1141,9 +1219,20 @@ export default function AdminDashboardPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map(p => (
+                  {inventoryRows.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-6 text-center text-sm text-slate-400">
+                        {inventorySearch ? `No products match "${inventorySearch}".` : 'No products in this group.'}
+                      </td>
+                    </tr>
+                  )}
+                  {inventoryRows.map(p => (
                     <tr key={p.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
-                      <td className="p-4 font-semibold text-slate-900 dark:text-white">{p.name}</td>
+                      <td className="p-4 whitespace-nowrap"><span className="font-mono text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{p.id}</span></td>
+                      <td className="p-4">
+                        <p className="font-semibold text-slate-900 dark:text-white">{p.name}</p>
+                        <p className="text-xs text-slate-400">{p.category}</p>
+                      </td>
                       <td className="p-4 text-slate-500">{p.unit}</td>
                       <td className="p-4">
                         <div className="w-40 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
@@ -1155,8 +1244,10 @@ export default function AdminDashboardPage({
                         <p className="text-xs text-slate-400 mt-1">{p.stock} {p.unit}</p>
                       </td>
                       <td className="p-4">
-                        {p.stock < LOW_STOCK_THRESHOLD ? (
-                          <span className="text-xs font-bold px-2 py-1 rounded-full bg-rose-100 text-rose-800">Low Stock</span>
+                        {p.stock === 0 ? (
+                          <span className="text-xs font-bold px-2 py-1 rounded-full bg-rose-600 text-white whitespace-nowrap">Out of Stock</span>
+                        ) : p.stock < LOW_STOCK_THRESHOLD ? (
+                          <span className="text-xs font-bold px-2 py-1 rounded-full bg-rose-100 text-rose-800 whitespace-nowrap">Low Stock</span>
                         ) : (
                           <span className="text-xs font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-800">In Stock</span>
                         )}
