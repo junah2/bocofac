@@ -16,7 +16,7 @@ const HISTORY_EMAIL = 'historical-import@bocofac.local';
 
 const NO_PHOTO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='100%25' height='100%25' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' font-size='20' text-anchor='middle' fill='%2394a3b8' font-family='sans-serif' dy='.3em'%3ENo Photo%3C/text%3E%3C/svg%3E";
 
-// Mga pangalan sa Excel na iba ang tawag sa database
+// Kapalit na pangalan kapag wala sa database ang eksaktong pangalan sa Excel
 const NAME_ALIASES = {
   'Coconut Rope': 'Coconut Rope (12m)',
   'Coconut Wood Spatula': 'Coconut Shell Spatula',
@@ -66,13 +66,15 @@ function readSales() {
   });
 }
 
-function dbNameFor(row) {
+// Eksaktong pangalan muna; alias lang kung wala ito sa database
+function findProduct(row, productsByName) {
   if (row.product === 'Coconut Husk Pole') {
     const name = HUSK_POLE_BY_PRICE[row.unitPrice];
     if (!name) throw new Error(`sales-history.csv line ${row.line}: unknown husk pole price ${row.unitPrice}`);
-    return name;
+    return productsByName.get(normalize(name));
   }
-  return NAME_ALIASES[row.product] || row.product;
+  return productsByName.get(normalize(row.product))
+    || (NAME_ALIASES[row.product] && productsByName.get(normalize(NAME_ALIASES[row.product])));
 }
 
 async function importSales() {
@@ -87,7 +89,7 @@ async function importSales() {
 
     for (const np of NEW_PRODUCTS) {
       if (productsByName.has(normalize(np.name))) continue;
-      const firstSale = sales.find((s) => dbNameFor(s) === np.name);
+      const firstSale = sales.find((s) => s.product === np.name);
       const id = await nextProductId(client);
       // [DATABASE] created_at = petsa ng unang benta para hindi ma-flag na "bagong product"
       await client.query(
@@ -101,7 +103,7 @@ async function importSales() {
 
     const unmatched = new Set();
     const resolved = sales.map((s) => {
-      const product = productsByName.get(normalize(dbNameFor(s)));
+      const product = findProduct(s, productsByName);
       if (!product) unmatched.add(s.product);
       return { ...s, product };
     });
