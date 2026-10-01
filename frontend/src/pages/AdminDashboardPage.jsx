@@ -92,6 +92,73 @@ const NAV_ITEMS = [
   { key: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
+const STOCK_FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'low', label: 'Low Stock' },
+  { key: 'out', label: 'Out of Stock' },
+  { key: 'in', label: 'In Stock' },
+];
+const STOCK_FILTER_TESTS = {
+  all: () => true,
+  low: p => p.stock < LOW_STOCK_THRESHOLD,
+  out: p => p.stock === 0,
+  in: p => p.stock >= LOW_STOCK_THRESHOLD,
+};
+const STOCK_SORTS = {
+  'stock-asc': (a, b) => a.stock - b.stock || a.name.localeCompare(b.name),
+  'stock-desc': (a, b) => b.stock - a.stock || a.name.localeCompare(b.name),
+  name: (a, b) => a.name.trim().localeCompare(b.name.trim()),
+  category: (a, b) => a.category.localeCompare(b.category) || a.stock - b.stock,
+};
+
+// [INVENTORY] Filter ayon sa stock + search + sort (Products at Inventory tabs)
+function StockFilterBar({ filter, onFilter, counts, search, onSearch, sort, onSort }) {
+  return (
+    <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by stock status">
+        {STOCK_FILTERS.map(f => {
+          const active = filter === f.key;
+          const alert = (f.key === 'low' || f.key === 'out') && counts[f.key] > 0;
+          return (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => onFilter(f.key)}
+              aria-pressed={active}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border cursor-pointer transition-colors ${
+                active
+                  ? 'bg-emerald-600 border-emerald-600 text-white'
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              {f.label}
+              <span className={`px-1.5 rounded-full text-[10px] tabular-nums ${
+                active ? 'bg-white/25 text-white' : alert ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+              }`}>
+                {counts[f.key]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex flex-col sm:flex-row gap-2 lg:ml-auto lg:w-auto">
+        <SearchBar value={search} onChange={onSearch} placeholder="Search ID or product" />
+        <select
+          value={sort}
+          onChange={(e) => onSort(e.target.value)}
+          aria-label="Sort products"
+          className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        >
+          <option value="stock-asc">Lowest stock first</option>
+          <option value="stock-desc">Highest stock first</option>
+          <option value="name">Name (A–Z)</option>
+          <option value="category">Category</option>
+        </select>
+      </div>
+    </div>
+  );
+}
+
 function ProductRow({ variants, restockDrafts, setRestockDrafts, startRestock, submitRestock, openEditProduct, handleDeleteProduct }) {
   const [selectedId, setSelectedId] = useState(variants[0].id);
   const p = variants.find(v => v.id === selectedId) || variants[0];
@@ -136,17 +203,10 @@ function ProductRow({ variants, restockDrafts, setRestockDrafts, startRestock, s
           <span className="text-emerald-700 dark:text-emerald-400">₱{p.price.toLocaleString()}</span>
         )}
       </td>
-      <td className="p-4">
-        <div className="flex items-center gap-2">
-          <span className={p.stock < LOW_STOCK_THRESHOLD ? 'text-rose-600 font-bold' : 'text-slate-700 dark:text-slate-300'}>
-            {p.stock} {p.unit}
-          </span>
-          {p.stock === 0 ? (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400">Out of Stock</span>
-          ) : p.stock < LOW_STOCK_THRESHOLD ? (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">Low Stock</span>
-          ) : null}
-        </div>
+      <td className="p-4 whitespace-nowrap">
+        <span className={p.stock < LOW_STOCK_THRESHOLD ? 'text-rose-600 font-bold' : 'text-slate-700 dark:text-slate-300'}>
+          {p.stock} {p.unit}
+        </span>
       </td>
       <td className="p-4">
         <div className="flex items-center justify-end gap-2">
@@ -308,23 +368,23 @@ export default function AdminDashboardPage({
     out: products.filter(p => p.stock === 0).length,
     in: products.length - lowStockProducts.length,
   }), [products, lowStockProducts]);
-  const inventoryRows = useMemo(() => {
-    const matchesFilter = {
-      all: () => true,
-      low: p => p.stock < LOW_STOCK_THRESHOLD,
-      out: p => p.stock === 0,
-      in: p => p.stock >= LOW_STOCK_THRESHOLD,
-    }[inventoryFilter];
-    const compare = {
-      'stock-asc': (a, b) => a.stock - b.stock || a.name.localeCompare(b.name),
-      'stock-desc': (a, b) => b.stock - a.stock || a.name.localeCompare(b.name),
-      name: (a, b) => a.name.trim().localeCompare(b.name.trim()),
-      category: (a, b) => a.category.localeCompare(b.category) || a.stock - b.stock,
-    }[inventorySort];
-    return products
-      .filter(p => matchesFilter(p) && matchesSearch(inventorySearch, productCode(p), p.id, p.name, p.category, p.unit))
+  const inventoryRows = useMemo(() => products
+    .filter(p => STOCK_FILTER_TESTS[inventoryFilter](p) && matchesSearch(inventorySearch, productCode(p), p.id, p.name, p.category, p.unit))
+    .sort(STOCK_SORTS[inventorySort]),
+  [products, inventoryFilter, inventorySearch, inventorySort]);
+
+  // [PRODUCTS] Parehong filter/sort; ang may sukat (variants) ay naka-grupo,
+  // at ang grupo ay inaayos ayon sa variant na pinakakaunti/pinakamarami ang stock
+  const [productFilter, setProductFilter] = useState('all');
+  const [productSearch, setProductSearch] = useState('');
+  const [productSort, setProductSort] = useState('stock-asc');
+  const productGroups = useMemo(() => {
+    const compare = STOCK_SORTS[productSort];
+    const matching = products
+      .filter(p => STOCK_FILTER_TESTS[productFilter](p) && matchesSearch(productSearch, productCode(p), p.id, p.name, p.category, p.unit))
       .sort(compare);
-  }, [products, inventoryFilter, inventorySearch, inventorySort]);
+    return groupProductsForDisplay(matching);
+  }, [products, productFilter, productSearch, productSort]);
 
   const navBadgeCounts = useMemo(() => ({
     orders: pendingOrders,
@@ -823,6 +883,15 @@ export default function AdminDashboardPage({
                 </div>
               )}
 
+              <StockFilterBar
+                filter={productFilter}
+                onFilter={setProductFilter}
+                counts={inventoryCounts}
+                search={productSearch}
+                onSearch={setProductSearch}
+                sort={productSort}
+                onSort={setProductSort}
+              />
               <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
                 <table className="w-full text-sm">
@@ -838,7 +907,14 @@ export default function AdminDashboardPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {groupProductsForDisplay(products).map(({ key, variants }) => (
+                    {productGroups.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="p-6 text-center text-sm text-slate-400">
+                          {productSearch ? `No products match "${productSearch}".` : 'No products in this group.'}
+                        </td>
+                      </tr>
+                    )}
+                    {productGroups.map(({ key, variants }) => (
                       <ProductRow
                         key={key}
                         variants={variants}
@@ -1160,53 +1236,15 @@ export default function AdminDashboardPage({
 
           {adminTab === 'inventory' && (
             <>
-              <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by stock status">
-                  {[
-                    { key: 'all', label: 'All' },
-                    { key: 'low', label: 'Low Stock' },
-                    { key: 'out', label: 'Out of Stock' },
-                    { key: 'in', label: 'In Stock' },
-                  ].map(f => {
-                    const active = inventoryFilter === f.key;
-                    const alert = (f.key === 'low' || f.key === 'out') && inventoryCounts[f.key] > 0;
-                    return (
-                      <button
-                        key={f.key}
-                        type="button"
-                        onClick={() => setInventoryFilter(f.key)}
-                        aria-pressed={active}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border cursor-pointer transition-colors ${
-                          active
-                            ? 'bg-emerald-600 border-emerald-600 text-white'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                        }`}
-                      >
-                        {f.label}
-                        <span className={`px-1.5 rounded-full text-[10px] tabular-nums ${
-                          active ? 'bg-white/25 text-white' : alert ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                        }`}>
-                          {inventoryCounts[f.key]}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2 lg:ml-auto lg:w-auto">
-                  <SearchBar value={inventorySearch} onChange={setInventorySearch} placeholder="Search ID or product" />
-                  <select
-                    value={inventorySort}
-                    onChange={(e) => setInventorySort(e.target.value)}
-                    aria-label="Sort products"
-                    className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  >
-                    <option value="stock-asc">Lowest stock first</option>
-                    <option value="stock-desc">Highest stock first</option>
-                    <option value="name">Name (A–Z)</option>
-                    <option value="category">Category</option>
-                  </select>
-                </div>
-              </div>
+              <StockFilterBar
+                filter={inventoryFilter}
+                onFilter={setInventoryFilter}
+                counts={inventoryCounts}
+                search={inventorySearch}
+                onSearch={setInventorySearch}
+                sort={inventorySort}
+                onSort={setInventorySort}
+              />
               <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto min-h-[calc(100vh-15rem)]">
               <table className="w-full text-sm">
