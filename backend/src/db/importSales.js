@@ -113,20 +113,32 @@ async function importSales() {
 
     const { rowCount: deleted } = await client.query("DELETE FROM orders WHERE id LIKE 'HIST-%'");
 
-    for (const [i, s] of resolved.entries()) {
-      const id = `HIST-${String(i + 1).padStart(6, '0')}`;
-      // Tanghali (PH time) para hindi lumipat ng araw/buwan kahit anong timezone ang browser
-      const orderedAt = `${s.orderedDate}T12:00:00+08:00`;
-      await client.query(
-        `INSERT INTO orders (id, buyer_name, buyer_email, total_amount, payment_method, status, ordered_at)
-         VALUES ($1,$2,$3,$4,'Cash on Delivery','Completed',$5)`,
-        [id, HISTORY_BUYER, HISTORY_EMAIL, s.totalAmount, orderedAt]
-      );
-      await client.query(
-        'INSERT INTO order_items (order_id, product_id, product_name, price, quantity) VALUES ($1,$2,$3,$4,$5)',
-        [id, s.product.id, s.product.name.trim(), s.unitPrice, s.quantity]
-      );
-    }
+    // [DATABASE] Isang bagsakan ang insert (unnest) para mabilis kahit malayo ang database
+    const ids = resolved.map((_, i) => `HIST-${String(i + 1).padStart(6, '0')}`);
+    await client.query(
+      `INSERT INTO orders (id, buyer_name, buyer_email, total_amount, payment_method, status, ordered_at)
+       SELECT id, $2, $3, total, 'Cash on Delivery', 'Completed', ordered_at
+       FROM unnest($1::text[], $4::numeric[], $5::timestamptz[]) AS t(id, total, ordered_at)`,
+      [
+        ids,
+        HISTORY_BUYER,
+        HISTORY_EMAIL,
+        resolved.map((s) => s.totalAmount),
+        // Tanghali (PH time) para hindi lumipat ng araw/buwan kahit anong timezone ang browser
+        resolved.map((s) => `${s.orderedDate}T12:00:00+08:00`),
+      ]
+    );
+    await client.query(
+      `INSERT INTO order_items (order_id, product_id, product_name, price, quantity)
+       SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::numeric[], $5::int[])`,
+      [
+        ids,
+        resolved.map((s) => s.product.id),
+        resolved.map((s) => s.product.name.trim()),
+        resolved.map((s) => s.unitPrice),
+        resolved.map((s) => s.quantity),
+      ]
+    );
 
     // [DATABASE] Bilangin ulit ang "sold" ng bawat product mula sa mismong mga order
     // (hindi kasama ang Rejected/Cancelled, gaya ng sa orders.routes.js)
