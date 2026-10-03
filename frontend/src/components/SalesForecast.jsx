@@ -480,6 +480,32 @@ function buildSalesBreakdown(orders, products, inPeriod = () => true) {
   };
 }
 
+// [ANALYTICS] Bawat benta (isang linya bawat produkto sa order), pinakabago muna - parehong mga item na
+// binibilang sa Total Sales (catalog products lang, walang shipping fee)
+const RECORD_PAGE = 50;
+function buildSaleRecords(orders, products, inPeriod = () => true) {
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const records = [];
+  orders.filter((o) => REALIZED(o) && inPeriod(new Date(o.orderedAt))).forEach((o) => {
+    (o.items || []).forEach((item, i) => {
+      const product = productById.get(item.productId);
+      if (!product) return;
+      records.push({
+        key: `${o.id}-${i}`,
+        orderId: o.id,
+        date: new Date(o.orderedAt),
+        productName: product.name.trim(),
+        category: product.category,
+        quantity: item.quantity,
+        price: item.price,
+        total: item.price * item.quantity,
+        channel: o.channel || (o.id.startsWith('HIST-') ? 'walk-in' : 'online'),
+      });
+    });
+  });
+  return records.sort((a, b) => b.date - a.date || b.key.localeCompare(a.key));
+}
+
 // Mga pagpipiliang linggo / buwan / taon (pinakabago muna), mula sa mga petsa ng benta
 const BREAKDOWN_PERIODS = [
   { key: 'all', label: 'All time' },
@@ -529,6 +555,13 @@ function SalesBreakdownModal({ orders, products, onClose }) {
   const options = useMemo(() => (period === 'all' ? [] : periodOptions(orders, period)), [orders, period]);
   const [selectedKey, setSelectedKey] = useState(null);
   const selected = options.find((o) => o.key === selectedKey) || options[0];
+  const [view, setView] = useState('products');
+  const [recordLimit, setRecordLimit] = useState(RECORD_PAGE);
+  const records = useMemo(
+    () => buildSaleRecords(orders, products, selected ? (d) => d >= selected.from && d < selected.to : undefined),
+    [orders, products, selected]
+  );
+  useEffect(() => { setRecordLimit(RECORD_PAGE); }, [selected, activeCategory, view]);
   const breakdown = useMemo(
     () => buildSalesBreakdown(orders, products, selected ? (d) => d >= selected.from && d < selected.to : undefined),
     [orders, products, selected]
@@ -549,6 +582,7 @@ function SalesBreakdownModal({ orders, products, onClose }) {
   const visible = activeCategory === 'all' ? categories : categories.filter((c) => c.category === activeCategory);
   const unitsSold = categories.reduce((s, c) => s + c.products.reduce((t, p) => t + p.quantity, 0), 0);
   const productCount = categories.reduce((s, c) => s + c.products.length, 0);
+  const visibleRecords = activeCategory === 'all' ? records : records.filter((r) => r.category === activeCategory);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-6 bg-slate-950/60 backdrop-blur-sm" onClick={onClose}>
@@ -621,6 +655,21 @@ function SalesBreakdownModal({ orders, products, onClose }) {
               <div key={c.category} style={{ width: `${share(c.total)}%`, background: categoryStyle(c.category).color }} title={`${c.category}: ${share(c.total).toFixed(1)}%`} />
             ))}
           </div>
+          <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 w-full sm:w-auto sm:inline-flex" role="group" aria-label="Show">
+            {[{ key: 'products', label: 'By Product' }, { key: 'records', label: `All Records (${visibleRecords.length.toLocaleString()})` }].map((v) => (
+              <button
+                key={v.key}
+                type="button"
+                onClick={() => setView(v.key)}
+                aria-pressed={view === v.key}
+                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors whitespace-nowrap ${
+                  view === v.key ? 'bg-white text-emerald-800 shadow-sm dark:bg-slate-950 dark:text-emerald-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by category">
             {[{ category: 'all', total: totalSales, products: { length: productCount } }, ...categories].map((c) => {
               const active = activeCategory === c.category;
@@ -648,8 +697,38 @@ function SalesBreakdownModal({ orders, products, onClose }) {
 
         {/* Products per category */}
         <div className="overflow-y-auto px-4 sm:px-6 py-5 space-y-5">
-          {visible.length === 0 && <p className="text-sm text-slate-400 text-center py-10">No sales yet.</p>}
-          {visible.map((c) => {
+          {view === 'records' && (
+            <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+              {visibleRecords.length === 0 && <p className="text-sm text-slate-400 text-center py-10">No sales yet.</p>}
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                {visibleRecords.slice(0, recordLimit).map((r) => (
+                  <li key={r.key} className="flex items-center gap-3 px-4 py-2.5">
+                    <span className="w-1.5 h-8 rounded-full shrink-0" style={{ background: categoryStyle(r.category).color }} />
+                    <div className="w-24 shrink-0">
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">{r.date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                      <p className="text-[10px] font-mono text-slate-400 truncate">{r.orderId}</p>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{r.productName}</p>
+                      <p className="text-[11px] text-slate-400">{r.quantity.toLocaleString()} × {peso(r.price)}{r.channel === 'walk-in' ? ' · Walk-in' : ' · Online'}</p>
+                    </div>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white whitespace-nowrap tabular-nums">{peso(r.total)}</p>
+                  </li>
+                ))}
+              </ul>
+              {visibleRecords.length > recordLimit && (
+                <button
+                  type="button"
+                  onClick={() => setRecordLimit((n) => n + RECORD_PAGE * 2)}
+                  className="w-full py-3 border-t border-slate-100 dark:border-slate-800 text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  Show more ({(visibleRecords.length - recordLimit).toLocaleString()} left)
+                </button>
+              )}
+            </section>
+          )}
+          {view === 'products' && visible.length === 0 && <p className="text-sm text-slate-400 text-center py-10">No sales yet.</p>}
+          {view === 'products' && visible.map((c) => {
             const style = categoryStyle(c.category);
             const top = c.products[0]?.total || 1;
             return (
