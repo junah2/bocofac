@@ -116,8 +116,8 @@ async function importSales() {
     // [DATABASE] Isang bagsakan ang insert (unnest) para mabilis kahit malayo ang database
     const ids = resolved.map((_, i) => `HIST-${String(i + 1).padStart(6, '0')}`);
     await client.query(
-      `INSERT INTO orders (id, buyer_name, buyer_email, total_amount, payment_method, status, ordered_at)
-       SELECT id, $2, $3, total, 'Cash on Delivery', 'Completed', ordered_at
+      `INSERT INTO orders (id, buyer_name, buyer_email, total_amount, payment_method, status, ordered_at, channel)
+       SELECT id, $2, $3, total, 'Cash', 'Completed', ordered_at, 'walk-in'
        FROM unnest($1::text[], $4::numeric[], $5::timestamptz[]) AS t(id, total, ordered_at)`,
       [
         ids,

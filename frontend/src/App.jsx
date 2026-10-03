@@ -387,21 +387,31 @@ export default function App() {
     }
   };
 
-  const handleUpdateProductStock = async (productId, newStock) => {
+  // [INVENTORY] reason: restock / returned / damaged / expired / adjustment (nakatala sa stock history)
+  const handleUpdateProductStock = async (productId, newStock, { reason, note } = {}) => {
     try {
       const res = await fetch(`${API_BASE}/products/${productId}/stock`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ stock: newStock }),
+        body: JSON.stringify({ stock: newStock, reason, note }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to update stock.');
       setProducts(prev => prev.map(p => (p.id === productId ? data : p)));
       addToast(`Stock updated for ${data.name}.`, 'success');
+      return true;
     } catch (err) {
       addToast(err.message || 'Failed to update stock.', 'error');
+      return false;
     }
+  };
+
+  // [WALK-IN SALE] Bagong walk-in na benta: idagdag sa orders at kunin ulit ang stock
+  const handleWalkInRecorded = (order) => {
+    setOrders(prev => [order, ...prev.filter(o => o.id !== order.id)]);
+    loadProducts();
+    addToast(`Walk-in sale ${order.id} recorded: ₱${order.totalAmount.toLocaleString()}.`, 'success');
   };
 
   const handleApplyPromo = async (productId, discountPercent) => {
@@ -859,6 +869,7 @@ export default function App() {
           onRejectOrder={handleRejectOrder}
           onUpdateOrderStatus={handleUpdateOrderStatus}
           onUpdateProductStock={handleUpdateProductStock}
+          onWalkInRecorded={handleWalkInRecorded}
           onApplyPromo={handleApplyPromo}
           onAddProduct={handleAddProduct}
           onUpdateProduct={handleUpdateProduct}

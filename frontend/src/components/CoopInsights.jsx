@@ -10,12 +10,13 @@ import {
   Tooltip,
   LabelList,
 } from 'recharts';
-import { Lightbulb, Wallet, ArrowDownUp, Users, CalendarDays, UserCheck } from 'lucide-react';
+import { Lightbulb, Wallet, ArrowDownUp, Users, UserCheck } from 'lucide-react';
 import { lastNMonths } from '../utils/dateBuckets';
+import BusiestOrderingDays, { weekdayStats } from './BusiestOrderingDays';
 
 const PALETTE = {
-  light: { grid: '#e2e8f0', axis: '#94a3b8', tooltipBg: '#ffffff', tooltipBorder: '#e2e8f0', tooltipText: '#0f172a', moneyIn: '#2f855a', moneyOut: '#d97706', single: '#2f855a', singleMuted: '#9fc5b0' },
-  dark: { grid: '#334155', axis: '#64748b', tooltipBg: '#0f172a', tooltipBorder: '#334155', tooltipText: '#f1f5f9', moneyIn: '#1f9d57', moneyOut: '#dd6b20', single: '#1f9d57', singleMuted: '#1e5b3a' },
+  light: { grid: '#e2e8f0', axis: '#94a3b8', tooltipBg: '#ffffff', tooltipBorder: '#e2e8f0', tooltipText: '#0f172a', moneyIn: '#2f6f4b', moneyOut: '#d97706', single: '#2f6f4b', singleMuted: '#96c6a6' },
+  dark: { grid: '#334155', axis: '#64748b', tooltipBg: '#0f172a', tooltipBorder: '#334155', tooltipText: '#f1f5f9', moneyIn: '#43895e', moneyOut: '#dd6b20', single: '#43895e', singleMuted: '#214833' },
 };
 
 const WITHDRAWAL_BANDS = [
@@ -27,9 +28,6 @@ const WITHDRAWAL_BANDS = [
   { label: 'over ₱10,000', short: '10k+', max: Infinity },
 ];
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const REALIZED_ORDER_STATUSES = ['Completed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered'];
 const INACTIVE_PAYER_DAYS = 90;
 const REMOVAL_DAYS = 365;
 
@@ -48,7 +46,7 @@ function sameMonth(date, bucket) {
   return d.getFullYear() === bucket.year && d.getMonth() === bucket.month;
 }
 
-function StatTile({ label, value, sub }) {
+export function StatTile({ label, value, sub }) {
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-5 text-left min-w-0">
       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
@@ -58,7 +56,7 @@ function StatTile({ label, value, sub }) {
   );
 }
 
-function Card({ icon: Icon, title, description, children }) {
+export function Card({ icon: Icon, title, description, children }) {
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 space-y-3 text-left min-w-0">
       <div>
@@ -150,17 +148,7 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
     return { fullyPaid, paying, noPayment, inactive, inactiveMembers, dueForRemoval, total: fullyPaid + paying + noPayment };
   }, [members, ledger]);
 
-  // [RANKING] Busiest ordering day: bilang ng orders bawat araw ng linggo
-  const ordersByWeekday = useMemo(() => {
-    const counts = WEEKDAYS.map((day, i) => ({ day, name: WEEKDAY_NAMES[i], count: 0 }));
-    orders
-      .filter(o => REALIZED_ORDER_STATUSES.includes(o.status))
-      .forEach(o => { counts[new Date(o.orderedAt).getDay()].count++; });
-    return counts;
-  }, [orders]);
-  const totalWeekdayOrders = ordersByWeekday.reduce((s, d) => s + d.count, 0);
-  const busiestDay = ordersByWeekday.reduce((best, d) => (d.count > best.count ? d : best), ordersByWeekday[0]);
-  const quietestDay = ordersByWeekday.reduce((low, d) => (d.count < low.count ? d : low), ordersByWeekday[0]);
+  const { total: totalWeekdayOrders, busiest: busiestDay, quietest: quietestDay } = useMemo(() => weekdayStats(orders), [orders]);
 
   const pipeline = useMemo(() => {
     const submitted = applicants.filter(a => a.status !== 'Draft');
@@ -345,31 +333,7 @@ export default function CoopInsights({ members = [], ledger = [], withdrawals = 
           )}
         </Card>
 
-        <Card icon={CalendarDays} title="Busiest Ordering Days" description="Completed and in-progress orders by day of the week - plan stock, staff and deliveries around the peaks.">
-          {totalWeekdayOrders === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-10">No completed orders yet.</p>
-          ) : (
-            <div style={{ width: '100%', height: 236 }}>
-              <ResponsiveContainer>
-                <BarChart data={ordersByWeekday} margin={{ top: 22, right: 8, left: -12, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={palette.grid} vertical={false} />
-                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: palette.axis }} axisLine={false} tickLine={false} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: palette.axis }} axisLine={false} tickLine={false} width={40} />
-                  <Tooltip
-                    cursor={{ fill: 'rgba(148,163,184,0.12)' }}
-                    content={<ChartTooltip render={(p) => <p>{p[0].payload.name}: {p[0].value} orders ({pct(p[0].value, totalWeekdayOrders)}%)</p>} />}
-                  />
-                  <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={36}>
-                    {ordersByWeekday.map(d => (
-                      <Cell key={d.day} fill={d.day === busiestDay.day ? palette.single : palette.singleMuted} />
-                    ))}
-                    <LabelList dataKey="count" content={(p) => (p.value === busiestDay.count && p.value > 0 ? <text x={p.x + p.width / 2} y={p.y - 8} textAnchor="middle" fontSize={11} fontWeight={700} fill={palette.axis}>Busiest</text> : null)} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </Card>
+        <BusiestOrderingDays orders={orders} isDarkMode={isDarkMode} />
       </div>
 
       <Card icon={UserCheck} title="Membership Pipeline" description="Submitted applications and where they are now.">

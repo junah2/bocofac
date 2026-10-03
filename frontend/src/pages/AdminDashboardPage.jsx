@@ -10,7 +10,6 @@ import {
   Settings as SettingsIcon,
   Bell,
   LogOut,
-  TrendingUp,
   AlertTriangle,
   Check,
   Printer,
@@ -25,27 +24,33 @@ import {
   Eye,
   Camera,
   Truck,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Receipt,
+  History,
 } from 'lucide-react';
+import bocofacLogo from '../assets/bocofac-logo.jpg';
 import { formatDate } from '../utils/formatDate';
-import { displayApplicantStatus } from '../utils/applicantStatus';
 import { printSalesReport, printMembershipReport, printInventoryReport } from '../utils/printDocument';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import { productCode } from '../utils/productCode';
+import { isLowStock, reorderLevelOf, DEFAULT_REORDER_LEVEL } from '../utils/stock';
 import ApplicantDetailModal from '../components/ApplicantDetailModal';
 import MemberDetailModal from '../components/MemberDetailModal';
 import MobileScrollHint from '../components/MobileScrollHint';
 import ExecDashboard from '../components/ExecDashboard';
 import ImageLightbox from '../components/ImageLightbox';
 import SearchBar, { matchesSearch } from '../components/SearchBar';
-import CoopInsights from '../components/CoopInsights';
+import SalesForecast from '../components/SalesForecast';
+import SalesRecords from '../components/SalesRecords';
+import StockModal from '../components/StockModal';
 import ShareCapitalLedger from '../components/ShareCapitalLedger';
 import PmesAttendanceModal from '../components/PmesAttendanceModal';
 import Footer from '../components/Footer';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
-const LOW_STOCK_THRESHOLD = 20;
 const PRODUCT_CATEGORIES = ['Charcoal', 'Fertilizer', 'Fibre & Coir', 'Handicraft'];
-const EMPTY_PRODUCT_FORM = { name: '', category: PRODUCT_CATEGORIES[0], description: '', price: '', stock: '', unit: '', specifications: '', imageFile: null, variantGroup: '', variantLabel: '', discountPercent: '' };
+const EMPTY_PRODUCT_FORM = { name: '', category: PRODUCT_CATEGORIES[0], description: '', price: '', stock: '', unit: '', specifications: '', imageFile: null, variantGroup: '', variantLabel: '', discountPercent: '', reorderLevel: '' };
 
 function groupProductsForDisplay(products) {
   const seenGroups = new Set();
@@ -80,17 +85,39 @@ const ORDER_STATUS_COLORS = {
   Cancelled: 'text-slate-500 dark:text-slate-400',
 };
 
-const NAV_ITEMS = [
-  { key: 'products', label: 'Products', icon: Box },
-  { key: 'orders', label: 'Orders', icon: ShoppingBag },
-  { key: 'inventory', label: 'Inventory', icon: Boxes },
-  { key: 'membership', label: 'Membership', icon: Users },
-  { key: 'pmes', label: 'PMES Schedule', icon: Calendar },
-  { key: 'ledger', label: 'Share Capital', icon: PhilippinePeso },
-  { key: 'analytics', label: 'Analytics', icon: BarChart3 },
-  { key: 'reports', label: 'Reports', icon: FileText },
-  { key: 'settings', label: 'Settings', icon: SettingsIcon },
+const NAV_SECTIONS = [
+  {
+    label: 'Store',
+    items: [
+      { key: 'products', label: 'Products', icon: Box },
+      { key: 'orders', label: 'Orders', icon: ShoppingBag },
+      { key: 'sales', label: 'Sales Records', icon: Receipt },
+      { key: 'inventory', label: 'Inventory', icon: Boxes },
+    ],
+  },
+  {
+    label: 'Cooperative',
+    items: [
+      { key: 'membership', label: 'Membership', icon: Users },
+      { key: 'pmes', label: 'PMES Schedule', icon: Calendar },
+      { key: 'ledger', label: 'Share Capital', icon: PhilippinePeso },
+    ],
+  },
+  {
+    label: 'Insights',
+    items: [
+      { key: 'analytics', label: 'Analytics', icon: BarChart3 },
+      { key: 'reports', label: 'Reports', icon: FileText },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { key: 'settings', label: 'Settings', icon: SettingsIcon },
+    ],
+  },
 ];
+const SIDEBAR_COLLAPSED_KEY = 'bocofac.adminSidebarCollapsed';
 
 const STOCK_FILTERS = [
   { key: 'all', label: 'All' },
@@ -100,9 +127,9 @@ const STOCK_FILTERS = [
 ];
 const STOCK_FILTER_TESTS = {
   all: () => true,
-  low: p => p.stock < LOW_STOCK_THRESHOLD,
+  low: isLowStock,
   out: p => p.stock === 0,
-  in: p => p.stock >= LOW_STOCK_THRESHOLD,
+  in: p => !isLowStock(p),
 };
 const STOCK_SORTS = {
   'stock-asc': (a, b) => a.stock - b.stock || a.name.localeCompare(b.name),
@@ -170,7 +197,41 @@ function StockFilterBar({ filter, onFilter, counts, search, onSearch, sort, onSo
   );
 }
 
-function ProductRow({ variants, restockDrafts, setRestockDrafts, startRestock, submitRestock, openEditProduct, handleDeleteProduct }) {
+// [MEMBERSHIP] Nakadalo na sa PMES = handa na para sa desisyon ng Board
+const isReadyForBoard = (a) => a.status === 'Pending Review';
+
+// [MEMBERSHIP] Progress ng application: Applied → PMES Seminar → Board Review
+function ApplicationProgress({ ready, pmesDate }) {
+  const steps = ['Applied', 'PMES', 'Board'];
+  const current = ready ? 2 : 1;
+  return (
+    <div className="min-w-[180px]">
+      <div className="flex items-center">
+        {steps.map((step, i) => (
+          <React.Fragment key={step}>
+            {i > 0 && <span className={`h-0.5 flex-1 ${i <= current ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'}`} />}
+            <span
+              title={step}
+              className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                i < current ? 'bg-emerald-600 text-white'
+                  : i === current ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-400 dark:bg-amber-950/60 dark:text-amber-300'
+                  : 'bg-slate-100 text-slate-400 dark:bg-slate-800'
+              }`}
+            >
+              {i < current ? '✓' : i + 1}
+            </span>
+          </React.Fragment>
+        ))}
+      </div>
+      <p className={`mt-1.5 text-xs font-bold ${ready ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+        {ready ? 'Ready for Board approval' : 'Waiting for PMES seminar'}
+      </p>
+      {ready && pmesDate && <p className="text-[11px] text-slate-400">Attended PMES {formatDate(pmesDate)}</p>}
+    </div>
+  );
+}
+
+function ProductRow({ variants, onOpenStock, openEditProduct, handleDeleteProduct }) {
   const [selectedId, setSelectedId] = useState(variants[0].id);
   const p = variants.find(v => v.id === selectedId) || variants[0];
   const hasSizes = variants.length > 1;
@@ -215,32 +276,27 @@ function ProductRow({ variants, restockDrafts, setRestockDrafts, startRestock, s
         )}
       </td>
       <td className="p-4 whitespace-nowrap">
-        <span className={p.stock < LOW_STOCK_THRESHOLD ? 'text-rose-600 font-bold' : 'text-slate-700 dark:text-slate-300'}>
+        <span className={isLowStock(p) ? 'text-rose-600 font-bold' : 'text-slate-700 dark:text-slate-300'}>
           {p.stock} {p.unit}
         </span>
+        <span className="block text-[10px] text-slate-400">Reorder at {reorderLevelOf(p)}</span>
       </td>
       <td className="p-4">
         <div className="flex items-center justify-end gap-2">
-          {restockDrafts[p.id] !== undefined ? (
-            <>
-              <input
-                type="number"
-                value={restockDrafts[p.id]}
-                onChange={(e) => setRestockDrafts(prev => ({ ...prev, [p.id]: e.target.value }))}
-                className="w-20 px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-sm"
-              />
-              <button onClick={() => submitRestock(p.id)} className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 cursor-pointer">
-                <Check className="w-4 h-4" />
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => startRestock(p.id, p.stock)}
-              className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 cursor-pointer"
-            >
-              Update Stock
-            </button>
-          )}
+          <button
+            onClick={() => onOpenStock(p.id, 'update')}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 cursor-pointer whitespace-nowrap"
+          >
+            Update Stock
+          </button>
+          <button
+            onClick={() => onOpenStock(p.id, 'history')}
+            title="Stock history"
+            aria-label={`Stock history of ${p.name}`}
+            className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+          >
+            <History className="w-4 h-4" />
+          </button>
         </div>
       </td>
       <td className="p-4">
@@ -267,6 +323,7 @@ export default function AdminDashboardPage({
   onRejectOrder,
   onUpdateOrderStatus,
   onUpdateProductStock,
+  onWalkInRecorded,
   onApplyPromo,
   onAddProduct,
   onUpdateProduct,
@@ -292,7 +349,20 @@ export default function AdminDashboardPage({
 }) {
   const [adminTab, setAdminTab] = useState('analytics');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [restockDrafts, setRestockDrafts] = useState({});
+  // [UI] Naaalala ang liit/laki ng sidebar sa browser na ito
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'; } catch { return false; }
+  });
+  const toggleSidebar = () => {
+    setSidebarCollapsed(c => {
+      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, c ? '0' : '1'); } catch { /* storage off - session lang */ }
+      return !c;
+    });
+  };
+  // [INVENTORY] Bukas na stock modal: { productId, view: 'update' | 'history' }
+  const [stockModal, setStockModal] = useState(null);
+  const stockModalProduct = stockModal && products.find(p => p.id === stockModal.productId);
+  const openStockModal = (productId, view) => setStockModal({ productId, view });
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProductId, setEditingProductId] = useState(null);
   const [productForm, setProductForm] = useState(EMPTY_PRODUCT_FORM);
@@ -311,13 +381,20 @@ export default function AdminDashboardPage({
   // [MEMBERSHIP] Ang na-approve na applicant ay nasa Members na, kaya wala na sa listahan ng applications
   const [applicantFilter, setApplicantFilter] = useState('all');
   const [memberFilter, setMemberFilter] = useState('all');
-  const openApplicants = useMemo(() => filteredApplicants.filter(a => a.status !== 'Approved'), [filteredApplicants]);
+  // [MEMBERSHIP] Naghihintay lang ang nasa listahan: ang Approved ay nasa Members na, ang Rejected ay nakatago
+  // (makikita sa "View rejected"). Dalawa ang yugto: hinihintay pang dumalo sa PMES, o handa na para sa Board.
+  const [showRejectedApplicants, setShowRejectedApplicants] = useState(false);
+  const openApplicants = useMemo(() => filteredApplicants
+    .filter(a => a.status !== 'Approved' && a.status !== 'Rejected')
+    .sort((a, b) => (isReadyForBoard(b) - isReadyForBoard(a)) || (new Date(a.submittedAt) - new Date(b.submittedAt))),
+  [filteredApplicants]);
+  const rejectedApplicants = useMemo(() => filteredApplicants.filter(a => a.status === 'Rejected'), [filteredApplicants]);
   const applicantFilters = useMemo(() => [
     { key: 'all', label: 'All', test: () => true },
-    { key: 'pending', label: 'Pending Review', test: a => a.status !== 'Rejected', alert: true },
-    { key: 'rejected', label: 'Rejected', test: a => a.status === 'Rejected' },
+    { key: 'pmes', label: 'Waiting for PMES', test: a => !isReadyForBoard(a) },
+    { key: 'board', label: 'Ready for Board Review', test: isReadyForBoard, alert: true },
   ].map(f => ({ ...f, count: openApplicants.filter(f.test).length })), [openApplicants]);
-  const applicantRows = openApplicants.filter(applicantFilters.find(f => f.key === applicantFilter).test);
+  const applicantRows = showRejectedApplicants ? rejectedApplicants : openApplicants.filter(applicantFilters.find(f => f.key === applicantFilter).test);
   const memberFilters = useMemo(() => [
     { key: 'all', label: 'All', test: () => true },
     { key: 'Active', label: 'Active', test: m => m.status === 'Active' },
@@ -385,7 +462,7 @@ export default function AdminDashboardPage({
     [orders, orderView]
   );
   const pendingApplicants = useMemo(() => applicants.filter(a => a.status !== 'Approved' && a.status !== 'Rejected').length, [applicants]);
-  const lowStockProducts = useMemo(() => products.filter(p => p.stock < LOW_STOCK_THRESHOLD), [products]);
+  const lowStockProducts = useMemo(() => products.filter(isLowStock), [products]);
 
   // [INVENTORY] Filter + search + sort; default: pinakamababang stock muna para magkakasunod ang low stock
   const [inventoryFilter, setInventoryFilter] = useState('all');
@@ -436,23 +513,6 @@ export default function AdminDashboardPage({
     },
   ].filter(Boolean), [pendingOrders, pendingApplicants, lowStockProducts]);
 
-  const startRestock = (productId, currentStock) => {
-    setRestockDrafts(prev => ({ ...prev, [productId]: currentStock }));
-  };
-  const submitRestock = (productId) => {
-    const value = Number(restockDrafts[productId]);
-    if (Number.isNaN(value) || value < 0) {
-      onToast?.('Please enter a valid stock quantity.', 'error');
-      return;
-    }
-    onUpdateProductStock(productId, value);
-    setRestockDrafts(prev => {
-      const next = { ...prev };
-      delete next[productId];
-      return next;
-    });
-  };
-
   const openAddProduct = () => {
     setEditingProductId(null);
     setProductForm(EMPTY_PRODUCT_FORM);
@@ -472,6 +532,7 @@ export default function AdminDashboardPage({
       variantGroup: p.variantGroup || '',
       variantLabel: p.variantLabel || '',
       discountPercent: p.discountPercent ? String(p.discountPercent) : '',
+      reorderLevel: String(reorderLevelOf(p)),
     });
     setShowProductForm(true);
   };
@@ -496,6 +557,7 @@ export default function AdminDashboardPage({
     ));
     formData.append('variantGroup', productForm.variantGroup.trim());
     formData.append('variantLabel', productForm.variantLabel.trim());
+    formData.append('reorderLevel', productForm.reorderLevel === '' ? String(DEFAULT_REORDER_LEVEL) : productForm.reorderLevel);
     if (productForm.imageFile) formData.append('image', productForm.imageFile);
 
     setSavingProduct(true);
@@ -526,6 +588,7 @@ export default function AdminDashboardPage({
   const TAB_TITLES = {
     products: 'Products',
     orders: 'Orders',
+    sales: 'Sales Records',
     inventory: 'Inventory',
     membership: 'Membership',
     pmes: 'PMES Schedule',
@@ -572,56 +635,97 @@ export default function AdminDashboardPage({
     setEditingSessionId(null);
   };
 
-  const SidebarNav = ({ onNavigate }) => (
+  // [UI] Sidebar: nakagrupo bawat section; kapag collapsed, icons lang (may tooltip)
+  const SidebarNav = ({ onNavigate, collapsed = false, onToggle }) => (
     <>
-      <div className="px-6 pt-8 pb-7 flex items-center gap-3.5 border-b border-white/10">
+      <div className={`h-20 flex items-center gap-2.5 border-b border-slate-200/80 dark:border-slate-800 shrink-0 ${collapsed ? 'justify-center px-2' : 'px-4'}`}>
+        {!collapsed && (
+          <>
+            <img src={bocofacLogo} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" />
+            <span className="font-serif font-extrabold tracking-tight text-lg text-slate-900 dark:text-white truncate">BOCOFAC</span>
+          </>
+        )}
+        {onToggle && (
+          <button
+            onClick={onToggle}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className={`p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white cursor-pointer transition-colors ${collapsed ? '' : 'ml-auto'}`}
+          >
+            {collapsed ? <PanelLeftOpen className="w-[18px] h-[18px]" /> : <PanelLeftClose className="w-[18px] h-[18px]" />}
+          </button>
+        )}
+      </div>
+      <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-5 ${collapsed ? 'px-2' : 'px-3'}`}>
+        {NAV_SECTIONS.map(section => (
+          <div key={section.label} className="space-y-0.5">
+            {collapsed ? (
+              <div className="mx-auto mb-2 w-6 border-t border-slate-200 dark:border-slate-800" />
+            ) : (
+              <p className="px-2.5 pb-1.5 text-[10.5px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{section.label}</p>
+            )}
+            {section.items.map(item => {
+              const Icon = item.icon;
+              const isActive = adminTab === item.key;
+              const badgeCount = navBadgeCounts[item.key] || 0;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => { setAdminTab(item.key); onNavigate?.(); }}
+                  title={collapsed ? `${item.label}${badgeCount > 0 ? ` (${badgeCount})` : ''}` : undefined}
+                  aria-label={item.label}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`relative w-full flex items-center gap-2.5 h-9 rounded-lg text-[13.5px] cursor-pointer transition-colors text-left ${
+                    collapsed ? 'justify-center px-0' : 'px-2.5'
+                  } ${
+                    isActive
+                      ? 'bg-emerald-50 text-emerald-800 font-semibold dark:bg-emerald-900/40 dark:text-emerald-200'
+                      : 'font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-white'
+                  }`}
+                >
+                  {isActive && !collapsed && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-emerald-600 dark:bg-emerald-400" />}
+                  <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.9} />
+                  {!collapsed && <span className="truncate">{item.label}</span>}
+                  {badgeCount > 0 && (collapsed ? (
+                    <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
+                  ) : (
+                    <span className="ml-auto rounded-md bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 px-1.5 py-0.5 text-[10.5px] font-bold leading-none tabular-nums">
+                      {badgeCount}
+                    </span>
+                  ))}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+      <div className={`border-t border-slate-200/80 dark:border-slate-800 p-3 flex items-center gap-2.5 shrink-0 ${collapsed ? 'flex-col' : ''}`}>
         {admin?.avatarUrl ? (
           <img
             src={resolveImageUrl(admin.avatarUrl)}
             alt=""
             onClick={() => setViewedAvatarUrl(resolveImageUrl(admin.avatarUrl))}
             title="View full photo"
-            className="w-14 h-14 rounded-full object-cover shrink-0 shadow-md ring-2 ring-white/70 cursor-pointer hover:opacity-80 transition"
+            className="w-8 h-8 rounded-full object-cover shrink-0 cursor-pointer hover:opacity-80 transition"
           />
         ) : (
-          <div className="w-14 h-14 rounded-full bg-white text-emerald-800 flex items-center justify-center shrink-0 shadow-md font-extrabold text-xl">
-            {(admin?.name || 'AD').slice(0, 1)}
+          <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold text-sm">
+            {(admin?.name || 'A').slice(0, 1)}
           </div>
         )}
-        <div className="min-w-0">
-          <h1 className="font-serif text-white font-extrabold tracking-tight text-2xl leading-tight">BOCOFAC</h1>
-          <p className="text-emerald-100/80 text-sm font-semibold uppercase tracking-wider truncate">{admin?.name || 'Admin User'}</p>
-        </div>
-      </div>
-      <nav className="flex-1 flex flex-col gap-2 px-3.5 py-5 overflow-y-auto">
-        {NAV_ITEMS.map(item => {
-          const Icon = item.icon;
-          const isActive = adminTab === item.key;
-          const badgeCount = navBadgeCounts[item.key] || 0;
-          return (
-            <button
-              key={item.key}
-              onClick={() => { setAdminTab(item.key); onNavigate?.(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold cursor-pointer transition text-left ${
-                isActive ? 'bg-white text-emerald-700 shadow-md' : 'text-emerald-50/90 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              <span>{item.label}</span>
-              {badgeCount > 0 && (
-                <span className="ml-auto w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-              )}
-            </button>
-          );
-        })}
-      </nav>
-      <div className="p-3.5 pb-6 border-t border-white/10">
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[12.5px] font-semibold leading-tight text-slate-800 dark:text-slate-100">{admin?.name || 'Admin User'}</p>
+            <p className="truncate text-[11px] leading-tight text-slate-400">{admin?.email || 'Administrator'}</p>
+          </div>
+        )}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold cursor-pointer transition text-left text-emerald-50/90 hover:bg-white/10 hover:text-white"
+          title="Logout"
+          aria-label="Logout"
+          className="p-1.5 rounded-lg text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 cursor-pointer transition-colors shrink-0"
         >
-          <LogOut className="w-5 h-5 shrink-0" />
-          <span>Logout</span>
+          <LogOut className="w-[18px] h-[18px]" />
         </button>
       </div>
     </>
@@ -630,13 +734,13 @@ export default function AdminDashboardPage({
   return (
     <div className="h-screen flex bg-[#faf8f4] dark:bg-slate-950 text-slate-900 dark:text-slate-100">
 
-      <aside className="hidden md:flex w-72 bg-gradient-to-b from-emerald-600 to-emerald-700 dark:from-emerald-800 dark:to-emerald-950 flex-col shrink-0 select-none sticky top-0 h-[calc(100vh-var(--footer-h,0px))] overflow-y-auto">
-        <SidebarNav />
+      <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-[68px]' : 'w-60'} transition-[width] duration-200 bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 flex-col shrink-0 select-none sticky top-0 h-[calc(100vh-var(--footer-h,0px))]`}>
+        <SidebarNav collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       </aside>
 
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="w-72 bg-gradient-to-b from-emerald-600 to-emerald-700 dark:from-emerald-800 dark:to-emerald-950 flex flex-col h-full">
+          <div className="w-64 bg-white dark:bg-slate-900 flex flex-col h-full shadow-xl">
             <SidebarNav onNavigate={() => setMobileMenuOpen(false)} />
           </div>
           <div className="flex-1 bg-slate-950/50" onClick={() => setMobileMenuOpen(false)} />
@@ -696,103 +800,6 @@ export default function AdminDashboardPage({
         </header>
 
         <main className="flex-grow p-4 sm:p-8 overflow-y-auto w-full space-y-6" style={{ paddingBottom: 'calc(var(--footer-h, 0px) + 2rem)' }}>
-
-          {adminTab === 'analytics' && (
-            <>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Overview</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm text-slate-500">Total Sales</p>
-                    <p className="text-lg font-extrabold text-emerald-600 break-words">₱{totalSales.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                    <p className="text-xs font-semibold text-emerald-600 mt-1">Verified revenue to date</p>
-                  </div>
-                  <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
-                    <TrendingUp className="w-6 h-6" />
-                  </div>
-                </div>
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm text-slate-500">Total Orders</p>
-                    <p className="text-2xl font-extrabold text-sky-600 break-words">{orders.length}</p>
-                    <p className="text-xs font-semibold text-sky-600 mt-1">{pendingOrders} pending</p>
-                  </div>
-                  <div className="w-14 h-14 rounded-full bg-sky-100 dark:bg-sky-950/50 flex items-center justify-center text-sky-700 dark:text-sky-400 shrink-0">
-                    <ShoppingBag className="w-6 h-6" />
-                  </div>
-                </div>
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm text-slate-500">Total Members</p>
-                    <p className="text-2xl font-extrabold text-violet-600 break-words">{members.filter(m => m.status !== 'Removed').length}</p>
-                    <p className="text-xs font-semibold text-violet-600 mt-1">{pendingApplicants} pending applications</p>
-                  </div>
-                  <div className="w-14 h-14 rounded-full bg-violet-100 dark:bg-violet-950/50 flex items-center justify-center text-violet-700 dark:text-violet-400 shrink-0">
-                    <Users className="w-6 h-6" />
-                  </div>
-                </div>
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm text-slate-500">Low Stock Alert</p>
-                    <p className="text-2xl font-extrabold text-rose-600 break-words">{lowStockProducts.length}</p>
-                    <p className="text-xs font-semibold text-rose-600 mt-1">Products below {LOW_STOCK_THRESHOLD} units</p>
-                  </div>
-                  <div className="w-14 h-14 rounded-full bg-rose-100 dark:bg-rose-950/50 flex items-center justify-center text-rose-700 dark:text-rose-400 shrink-0">
-                    <AlertTriangle className="w-6 h-6" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex flex-col">
-                  <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                    <AlertTriangle className="w-4.5 h-4.5 text-rose-500" /> Low Stock Products
-                  </h3>
-                  {lowStockProducts.length === 0 ? (
-                    <p className="text-sm text-slate-400 text-center py-10">All products are well stocked.</p>
-                  ) : (
-                    <div className="space-y-3 flex-1 overflow-y-auto max-h-[260px] pr-1">
-                      {lowStockProducts.slice(0, 6).map(p => (
-                        <button
-                          key={p.id}
-                          onClick={() => setAdminTab('inventory')}
-                          className="w-full flex items-center justify-between gap-3 p-3 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 hover:bg-rose-100 dark:hover:bg-rose-950/40 text-left cursor-pointer transition"
-                        >
-                          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 line-clamp-1">{p.name}</span>
-                          <span className="text-xs font-bold text-rose-600 shrink-0">{p.stock} {p.unit}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 flex flex-col">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-slate-900 dark:text-white">Recent Orders</h3>
-                    <button onClick={() => setAdminTab('orders')} className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer">View all</button>
-                  </div>
-                  {orders.length === 0 ? (
-                    <p className="text-sm text-slate-400 text-center py-10">No orders yet.</p>
-                  ) : (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800 flex-1 overflow-y-auto max-h-[260px] pr-1">
-                      {orders.slice(0, 5).map(o => (
-                        <div key={o.id} className="flex items-center justify-between gap-4 py-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 line-clamp-1">{o.items.map(i => i.productName).join(', ')}</p>
-                            <p className="text-xs text-slate-400">{formatDate(o.orderedAt)}</p>
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="text-sm font-bold text-slate-900 dark:text-white">₱{o.totalAmount.toLocaleString()}</span>
-                            <span className={`text-xs font-bold ${ORDER_STATUS_COLORS[o.status] || ORDER_STATUS_COLORS['Pending Verification']}`}>{getOrderStatusLabel(o.status)}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
 
           {adminTab === 'products' && (
             <div className="space-y-6">
@@ -858,6 +865,19 @@ export default function AdminDashboardPage({
                       <p className="text-[10px] text-slate-400 mt-1">Set 0 to remove the promo. Applies instantly on the storefront.</p>
                     </div>
                   )}
+                  <div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder={`Reorder level (default ${DEFAULT_REORDER_LEVEL})`}
+                      aria-label="Reorder level"
+                      value={productForm.reorderLevel}
+                      onChange={(e) => setProductForm(prev => ({ ...prev, reorderLevel: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-sm"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">Marked Low Stock when the stock reaches this number.</p>
+                  </div>
                   <textarea
                     placeholder="Description"
                     value={productForm.description}
@@ -931,7 +951,7 @@ export default function AdminDashboardPage({
                       <th className="p-4 font-bold">Category</th>
                       <th className="p-4 font-bold">Price</th>
                       <th className="p-4 font-bold">Stock</th>
-                      <th className="p-4 font-bold text-right">Restock</th>
+                      <th className="p-4 font-bold text-right">Stock</th>
                       <th className="p-4 font-bold text-right">Actions</th>
                     </tr>
                   </thead>
@@ -947,10 +967,7 @@ export default function AdminDashboardPage({
                       <ProductRow
                         key={key}
                         variants={variants}
-                        restockDrafts={restockDrafts}
-                        setRestockDrafts={setRestockDrafts}
-                        startRestock={startRestock}
-                        submitRestock={submitRestock}
+                        onOpenStock={openStockModal}
                         openEditProduct={openEditProduct}
                         handleDeleteProduct={handleDeleteProduct}
                       />
@@ -1215,6 +1232,16 @@ export default function AdminDashboardPage({
             </div>
           )}
 
+          {stockModalProduct && (
+            <StockModal
+              key={stockModalProduct.id}
+              product={stockModalProduct}
+              initialView={stockModal.view}
+              onClose={() => setStockModal(null)}
+              onSubmit={onUpdateProductStock}
+            />
+          )}
+
           {confirmPrompt && (
             <div className="fixed inset-0 z-[60] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 space-y-4">
@@ -1263,6 +1290,10 @@ export default function AdminDashboardPage({
             />
           )}
 
+          {adminTab === 'sales' && (
+            <SalesRecords orders={orders} products={products} onWalkInRecorded={onWalkInRecorded} />
+          )}
+
           {adminTab === 'inventory' && (
             <>
               <StockFilterBar
@@ -1284,12 +1315,13 @@ export default function AdminDashboardPage({
                     <th className="p-4 font-bold">Unit</th>
                     <th className="p-4 font-bold">Stock Level</th>
                     <th className="p-4 font-bold">Status</th>
+                    <th className="p-4 font-bold text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {inventoryRows.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="p-6 text-center text-sm text-slate-400">
+                      <td colSpan={6} className="p-6 text-center text-sm text-slate-400">
                         {inventorySearch ? `No products match "${inventorySearch}".` : 'No products in this group.'}
                       </td>
                     </tr>
@@ -1305,20 +1337,36 @@ export default function AdminDashboardPage({
                       <td className="p-4">
                         <div className="w-40 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                           <div
-                            className={`h-full ${p.stock < LOW_STOCK_THRESHOLD ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                            className={`h-full ${isLowStock(p) ? 'bg-rose-500' : 'bg-emerald-500'}`}
                             style={{ width: `${Math.min(100, (p.stock / 400) * 100)}%` }}
                           />
                         </div>
-                        <p className="text-xs text-slate-400 mt-1">{p.stock} {p.unit}</p>
+                        <p className="text-xs text-slate-400 mt-1">{p.stock} {p.unit} · reorder at {reorderLevelOf(p)}</p>
                       </td>
                       <td className="p-4">
                         {p.stock === 0 ? (
                           <span className="text-xs font-bold px-2 py-1 rounded-full bg-rose-600 text-white whitespace-nowrap">Out of Stock</span>
-                        ) : p.stock < LOW_STOCK_THRESHOLD ? (
+                        ) : isLowStock(p) ? (
                           <span className="text-xs font-bold px-2 py-1 rounded-full bg-rose-100 text-rose-800 whitespace-nowrap">Low Stock</span>
                         ) : (
                           <span className="text-xs font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-800">In Stock</span>
                         )}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => openStockModal(p.id, 'update')}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 cursor-pointer whitespace-nowrap"
+                          >
+                            Update
+                          </button>
+                          <button
+                            onClick={() => openStockModal(p.id, 'history')}
+                            className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 text-xs font-bold cursor-pointer flex items-center gap-1"
+                          >
+                            <History className="w-3.5 h-3.5" /> History
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1336,10 +1384,24 @@ export default function AdminDashboardPage({
               </div>
               <SearchBar value={memberSearch} onChange={setMemberSearch} placeholder="Search by name, email, ID, or mobile number" />
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <h3 className="font-bold text-slate-900 dark:text-white">Applications</h3>
-                <FilterChips label="Filter applications" value={applicantFilter} onChange={setApplicantFilter} options={applicantFilters} />
+                <h3 className="font-bold text-slate-900 dark:text-white">{showRejectedApplicants ? 'Rejected Applications' : 'Applications'}</h3>
+                {showRejectedApplicants ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowRejectedApplicants(false)}
+                    className="self-start px-3 py-1.5 rounded-full text-xs font-bold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    ← Back to waiting applications
+                  </button>
+                ) : (
+                  <FilterChips label="Filter applications" value={applicantFilter} onChange={setApplicantFilter} options={applicantFilters} />
+                )}
               </div>
-              <p className="text-xs text-slate-400 -mt-3">Approved applicants move to Members below.</p>
+              <p className="text-xs text-slate-400 -mt-3">
+                {showRejectedApplicants
+                  ? 'Applications the Board did not approve. Kept for reference only.'
+                  : 'Applicants still waiting. Approved ones move to Members below; the Board approves or rejects them.'}
+              </p>
               <MobileScrollHint />
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-auto max-h-[70vh]">
                 <table className="w-full text-sm">
@@ -1347,14 +1409,15 @@ export default function AdminDashboardPage({
                     <tr className="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase text-slate-400">
                       <th className="p-4 font-bold">Applicant</th>
                       <th className="p-4 font-bold">Agricultural Type</th>
-                      <th className="p-4 font-bold">Status</th>
+                      <th className="p-4 font-bold">Applied</th>
+                      <th className="p-4 font-bold">{showRejectedApplicants ? 'Status' : 'Progress'}</th>
                       <th className="p-4 font-bold text-right">Profile</th>
                     </tr>
                   </thead>
                   <tbody>
                     {applicantRows.length === 0 && (
-                      <tr><td colSpan={4} className="p-6 text-center text-sm text-slate-400">
-                        {memberSearch ? `No applicants match "${memberSearch}".` : 'No applications here.'}
+                      <tr><td colSpan={5} className="p-6 text-center text-sm text-slate-400">
+                        {memberSearch ? `No applicants match "${memberSearch}".` : showRejectedApplicants ? 'No rejected applications.' : 'No one is waiting right now.'}
                       </td></tr>
                     )}
                     {applicantRows.map(a => (
@@ -1363,13 +1426,20 @@ export default function AdminDashboardPage({
                           <p className="font-semibold text-slate-900 dark:text-white">{a.fullName}</p>
                           <p className="text-xs text-slate-400">{a.email}</p>
                         </td>
-                        <td className="p-4 text-slate-600 dark:text-slate-300">{a.agriculturalType}</td>
+                        <td className="p-4 text-slate-600 dark:text-slate-300">{a.agriculturalType || <span className="text-slate-300 dark:text-slate-600">—</span>}</td>
+                        <td className="p-4 whitespace-nowrap">
+                          <p className="text-slate-700 dark:text-slate-200">{a.submittedAt ? formatDate(a.submittedAt) : '—'}</p>
+                          {a.submittedAt && (() => {
+                            const days = Math.max(0, Math.floor((Date.now() - new Date(a.submittedAt)) / 86400000));
+                            return <p className={`text-[11px] ${days >= 30 && !showRejectedApplicants ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}>{days === 0 ? 'Today' : `${days} day${days === 1 ? '' : 's'} ago`}</p>;
+                          })()}
+                        </td>
                         <td className="p-4">
-                          <span className={`text-xs font-bold whitespace-nowrap ${
-                            a.status === 'Approved' ? 'text-emerald-700 dark:text-emerald-400' :
-                            a.status === 'Rejected' ? 'text-rose-600 dark:text-rose-400' :
-                            'text-amber-600 dark:text-amber-400'
-                          }`}>{displayApplicantStatus(a.status)}</span>
+                          {showRejectedApplicants ? (
+                            <span className="text-xs font-bold text-rose-600 dark:text-rose-400">Rejected</span>
+                          ) : (
+                            <ApplicationProgress ready={isReadyForBoard(a)} pmesDate={a.pmesDate} />
+                          )}
                         </td>
                         <td className="p-4 text-right">
                           <button
@@ -1386,6 +1456,16 @@ export default function AdminDashboardPage({
                   </tbody>
                 </table>
               </div>
+
+              {!showRejectedApplicants && rejectedApplicants.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowRejectedApplicants(true)}
+                  className="-mt-3 self-start text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:underline cursor-pointer"
+                >
+                  View rejected applications ({rejectedApplicants.length})
+                </button>
+              )}
 
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2">
                 <h3 className="font-bold text-slate-900 dark:text-white">Members</h3>
@@ -1651,28 +1731,9 @@ export default function AdminDashboardPage({
           )}
 
           {adminTab === 'analytics' && (
-            <ExecDashboard
-              products={products}
-              orders={orders}
-              members={members}
-              ledger={ledger}
-              onVerifyOrder={onVerifyOrder}
-              onUpdateProductStock={onUpdateProductStock}
-              onApplyPromo={onApplyPromo}
-              onToast={onToast}
-              isDarkMode={isDarkMode}
-            />
-          )}
-
-          {adminTab === 'analytics' && (
-            <CoopInsights
-              members={members}
-              ledger={ledger}
-              withdrawals={withdrawals}
-              orders={orders}
-              applicants={applicants}
-              isDarkMode={isDarkMode}
-            />
+            <SalesForecast orders={orders} products={products} isDarkMode={isDarkMode}>
+              <ExecDashboard products={products} orders={orders} isDarkMode={isDarkMode} />
+            </SalesForecast>
           )}
 
           {adminTab === 'reports' && (
@@ -1681,9 +1742,14 @@ export default function AdminDashboardPage({
                 <FileText className="w-6 h-6 text-emerald-700" />
                 <h3 className="font-bold text-slate-900 dark:text-white">Sales Report</h3>
                 <p className="text-xs text-slate-500">₱{totalSales.toLocaleString()} verified revenue across {realizedOrders.length} orders.</p>
-                <button onClick={() => printSalesReport(realizedOrders)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
-                  <Printer className="w-3.5 h-3.5" /> Print Report
-                </button>
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  <button onClick={() => printSalesReport(realizedOrders)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
+                    <Printer className="w-3.5 h-3.5" /> Print All
+                  </button>
+                  <button onClick={() => setAdminTab('sales')} className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
+                    <Calendar className="w-3.5 h-3.5" /> By date range
+                  </button>
+                </div>
               </div>
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 space-y-3">
                 <Users className="w-6 h-6 text-violet-700" />
@@ -1696,8 +1762,8 @@ export default function AdminDashboardPage({
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 space-y-3">
                 <Boxes className="w-6 h-6 text-rose-700" />
                 <h3 className="font-bold text-slate-900 dark:text-white">Inventory Report</h3>
-                <p className="text-xs text-slate-500">{products.length} products, {lowStockProducts.length} below {LOW_STOCK_THRESHOLD} units.</p>
-                <button onClick={() => printInventoryReport(products, LOW_STOCK_THRESHOLD)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
+                <p className="text-xs text-slate-500">{products.length} products, {lowStockProducts.length} at or below their reorder level.</p>
+                <button onClick={() => printInventoryReport(products)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
                   <Printer className="w-3.5 h-3.5" /> Print Report
                 </button>
               </div>

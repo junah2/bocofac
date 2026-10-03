@@ -40,13 +40,14 @@ import ApplicantDetailModal from '../components/ApplicantDetailModal';
 import MobileScrollHint from '../components/MobileScrollHint';
 import Footer from '../components/Footer';
 import CoopInsights from '../components/CoopInsights';
+import SalesForecast from '../components/SalesForecast';
 import SearchBar, { matchesSearch } from '../components/SearchBar';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
+import { isLowStock } from '../utils/stock';
 import bocofacLogo from '../assets/bocofac-logo.jpg';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
-const PIE_COLORS = { Approved: '#6b7c52', Pending: '#f59e0b', Rejected: '#ef4444' };
-const LOW_STOCK_THRESHOLD = 20;
+const PIE_COLORS = { Approved: '#2f6f4b', Pending: '#f59e0b', Rejected: '#ef4444' };
 
 export default function BoardDashboardPage({
   bod,
@@ -132,7 +133,7 @@ export default function BoardDashboardPage({
   const pendingVerificationOrders = useMemo(() => orders.filter(o => o.status === 'Pending Verification').length, [orders]);
   const rejectedCancelledOrders = useMemo(() => orders.filter(o => o.status === 'Rejected' || o.status === 'Cancelled').length, [orders]);
   const avgOrderValue = useMemo(() => (realizedOrders.length ? totalFinancial / realizedOrders.length : 0), [realizedOrders, totalFinancial]);
-  const lowStockProducts = useMemo(() => products.filter(p => p.stock > 0 && p.stock < LOW_STOCK_THRESHOLD), [products]);
+  const lowStockProducts = useMemo(() => products.filter(p => p.stock > 0 && isLowStock(p)), [products]);
   const outOfStockProducts = useMemo(() => products.filter(p => p.stock === 0), [products]);
 
   const financialChartData = useMemo(() => {
@@ -397,6 +398,8 @@ export default function BoardDashboardPage({
                 </div>
               </div>
 
+              <SalesForecast orders={orders} products={products} isDarkMode={isDarkMode} />
+
               <CoopInsights
                 members={members}
                 ledger={ledger}
@@ -471,11 +474,11 @@ export default function BoardDashboardPage({
                     <p className="text-[11px] text-slate-400">Listed products, {totalSales.toLocaleString()} units sold to date</p>
                   </div>
                   <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3">
-                    <ReportStatRow label="Low Stock (< 20 units)" value={lowStockProducts.length} tone={lowStockProducts.length > 0 ? 'warn' : undefined} />
+                    <ReportStatRow label="Low Stock (at reorder level)" value={lowStockProducts.length} tone={lowStockProducts.length > 0 ? 'warn' : undefined} />
                     <ReportStatRow label="Out of Stock" value={outOfStockProducts.length} tone={outOfStockProducts.length > 0 ? 'danger' : undefined} />
                     <ReportStatRow label="Total Units Sold" value={totalSales.toLocaleString()} />
                   </div>
-                  <button onClick={() => printInventoryReport(products, LOW_STOCK_THRESHOLD)} className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900 rounded-xl py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer">
+                  <button onClick={() => printInventoryReport(products)} className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900 rounded-xl py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer">
                     <Printer className="w-3.5 h-3.5" /> Print Report
                   </button>
                 </div>

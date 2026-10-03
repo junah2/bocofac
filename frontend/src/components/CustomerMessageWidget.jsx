@@ -82,7 +82,7 @@ export default function CustomerMessageWidget({ user, onToast, forceOpen, onForc
     <div className="fixed bottom-24 right-6 z-50">
       {open && (
         <div className="mb-3 w-96 max-w-[90vw] h-[32rem] max-h-[70vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-[#313826] text-white">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-[#1c3b2b] text-white">
             <p className="text-sm font-bold">Message BOCOFAC</p>
             <button onClick={() => setOpen(false)} className="text-white/80 hover:text-white cursor-pointer">
               <X className="w-4 h-4" />
@@ -144,7 +144,7 @@ export default function CustomerMessageWidget({ user, onToast, forceOpen, onForc
       )}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative w-14 h-14 rounded-full bg-[#313826] hover:bg-emerald-800 text-white shadow-xl flex items-center justify-center cursor-pointer transition"
+        className="relative w-14 h-14 rounded-full bg-[#1c3b2b] hover:bg-emerald-800 text-white shadow-xl flex items-center justify-center cursor-pointer transition"
       >
         {open ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
         {!open && unreadCount > 0 && (

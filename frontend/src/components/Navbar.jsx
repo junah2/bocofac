@@ -176,7 +176,7 @@ export default function Navbar({
           {showAccountButton && (
             <button
               onClick={() => setPage(accountTarget)}
-              className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#313826] hover:bg-emerald-800 text-white text-xs font-bold uppercase tracking-wide transition cursor-pointer"
+              className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#1c3b2b] hover:bg-emerald-800 text-white text-xs font-bold uppercase tracking-wide transition cursor-pointer"
             >
               <AccountIcon className="w-3.5 h-3.5" /> {accountLabel}
             </button>
@@ -194,7 +194,7 @@ export default function Navbar({
                     className="w-6 h-6 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-[#313826] text-white text-[11px] font-bold flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-full bg-[#1c3b2b] text-white text-[11px] font-bold flex items-center justify-center">
                     {(user.name || 'U')[0].toUpperCase()}
                   </div>
                 )}
@@ -209,7 +209,7 @@ export default function Navbar({
                         className="w-14 h-14 rounded-full object-cover mb-2"
                       />
                     ) : (
-                      <div className="w-14 h-14 rounded-full bg-[#313826] text-white text-xl font-bold flex items-center justify-center mb-2">
+                      <div className="w-14 h-14 rounded-full bg-[#1c3b2b] text-white text-xl font-bold flex items-center justify-center mb-2">
                         {(user.name || 'U')[0].toUpperCase()}
                       </div>
                     )}
@@ -223,7 +223,7 @@ export default function Navbar({
                         onClick={() => { onNotificationNavigate?.(tab.id); setProfileMenuOpen(false); }}
                         className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold mb-1 cursor-pointer transition ${
                           i === 0
-                            ? 'bg-[#313826] text-white'
+                            ? 'bg-[#1c3b2b] text-white'
                             : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900'
                         }`}
                       >
@@ -259,7 +259,7 @@ export default function Navbar({
               onClick={() => go(link.key)}
               className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold cursor-pointer transition ${
                 page === link.key
-                  ? 'bg-[#313826] text-white'
+                  ? 'bg-[#1c3b2b] text-white'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900'
               }`}
             >

@@ -42,7 +42,7 @@ export default function PublicAbout({ onApplyMembership }) {
   return (
     <div className="animate-in fade-in duration-500">
 
-      <section className="relative overflow-hidden bg-[#1e2318]">
+      <section className="relative overflow-hidden bg-[#0f2218]">
         <div className="relative max-w-6xl mx-auto px-6 py-20 sm:py-28 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="text-center lg:text-left space-y-8">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-semibold uppercase tracking-wider backdrop-blur">
@@ -172,7 +172,7 @@ export default function PublicAbout({ onApplyMembership }) {
       </section>
 
       <section className="max-w-5xl mx-auto px-6 py-20">
-        <div className="rounded-2xl bg-[#313826] text-white px-8 py-12 sm:px-14 flex flex-col sm:flex-row items-center justify-between gap-6 relative overflow-hidden">
+        <div className="rounded-2xl bg-[#1c3b2b] text-white px-8 py-12 sm:px-14 flex flex-col sm:flex-row items-center justify-between gap-6 relative overflow-hidden">
           <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
           <div className="text-center sm:text-left space-y-1 relative">
             <h3 className="text-xl sm:text-2xl font-extrabold">Join the Cooperative</h3>

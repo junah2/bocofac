@@ -88,7 +88,7 @@ export default function AdminMessageWidget({ conversations = [], onRefetchConver
     <div className="fixed bottom-6 right-6 z-50">
       {open && (
         <div className="mb-3 w-96 max-w-[90vw] h-[34rem] max-h-[75vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-[#313826] text-white">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-[#1c3b2b] text-white">
             <div className="flex items-center gap-2 min-w-0">
               {selectedUserId && (
                 <button onClick={backToList} className="text-white/80 hover:text-white cursor-pointer shrink-0">
@@ -216,7 +216,7 @@ export default function AdminMessageWidget({ conversations = [], onRefetchConver
       )}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative w-14 h-14 rounded-full bg-[#313826] hover:bg-emerald-800 text-white shadow-xl flex items-center justify-center cursor-pointer transition"
+        className="relative w-14 h-14 rounded-full bg-[#1c3b2b] hover:bg-emerald-800 text-white shadow-xl flex items-center justify-center cursor-pointer transition"
       >
         {open ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
         {!open && totalUnread > 0 && (

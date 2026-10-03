@@ -14,6 +14,7 @@ const { validate } = require('../middleware/validate');
 const { signupSchema, signinSchema, updateMeSchema, passwordSchema } = require('../validation/auth.schema');
 const { signinLimiter, signupLimiter, forgotPasswordLimiter, resetPasswordLimiter } = require('../middleware/rateLimit');
 const { uploadAvatar, verifyUploadedFileType, IMAGE_MIME_TYPES } = require('../middleware/upload');
+const { persistUpload } = require('../utils/storage');
 
 // [PASSWORD HASHING] bcrypt, 12 rounds - hindi sine-save ang totoong password, hash lang
 const BCRYPT_ROUNDS = 12;
@@ -141,6 +142,7 @@ router.patch('/me/avatar', requireAuth, uploadAvatar.single('avatar'), asyncHand
   if (!(await verifyUploadedFileType(req.file.path, IMAGE_MIME_TYPES))) {
     return res.status(400).json({ error: 'Image file content does not match an allowed type (JPG/PNG/WebP).' });
   }
+  await persistUpload(req.file);
 
   const avatarUrl = `/uploads/avatars/${req.file.filename}`;
   const { rows } = await pool.query(

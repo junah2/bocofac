@@ -308,7 +308,7 @@ UPDATE orders SET payment_method = 'GCash',
                           ELSE lpad(floor(random() * 1e13)::bigint::text, 13, '0') END
 WHERE payment_method = 'Bank Transfer';
 ALTER TABLE orders ADD CONSTRAINT orders_payment_method_check
-  CHECK (payment_method IN ('GCash', 'Cash on Delivery'));
+  CHECK (payment_method IN ('GCash', 'Cash on Delivery', 'Cash'));
 
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS member_discount_applied BOOLEAN NOT NULL DEFAULT false;
 
@@ -408,3 +408,32 @@ SELECT setval('product_no_seq', GREATEST(
 ALTER TABLE products ALTER COLUMN product_no SET DEFAULT nextval('product_no_seq');
 ALTER TABLE products ALTER COLUMN product_no SET NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_products_product_no ON products(product_no);
+
+-- [DATABASE] Saan nanggaling ang benta: online (checkout sa website) o walk-in (binili sa opisina/tindahan).
+-- Ang sales history (HIST-*) ay walk-in na cash dahil wala pang system noon.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'online';
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_channel_check;
+ALTER TABLE orders ADD CONSTRAINT orders_channel_check CHECK (channel IN ('online', 'walk-in'));
+UPDATE orders SET channel = 'walk-in', payment_method = 'Cash'
+WHERE id LIKE 'HIST-%' AND (channel <> 'walk-in' OR payment_method <> 'Cash');
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS recorded_by INTEGER REFERENCES users(id);
+CREATE INDEX IF NOT EXISTS idx_orders_ordered_at ON orders(ordered_at);
+
+-- [INVENTORY] Reorder level bawat product: kapag ganito na lang o mas mababa ang stock, kailangan nang mag-restock
+ALTER TABLE products ADD COLUMN IF NOT EXISTS reorder_level INTEGER NOT NULL DEFAULT 20;
+ALTER TABLE products DROP CONSTRAINT IF EXISTS products_reorder_level_check;
+ALTER TABLE products ADD CONSTRAINT products_reorder_level_check CHECK (reorder_level >= 0);
+
+-- [INVENTORY] Kasaysayan ng bawat galaw ng stock (restock, benta, cancel, sira, atbp.) at kung sino ang gumawa
+CREATE TABLE IF NOT EXISTS stock_movements (
+  id BIGSERIAL PRIMARY KEY,
+  product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  change INTEGER NOT NULL,
+  stock_after INTEGER NOT NULL,
+  reason TEXT NOT NULL CHECK (reason IN ('initial stock', 'restock', 'online order', 'walk-in sale', 'order cancelled', 'order rejected', 'adjustment', 'damaged', 'expired', 'returned')),
+  note TEXT,
+  order_id TEXT REFERENCES orders(id) ON DELETE SET NULL,
+  actor_user_id INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements(product_id, created_at DESC);

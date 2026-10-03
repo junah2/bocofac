@@ -681,7 +681,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
           {activeTab === 'orders' && (
             <>
               <div style={{
-                background: 'linear-gradient(135deg, var(--green) 0%, #566343 100%)',
+                background: 'linear-gradient(135deg, var(--green) 0%, #275a3e 100%)',
                 borderRadius: 16, padding: '28px 32px', marginBottom: 24,
                 color: '#fff', boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
               }}>
@@ -868,7 +868,7 @@ export default function DashboardPage({ user, setUser, setPage, pmesSessions = [
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
               <div style={{
-                background: 'linear-gradient(135deg, var(--green) 0%, #566343 100%)',
+                background: 'linear-gradient(135deg, var(--green) 0%, #275a3e 100%)',
                 borderRadius: 16, padding: '28px 32px',
                 color: '#fff', boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -1292,7 +1292,7 @@ function MembershipContributionPanel({
     ? 'Complete'
     : totalContribution > 0 ? 'Partial' : 'Unpaid';
   const statusColors = {
-    Complete: { bg: '#ebebe0', text: '#424c34' },
+    Complete: { bg: '#e0efe5', text: '#214833' },
     Partial: { bg: '#fef3c7', text: '#92400e' },
     Unpaid: { bg: '#f1f5f9', text: '#475569' },
   }[contributionStatus];
@@ -1540,8 +1540,8 @@ function MembershipContributionPanel({
                   <span style={{
                     display: 'inline-block', padding: '2px 10px', borderRadius: 999,
                     fontSize: 11, fontWeight: 700,
-                    background: entry.status === 'Verified' ? '#ebebe0' : '#fef3c7',
-                    color: entry.status === 'Verified' ? '#424c34' : '#92400e',
+                    background: entry.status === 'Verified' ? '#e0efe5' : '#fef3c7',
+                    color: entry.status === 'Verified' ? '#214833' : '#92400e',
                   }}>
                     {entry.status}
                   </span>
@@ -1598,8 +1598,8 @@ function MembershipContributionPanel({
                 <span style={{
                   display: 'inline-block', padding: '2px 10px', borderRadius: 999,
                   fontSize: 11, fontWeight: 700,
-                  background: req.status === 'Sent' ? '#ebebe0' : req.status === 'Rejected' ? '#fee2e2' : req.status === 'Approved' ? '#e0f2fe' : '#fef3c7',
-                  color: req.status === 'Sent' ? '#424c34' : req.status === 'Rejected' ? '#991b1b' : req.status === 'Approved' ? '#075985' : '#92400e',
+                  background: req.status === 'Sent' ? '#e0efe5' : req.status === 'Rejected' ? '#fee2e2' : req.status === 'Approved' ? '#e0f2fe' : '#fef3c7',
+                  color: req.status === 'Sent' ? '#214833' : req.status === 'Rejected' ? '#991b1b' : req.status === 'Approved' ? '#075985' : '#92400e',
                 }}>
                   {req.status === 'Sent' ? 'Released' : req.status === 'Approved' ? 'Approved - claim at office' : req.status}
                 </span>

@@ -158,6 +158,57 @@ export function printSalesReport(orders) {
   openPrintWindow('Sales Report', bodyHtml, { width: 720, height: 800 });
 }
 
+// [SALES RECORDS] Sales report ng napiling petsa at filter: buod bawat product + bawat item na nabenta
+export function printSalesRecords(lines, { rangeLabel, filterLabel, summary }) {
+  const money = (n) => `₱${Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const productRows = summary.products.map((p) => `
+    <tr>
+      <td>${escapeHtml(p.code)}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${escapeHtml(p.category)}</td>
+      <td class="num">${p.quantity.toLocaleString()}</td>
+      <td class="num">${money(p.total)}</td>
+    </tr>
+  `).join('');
+  const lineRows = lines.map((l) => `
+    <tr>
+      <td>${l.date.toLocaleDateString('en-PH')}</td>
+      <td>${escapeHtml(l.orderId)}</td>
+      <td>${escapeHtml(l.productName)}</td>
+      <td class="num">${l.quantity.toLocaleString()}</td>
+      <td class="num">${money(l.price)}</td>
+      <td class="num">${money(l.total)}</td>
+      <td>${escapeHtml(l.buyer || '—')}</td>
+      <td>${l.channel === 'walk-in' ? 'Walk-in' : 'Online'}</td>
+    </tr>
+  `).join('');
+
+  const bodyHtml = `
+    <h1>${COOP_NAME}</h1>
+    <p class="sub">Sales Report · ${escapeHtml(rangeLabel)}${filterLabel ? ` · ${escapeHtml(filterLabel)}` : ''}</p>
+    <table>
+      <tr><td class="label">Sales Amount</td><td class="value total">${money(summary.amount)}</td></tr>
+      <tr><td class="label">Transactions</td><td class="value">${summary.transactions.toLocaleString()}</td></tr>
+      <tr><td class="label">Units Sold</td><td class="value">${summary.units.toLocaleString()}</td></tr>
+      <tr><td class="label">Walk-in / Online</td><td class="value">${summary.walkInShare}% / ${Math.round((100 - summary.walkInShare) * 10) / 10}%</td></tr>
+    </table>
+    <p style="font-size:10px;color:#94a3b8;margin:6px 0 0;">Amounts are item prices, before the member discount and shipping fee.</p>
+    <div class="divider"></div>
+    <p style="font-size:12px;font-weight:700;margin:0;">Sales by Product</p>
+    <table class="data-table">
+      <thead><tr><th>ID</th><th>Product</th><th>Category</th><th class="num">Units</th><th class="num">Amount</th></tr></thead>
+      <tbody>${productRows}</tbody>
+    </table>
+    <div class="divider"></div>
+    <p style="font-size:12px;font-weight:700;margin:0;">Items Sold</p>
+    <table class="data-table">
+      <thead><tr><th>Date</th><th>Order</th><th>Product</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Total</th><th>Buyer</th><th>Source</th></tr></thead>
+      <tbody>${lineRows}</tbody>
+    </table>
+  `;
+  openPrintWindow('Sales Report', bodyHtml, { width: 860, height: 900 });
+}
+
 export function printMembershipReport(members, pendingApplicants = 0) {
   const sorted = members
     .slice()
@@ -194,16 +245,20 @@ export function printMembershipReport(members, pendingApplicants = 0) {
   openPrintWindow('Membership Report', bodyHtml, { width: 640, height: 800 });
 }
 
-export function printInventoryReport(products, lowStockThreshold = 20) {
+// [INVENTORY] Low stock = nasa o mas mababa sa reorder level ng mismong product
+export function printInventoryReport(products) {
+  const reorderAt = (p) => (Number.isFinite(p.reorderLevel) ? p.reorderLevel : 20);
+  const isLow = (p) => p.stock <= reorderAt(p);
   const sorted = products.slice().sort((a, b) => a.stock - b.stock);
-  const lowStockCount = products.filter((p) => p.stock < lowStockThreshold).length;
+  const lowStockCount = products.filter(isLow).length;
 
   const rows = sorted.map((p) => `
     <tr>
       <td>${escapeHtml(p.name)}</td>
       <td>${escapeHtml(p.category || '—')}</td>
       <td class="num">₱${Number(p.price).toLocaleString()}</td>
-      <td class="num" style="${p.stock < lowStockThreshold ? 'color:#e11d48;font-weight:700;' : ''}">${p.stock} ${escapeHtml(p.unit || '')}</td>
+      <td class="num" style="${isLow(p) ? 'color:#e11d48;font-weight:700;' : ''}">${p.stock} ${escapeHtml(p.unit || '')}</td>
+      <td class="num">${reorderAt(p)}</td>
     </tr>
   `).join('');
 
@@ -212,15 +267,15 @@ export function printInventoryReport(products, lowStockThreshold = 20) {
     <p class="sub">Inventory Report</p>
     <table>
       <tr><td class="label">Total Products</td><td class="value total">${products.length}</td></tr>
-      <tr><td class="label">Below ${lowStockThreshold} Units</td><td class="value">${lowStockCount}</td></tr>
+      <tr><td class="label">Need Restocking (at or below reorder level)</td><td class="value">${lowStockCount}</td></tr>
     </table>
     <div class="divider"></div>
     <table class="data-table">
       <thead>
-        <tr><th>Product</th><th>Category</th><th class="num">Price</th><th class="num">Stock</th></tr>
+        <tr><th>Product</th><th>Category</th><th class="num">Price</th><th class="num">Stock</th><th class="num">Reorder At</th></tr>
       </thead>
       <tbody>
-        ${rows || '<tr><td colspan="4" style="font-size:12px;color:#94a3b8;padding:10px 0;">No products to report.</td></tr>'}
+        ${rows || '<tr><td colspan="5" style="font-size:12px;color:#94a3b8;padding:10px 0;">No products to report.</td></tr>'}
       </tbody>
     </table>
   `;
@@ -242,13 +297,13 @@ const APPLICATION_STYLES = `
   <style>
     @page { size: A4; margin: 14mm; }
     body { padding: 0; font-size: 11px; }
-    .form-head { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #1e2318; padding-bottom: 10px; }
+    .form-head { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #0f2218; padding-bottom: 10px; }
     .form-head img { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; }
     .form-head h1 { font-size: 17px; }
     .form-head .sub { margin: 0; }
     .form-title { font-size: 14px; font-weight: 800; letter-spacing: .06em; text-align: center; margin: 12px 0 4px; }
     .form-meta { display: flex; justify-content: space-between; font-size: 10.5px; color: #475569; margin-bottom: 6px; }
-    h2 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; background: #eef1e8; color: #1e2318; padding: 4px 6px; margin: 12px 0 0; }
+    h2 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; background: #eef1e8; color: #0f2218; padding: 4px 6px; margin: 12px 0 0; }
     .grid { display: grid; border-left: 1px solid #94a3b8; border-top: 1px solid #94a3b8; }
     .cell { border-right: 1px solid #94a3b8; border-bottom: 1px solid #94a3b8; padding: 3px 6px 4px; min-height: 34px; }
     .cell .k { font-size: 8.5px; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }

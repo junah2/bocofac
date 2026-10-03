@@ -6,6 +6,8 @@ const { broadcast } = require('../sse');
 const { nextProductId } = require('../utils/ids');
 const { uploadProductImage, verifyUploadedFileType, IMAGE_MIME_TYPES } = require('../middleware/upload');
 const { auditFromRequest } = require('../utils/audit');
+const { MANUAL_REASONS, logStockMovement, movementToClient } = require('../utils/stockMovements');
+const { persistUpload } = require('../utils/storage');
 
 const router = express.Router();
 
@@ -37,6 +39,7 @@ function toClient(row) {
     discountPercent,
     salePrice,
     stock: row.stock,
+    reorderLevel: row.reorder_level ?? 20,
     unit: row.unit,
     image: row.image,
     rating: row.rating === null ? null : Number(row.rating),
@@ -70,19 +73,65 @@ router.post('/:id/view', asyncHandler(async (req, res) => {
   res.json(toClient(rows[0]));
 }));
 
-// [INVENTORY] Admin/board: manual na pag-update ng stock (restock)
+// [INVENTORY] Kasaysayan ng stock ng isang product (pinakabago muna)
+router.get('/:id/stock-movements', requireRole('admin', 'board'), asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT m.*, u.name AS actor_name, u.email AS actor_email
+     FROM stock_movements m LEFT JOIN users u ON u.id = m.actor_user_id
+     WHERE m.product_id = $1
+     ORDER BY m.created_at DESC, m.id DESC
+     LIMIT 200`,
+    [req.params.id]
+  );
+  res.json(rows.map(movementToClient));
+}));
+
+// [INVENTORY] Admin/board: manual na pag-update ng stock (restock, sira, expired, adjustment) - may dahilan dapat
 router.patch('/:id/stock', requireRole('admin', 'board'), asyncHandler(async (req, res) => {
   const { stock } = req.body;
-  if (typeof stock !== 'number' || stock < 0) {
-    return res.status(400).json({ error: 'stock must be a non-negative number.' });
+  const note = typeof req.body.note === 'string' ? req.body.note.trim().slice(0, 300) : '';
+  if (!Number.isInteger(stock) || stock < 0) {
+    return res.status(400).json({ error: 'stock must be a whole number, 0 or more.' });
   }
-  const { rows } = await pool.query(
-    'UPDATE products SET stock = $1 WHERE id = $2 RETURNING *',
-    [stock, req.params.id]
-  );
-  if (!rows[0]) return res.status(404).json({ error: 'Product not found.' });
-  broadcast('products');
-  res.json(toClient(rows[0]));
+  if (req.body.reason !== undefined && !MANUAL_REASONS.includes(req.body.reason)) {
+    return res.status(400).json({ error: `reason must be one of: ${MANUAL_REASONS.join(', ')}` });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: before } = await client.query('SELECT stock FROM products WHERE id = $1 FOR UPDATE', [req.params.id]);
+    if (!before[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Product not found.' });
+    }
+    const change = stock - before[0].stock;
+    const reason = req.body.reason || (change > 0 ? 'restock' : 'adjustment');
+    // [VALIDATION] Dapat tugma ang dahilan sa galaw: restock/returned = dagdag, sira/expired = bawas
+    if (change < 0 && ['restock', 'returned'].includes(reason)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `A ${reason} should add stock. Use "adjustment", "damaged" or "expired" to lower it.` });
+    }
+    if (change > 0 && ['damaged', 'expired'].includes(reason)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Marking items as ${reason} should lower the stock.` });
+    }
+    const { rows } = await client.query('UPDATE products SET stock = $1 WHERE id = $2 RETURNING *', [stock, req.params.id]);
+    await logStockMovement(client, {
+      productId: req.params.id, change, stockAfter: stock, reason, note: note || null, actorUserId: req.user.sub,
+    });
+    if (change !== 0) {
+      await auditFromRequest(req, 'product.stock', { db: client, entityType: 'product', entityId: req.params.id, metadata: { change, stock, reason } });
+    }
+    await client.query('COMMIT');
+    broadcast('products');
+    res.json(toClient(rows[0]));
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }));
 
 router.patch('/:id/promo', requireRole('admin'), asyncHandler(async (req, res) => {
@@ -103,6 +152,7 @@ router.patch('/:id/promo', requireRole('admin'), asyncHandler(async (req, res) =
 router.post('/', requireRole('admin'), uploadProductImage.single('image'), asyncHandler(async (req, res) => {
   const { name, category, description, price, unit, variantGroup, variantLabel } = req.body;
   const stock = req.body.stock !== undefined ? Number(req.body.stock) : 0;
+  const reorderLevel = req.body.reorderLevel !== undefined && req.body.reorderLevel !== '' ? Number(req.body.reorderLevel) : 20;
   const priceNum = Number(price);
 
   if (!name || !category || !price) {
@@ -114,12 +164,16 @@ router.post('/', requireRole('admin'), uploadProductImage.single('image'), async
   if (Number.isNaN(priceNum) || priceNum < 0) {
     return res.status(400).json({ error: 'price must be a non-negative number.' });
   }
-  if (Number.isNaN(stock) || stock < 0) {
-    return res.status(400).json({ error: 'stock must be a non-negative number.' });
+  if (!Number.isInteger(stock) || stock < 0) {
+    return res.status(400).json({ error: 'stock must be a whole number, 0 or more.' });
+  }
+  if (!Number.isInteger(reorderLevel) || reorderLevel < 0) {
+    return res.status(400).json({ error: 'reorderLevel must be a whole number, 0 or more.' });
   }
   if (req.file && !(await verifyUploadedFileType(req.file.path, IMAGE_MIME_TYPES))) {
     return res.status(400).json({ error: 'Image file content does not match an allowed type (JPG/PNG/WebP).' });
   }
+  if (req.file) await persistUpload(req.file);
 
   const specifications = parseSpecifications(req.body.specifications) || [];
   const image = req.file ? `/uploads/products/${req.file.filename}` : (req.body.image || null);
@@ -129,11 +183,12 @@ router.post('/', requireRole('admin'), uploadProductImage.single('image'), async
     await client.query('BEGIN');
     const id = await nextProductId(client);
     const { rows } = await client.query(
-      `INSERT INTO products (id, name, category, description, price, stock, unit, image, specifications, variant_group, variant_label)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      `INSERT INTO products (id, name, category, description, price, stock, unit, image, specifications, variant_group, variant_label, reorder_level)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING *`,
-      [id, name, category, description || null, priceNum, stock, unit || null, image, specifications, variantGroup || null, variantLabel || null]
+      [id, name, category, description || null, priceNum, stock, unit || null, image, specifications, variantGroup || null, variantLabel || null, reorderLevel]
     );
+    await logStockMovement(client, { productId: id, change: stock, stockAfter: stock, reason: 'initial stock', actorUserId: req.user.sub });
     await auditFromRequest(req, 'product.create', { db: client, entityType: 'product', entityId: id });
     await client.query('COMMIT');
     broadcast('products');
@@ -150,6 +205,7 @@ router.put('/:id', requireRole('admin'), uploadProductImage.single('image'), asy
   const { name, category, description, unit, variantGroup, variantLabel } = req.body;
   const price = req.body.price !== undefined ? Number(req.body.price) : undefined;
   const discountPercent = req.body.discountPercent !== undefined ? Number(req.body.discountPercent) : undefined;
+  const reorderLevel = req.body.reorderLevel !== undefined && req.body.reorderLevel !== '' ? Number(req.body.reorderLevel) : undefined;
 
   if (category && !CATEGORIES.includes(category)) {
     return res.status(400).json({ error: `category must be one of: ${CATEGORIES.join(', ')}` });
@@ -160,9 +216,13 @@ router.put('/:id', requireRole('admin'), uploadProductImage.single('image'), asy
   if (discountPercent !== undefined && (Number.isNaN(discountPercent) || discountPercent < 0 || discountPercent > 100)) {
     return res.status(400).json({ error: 'discountPercent must be a number between 0 and 100.' });
   }
+  if (reorderLevel !== undefined && (!Number.isInteger(reorderLevel) || reorderLevel < 0)) {
+    return res.status(400).json({ error: 'reorderLevel must be a whole number, 0 or more.' });
+  }
   if (req.file && !(await verifyUploadedFileType(req.file.path, IMAGE_MIME_TYPES))) {
     return res.status(400).json({ error: 'Image file content does not match an allowed type (JPG/PNG/WebP).' });
   }
+  if (req.file) await persistUpload(req.file);
 
   const specifications = parseSpecifications(req.body.specifications);
   const image = req.file ? `/uploads/products/${req.file.filename}` : undefined;
@@ -178,10 +238,11 @@ router.put('/:id', requireRole('admin'), uploadProductImage.single('image'), asy
          image = COALESCE($7, image),
          variant_group = COALESCE($9, variant_group),
          variant_label = COALESCE($10, variant_label),
-         discount_percent = COALESCE($11, discount_percent)
+         discount_percent = COALESCE($11, discount_percent),
+         reorder_level = COALESCE($12, reorder_level)
      WHERE id = $8
      RETURNING *`,
-    [name, category, description, price, unit, specifications, image, req.params.id, variantGroup, variantLabel, discountPercent]
+    [name, category, description, price, unit, specifications, image, req.params.id, variantGroup, variantLabel, discountPercent, reorderLevel]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Product not found.' });
   await auditFromRequest(req, 'product.update', { entityType: 'product', entityId: rows[0].id });

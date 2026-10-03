@@ -11,7 +11,7 @@
   @apply bg-slate-900/85 backdrop-blur-md border border-slate-800/50 shadow-sm;
 }
 .organic-gradient {
-  background: linear-gradient(135deg, #424c34 0%, #1e2318 100%);
+  background: linear-gradient(135deg, #214833 0%, #0f2218 100%);
 }
 
 .auth-dark-panel input::placeholder {
@@ -37,11 +37,11 @@
 
 :root {
 
-  --green: #6b7c52;
-  --green-dark: #566343;
-  --green-mid: #8f9d6c;
-  --green-light: #ebebe0;
-  --green-lighter: #f7f7f2;
+  --green: #2f6f4b;
+  --green-dark: #275a3e;
+  --green-mid: #43895e;
+  --green-light: #e0efe5;
+  --green-lighter: #f2f8f4;
   --text: #2b2b2b;
   --text-muted: #726b5c;
   --border: #d9dcc7;
@@ -55,8 +55,8 @@
   --alert-rose-bg: #fee2e2;
   --alert-rose-border: #fca5a5;
   --alert-rose-text: #991b1b;
-  --alert-emerald-bg: #f7f7f2;
-  --tile-green-bg: #ebebe0;
+  --alert-emerald-bg: #f2f8f4;
+  --tile-green-bg: #e0efe5;
   --tile-amber-bg: #fffbeb;
   --tile-blue-bg: #eff6ff;
   --shadow-sm: 0 1px 4px rgba(0,0,0,0.06);
@@ -69,9 +69,9 @@
 }
 
 .dark {
-  --green: #a8b587;
-  --green-dark: #8f9d6c;
-  --green-mid: #8f9d6c;
+  --green: #64a67c;
+  --green-dark: #43895e;
+  --green-mid: #43895e;
   --green-light: rgba(168, 181, 135, 0.12);
   --green-lighter: rgba(168, 181, 135, 0.08);
   --text: #e2e8f0;

@@ -22,7 +22,7 @@ export default function Footer() {
   return (
     <footer
       ref={footerRef}
-      className="fixed inset-x-0 bottom-0 z-30 bg-[#1e2318] dark:bg-black text-slate-300 border-t border-slate-800 shadow-[0_-4px_16px_rgba(0,0,0,0.12)]"
+      className="fixed inset-x-0 bottom-0 z-30 bg-[#0f2218] dark:bg-black text-slate-300 border-t border-slate-800 shadow-[0_-4px_16px_rgba(0,0,0,0.12)]"
     >
       <div className="max-w-[1680px] mx-auto px-4 sm:px-8 py-2 flex items-center justify-center gap-x-6 gap-y-1.5 flex-wrap text-xs text-center">
         <a

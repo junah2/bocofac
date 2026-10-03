@@ -46,7 +46,7 @@ export default function PublicHome({ products, memberCount, onShopNow, onApplyMe
 
       <section className="relative overflow-hidden">
         <img src={coconutFarmerHero} alt="" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1e2318]/80 via-[#1e2318]/50 to-[#1e2318]/85" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0f2218]/80 via-[#0f2218]/50 to-[#0f2218]/85" />
 
         <div className="relative max-w-3xl mx-auto px-6 py-24 sm:py-32 text-center">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-semibold uppercase tracking-wider shadow-lg mb-6">
@@ -72,7 +72,7 @@ export default function PublicHome({ products, memberCount, onShopNow, onApplyMe
             </button>
             <button
               onClick={onApplyMembership}
-              className="px-6 py-3 rounded-xl bg-white hover:bg-slate-100 text-[#313826] font-semibold shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+              className="px-6 py-3 rounded-xl bg-white hover:bg-slate-100 text-[#1c3b2b] font-semibold shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
             >
               <Users className="w-4.5 h-4.5" /> Apply Membership
             </button>
@@ -83,19 +83,19 @@ export default function PublicHome({ products, memberCount, onShopNow, onApplyMe
       <section className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
         <div className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
           <div>
-            <p className="text-2xl sm:text-3xl font-extrabold text-[#313826] dark:text-emerald-400">{memberCount}+</p>
+            <p className="text-2xl sm:text-3xl font-extrabold text-[#1c3b2b] dark:text-emerald-400">{memberCount}+</p>
             <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mt-1">Active Members</p>
           </div>
           <div>
-            <p className="text-2xl sm:text-3xl font-extrabold text-[#313826] dark:text-emerald-400">{products.length}+</p>
+            <p className="text-2xl sm:text-3xl font-extrabold text-[#1c3b2b] dark:text-emerald-400">{products.length}+</p>
             <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mt-1">Farm Products</p>
           </div>
           <div>
-            <p className="text-2xl sm:text-3xl font-extrabold text-[#313826] dark:text-emerald-400">100%</p>
+            <p className="text-2xl sm:text-3xl font-extrabold text-[#1c3b2b] dark:text-emerald-400">100%</p>
             <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mt-1">Organic Sourced</p>
           </div>
           <div>
-            <p className="text-2xl sm:text-3xl font-extrabold text-[#313826] dark:text-emerald-400">Direct</p>
+            <p className="text-2xl sm:text-3xl font-extrabold text-[#1c3b2b] dark:text-emerald-400">Direct</p>
             <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mt-1">Farm-to-Buyer Trade</p>
           </div>
         </div>
@@ -121,7 +121,7 @@ export default function PublicHome({ products, memberCount, onShopNow, onApplyMe
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-2">
-        <div className="bg-[#1e2318] text-white px-8 py-16 sm:px-14 flex flex-col justify-center gap-4 relative overflow-hidden">
+        <div className="bg-[#0f2218] text-white px-8 py-16 sm:px-14 flex flex-col justify-center gap-4 relative overflow-hidden">
           <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/5 rounded-full blur-2xl" />
           <div className="relative w-12 h-12 rounded-full bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center">
             <Sprout className="w-5 h-5 text-emerald-300" />

@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 
 const { UPLOADS_ROOT } = require('./middleware/upload');
+const { bucketFallback } = require('./utils/storage');
 
 const { attachUser } = require('./middleware/auth');
 const errorHandler = require('./middleware/errorHandler');
@@ -53,8 +54,8 @@ app.use(express.json());
 // [AUTH] Binabasa ang login cookie sa bawat request para malaman kung sino ang user
 app.use(attachUser);
 
-app.use('/uploads/products', express.static(path.join(UPLOADS_ROOT, 'products')));
-app.use('/uploads/avatars', express.static(path.join(UPLOADS_ROOT, 'avatars')));
+app.use('/uploads/products', express.static(path.join(UPLOADS_ROOT, 'products')), bucketFallback('products'));
+app.use('/uploads/avatars', express.static(path.join(UPLOADS_ROOT, 'avatars')), bucketFallback('avatars'));
 
 // [API ROUTES] Lahat ng endpoints ng system (auth, products, members, ledger, orders, atbp.)
 app.use('/api/auth', authRoutes);

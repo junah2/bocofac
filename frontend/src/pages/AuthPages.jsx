@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Mail, Lock, UserCircle, ShieldCheck, ArrowLeft, UserPlus, Sprout, ShoppingBag, Handshake, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Mail, Lock, UserCircle, ShieldCheck, ArrowLeft, UserPlus, Sprout, ShoppingBag, Handshake, Eye, EyeOff, X } from 'lucide-react';
 import { GreenBtn, FormInput } from '../components/UI';
 import coconutHero from '../assets/coconut-palms-hero.jpg';
 import bocofacLogo from '../assets/bocofac-logo.jpg';
@@ -18,6 +18,21 @@ function passwordError(value) {
   return '';
 }
 
+// [LOGIN] Kusang inaalala ang mga account na nag-login sa browser na ito (email lang, hindi ang password), pinakabago muna
+const REMEMBERED_EMAILS_KEY = 'bocofac.rememberedEmails';
+const MAX_REMEMBERED = 5;
+function loadRememberedEmails() {
+  try {
+    const list = JSON.parse(localStorage.getItem(REMEMBERED_EMAILS_KEY) || '[]');
+    return Array.isArray(list) ? list.filter((e) => typeof e === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+function saveRememberedEmails(list) {
+  try { localStorage.setItem(REMEMBERED_EMAILS_KEY, JSON.stringify(list.slice(0, MAX_REMEMBERED))); } catch { /* storage off - hindi maaalala */ }
+}
+
 function AutofillDecoy() {
   const hiddenStyle = { position: 'absolute', width: 0, height: 0, padding: 0, margin: 0, border: 0, opacity: 0, overflow: 'hidden', pointerEvents: 'none' };
   return (
@@ -30,7 +45,7 @@ function AutofillDecoy() {
 
 function AuthShell({ children, wide }) {
   return (
-    <div className="h-full min-h-[calc(100vh-64px)] flex items-center justify-center px-5 py-6 relative overflow-hidden bg-[#1e2318]">
+    <div className="h-full min-h-[calc(100vh-64px)] flex items-center justify-center px-5 py-6 relative overflow-hidden bg-[#0f2218]">
       <div className="absolute inset-0 organic-gradient opacity-95" />
       <div className="absolute -right-24 -top-24 w-96 h-96 bg-emerald-600/20 rounded-full blur-3xl" />
       <div className="absolute -left-24 bottom-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl" />
@@ -46,7 +61,7 @@ function AuthShell({ children, wide }) {
 
 function AuthBrandPanel() {
   return (
-    <div className="hidden lg:flex flex-col lg:w-1/2 relative overflow-hidden bg-[#1e2318] px-10 py-10">
+    <div className="hidden lg:flex flex-col lg:w-1/2 relative overflow-hidden bg-[#0f2218] px-10 py-10">
       <img src={coconutHero} alt="" className="absolute inset-0 w-full h-full object-cover" />
       <div
         className="absolute inset-0"
@@ -191,10 +206,10 @@ export function SignupPage({ setPage, onToast }) {
           '--text': '#2b2b2b',
           '--text-muted': '#726b5c',
           '--border': '#d9dcc7',
-          '--green': '#6b7c52',
-          '--green-dark': '#566343',
-          '--green-light': 'rgba(107, 124, 82, 0.12)',
-          '--tile-green-bg': '#ebebe0',
+          '--green': '#2f6f4b',
+          '--green-dark': '#275a3e',
+          '--green-light': 'rgba(47, 111, 75, 0.12)',
+          '--tile-green-bg': '#e0efe5',
           '--tile-blue-bg': '#dbeafe',
           '--tile-amber-bg': '#fef3c7',
         }}
@@ -258,7 +273,30 @@ function validateSigninField(key, values) {
 }
 
 export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
+  const [rememberedEmails, setRememberedEmails] = useState(loadRememberedEmails);
   const [form, setForm] = useState({ email: '', pass: '' });
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const emailBoxRef = useRef(null);
+  useEffect(() => {
+    const onDown = (e) => { if (emailBoxRef.current && !emailBoxRef.current.contains(e.target)) setShowSuggestions(false); };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
+  // Lumalabas lang ang suggestion kapag may tina-type na, at ang mga account lang na nagsisimula rito
+  const typed = form.email.trim().toLowerCase();
+  const suggestions = typed ? rememberedEmails.filter((e) => e.toLowerCase().startsWith(typed) && e.toLowerCase() !== typed) : [];
+  const pickEmail = (email) => {
+    setForm((prev) => ({ ...prev, email }));
+    setErrors((prev) => ({ ...prev, email: '' }));
+    setShowSuggestions(false);
+    // Diretso sa password pagkapili ng account
+    setTimeout(() => document.querySelector('input[name="signin-password"]')?.focus(), 0);
+  };
+  const forgetEmail = (email) => {
+    const next = rememberedEmails.filter((e) => e !== email);
+    setRememberedEmails(next);
+    saveRememberedEmails(next);
+  };
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -299,6 +337,10 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Invalid email or password.');
 
+      const signedInEmail = form.email.trim().toLowerCase();
+      const others = rememberedEmails.filter((e) => e.toLowerCase() !== signedInEmail);
+      saveRememberedEmails([signedInEmail, ...others]);
+
       if (data.role === 'admin') {
         setAdmin(data);
         setPage('admin-dashboard');
@@ -329,7 +371,7 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
         </button>
 
         <div className="text-center mb-5">
-          <div className="w-16 h-16 mx-auto rounded-full bg-[#313826] flex items-center justify-center mb-3 shadow-sm ring-4 ring-emerald-100 dark:ring-emerald-900/40">
+          <div className="w-16 h-16 mx-auto rounded-full bg-[#1c3b2b] flex items-center justify-center mb-3 shadow-sm ring-4 ring-emerald-100 dark:ring-emerald-900/40">
             <UserCircle className="w-7 h-7 text-white" />
           </div>
           <h1 className="font-serif text-emerald-600 dark:text-emerald-400 text-xl font-bold">Welcome Back</h1>
@@ -340,7 +382,7 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
 
         <div className="mb-4">
           <label className="block text-sm font-bold text-slate-800 dark:text-slate-200 mb-2">Email Address</label>
-          <div className="relative">
+          <div className="relative" ref={emailBoxRef}>
             <Mail className="w-4.5 h-4.5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
             <input
               type="email"
@@ -348,11 +390,44 @@ export function SigninPage({ setPage, setUser, setAdmin, setBod, onToast }) {
               autoComplete="off"
               {...noAutofillProps}
               value={form.email}
-              onChange={set('email')}
+              onChange={(e) => { set('email')(e); setShowSuggestions(true); }}
+              onKeyDown={(e) => { if (e.key === 'Escape') setShowSuggestions(false); }}
               onBlur={handleBlur('email')}
+              aria-autocomplete="list"
+              aria-expanded={showSuggestions && suggestions.length > 0}
               placeholder="youremail@example.com"
               className={`w-full pl-11 pr-4 py-2.5 rounded-xl border dark:bg-slate-950 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 ${errors.email ? 'border-red-500 focus:ring-red-500' : 'border-slate-300 dark:border-slate-700 focus:ring-emerald-500'}`}
             />
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-20 left-0 right-0 mt-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg overflow-hidden" role="listbox" aria-label="Remembered accounts">
+                <p className="px-3.5 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">Continue as</p>
+                {suggestions.map((email) => (
+                  <div key={email} className="flex items-center group hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected="false"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => pickEmail(email)}
+                      className="flex-1 min-w-0 flex items-center gap-2.5 px-3.5 py-2.5 text-left cursor-pointer"
+                    >
+                      <span className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 flex items-center justify-center text-xs font-bold uppercase shrink-0">{email[0]}</span>
+                      <span className="text-sm text-slate-800 dark:text-slate-200 truncate">{email}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => forgetEmail(email)}
+                      aria-label={`Forget ${email}`}
+                      title="Remove from this device"
+                      className="p-2 mr-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           {errors.email && <p className="mt-1.5 text-xs font-medium text-red-600 dark:text-red-400">{errors.email}</p>}
         </div>

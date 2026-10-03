@@ -1,5 +1,4 @@
 const express = require('express');
-const path = require('path');
 const fs = require('fs/promises');
 const pool = require('../db/pool');
 const asyncHandler = require('../utils/asyncHandler');
@@ -13,6 +12,7 @@ const { validate } = require('../middleware/validate');
 const { applicantCreateSchema } = require('../validation/applicants.schema');
 const { applicantLookupLimiter, applicantDocsLimiter } = require('../middleware/rateLimit');
 const { validateRequiredShareCapital, MIN_REQUIRED_SHARE_CAPITAL, MAX_REQUIRED_SHARE_CAPITAL } = require('../utils/shareCapital');
+const { persistUpload, sendStoredFile } = require('../utils/storage');
 
 const router = express.Router();
 
@@ -244,6 +244,7 @@ router.post('/:id/documents', applicantDocsLimiter, uploadApplicantDoc.single('f
   if (!(await verifyUploadedFileType(req.file.path, DOC_MIME_TYPES))) {
     return res.status(400).json({ error: 'File content does not match an allowed type (image or PDF).' });
   }
+  await persistUpload(req.file);
 
   const client = await pool.connect();
   try {
@@ -288,7 +289,7 @@ router.get('/:id/documents/:docType', requireRole('admin', 'board'), asyncHandle
     [req.params.id, req.params.docType]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Document not found.' });
-  res.sendFile(path.resolve(rows[0].file_path));
+  await sendStoredFile(res, rows[0].file_path);
 }));
 
 // [MEMBERSHIP] Board ang nag-a-approve / reject ng application
