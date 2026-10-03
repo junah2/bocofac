@@ -127,7 +127,7 @@ const STOCK_FILTERS = [
 ];
 const STOCK_FILTER_TESTS = {
   all: () => true,
-  low: isLowStock,
+  low: p => p.stock > 0 && isLowStock(p),
   out: p => p.stock === 0,
   in: p => !isLowStock(p),
 };
@@ -470,9 +470,9 @@ export default function AdminDashboardPage({
   const [inventorySort, setInventorySort] = useState('stock-asc');
   const inventoryCounts = useMemo(() => ({
     all: products.length,
-    low: lowStockProducts.length,
+    low: products.filter(STOCK_FILTER_TESTS.low).length,
     out: products.filter(p => p.stock === 0).length,
-    in: products.length - lowStockProducts.length,
+    in: products.filter(STOCK_FILTER_TESTS.in).length,
   }), [products, lowStockProducts]);
   const inventoryRows = useMemo(() => products
     .filter(p => STOCK_FILTER_TESTS[inventoryFilter](p) && matchesSearch(inventorySearch, productCode(p), p.id, p.name, p.category, p.unit))
@@ -1337,7 +1337,7 @@ export default function AdminDashboardPage({
                       <td className="p-4">
                         <div className="w-40 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                           <div
-                            className={`h-full ${isLowStock(p) ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                            className={`h-full ${p.stock === 0 ? 'bg-rose-500' : isLowStock(p) ? 'bg-amber-400' : 'bg-emerald-500'}`}
                             style={{ width: `${Math.min(100, (p.stock / 400) * 100)}%` }}
                           />
                         </div>
@@ -1345,11 +1345,11 @@ export default function AdminDashboardPage({
                       </td>
                       <td className="p-4">
                         {p.stock === 0 ? (
-                          <span className="text-xs font-bold px-2 py-1 rounded-full bg-rose-600 text-white whitespace-nowrap">Out of Stock</span>
+                          <span className="text-sm font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">Out of Stock</span>
                         ) : isLowStock(p) ? (
-                          <span className="text-xs font-bold px-2 py-1 rounded-full bg-rose-100 text-rose-800 whitespace-nowrap">Low Stock</span>
+                          <span className="text-sm font-bold text-amber-500 dark:text-amber-400 whitespace-nowrap">Low Stock</span>
                         ) : (
-                          <span className="text-xs font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-800">In Stock</span>
+                          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">In Stock</span>
                         )}
                       </td>
                       <td className="p-4">

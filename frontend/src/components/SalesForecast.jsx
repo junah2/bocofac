@@ -18,6 +18,7 @@ import { STATISTICIAN_MONTHLY_SALES_MODEL, STATISTICIAN_WEEKLY_SALES_MODEL, STAT
 import { Card } from './CoopInsights';
 import MobileScrollHint from './MobileScrollHint';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
+import { analyticsOrders } from '../utils/productPerformance';
 
 const PALETTE = {
   light: { grid: '#e2e8f0', axis: '#94a3b8', tooltipBg: '#ffffff', tooltipBorder: '#e2e8f0', tooltipText: '#0f172a', actual: '#2f6f4b', forecast: '#d97706', band: '#f59e0b', up: '#2f6f4b', down: '#d97706', muted: '#cbd5e1' },
@@ -61,7 +62,9 @@ const weekDate = (d, opts = { month: 'short', day: 'numeric' }) => d.toLocaleDat
 const addWeeks = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n * 7);
 const listNames = (items) => (items.length <= 2 ? items.join(' and ') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
 
-export default function SalesForecast({ orders = [], products = [], isDarkMode, children }) {
+export default function SalesForecast({ orders: allOrders = [], products = [], isDarkMode, children }) {
+  // [ANALYTICS] Sales history ng statistician hanggang Aug 31, 2026 + mga bagong benta pagkatapos nito
+  const orders = useMemo(() => analyticsOrders(allOrders), [allOrders]);
   const palette = PALETTE[isDarkMode ? 'dark' : 'light'];
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [period, setPeriod] = useState('monthly');
@@ -357,7 +360,7 @@ export default function SalesForecast({ orders = [], products = [], isDarkMode, 
         </div>
       </Card>
 
-      {children}
+      {React.isValidElement(children) ? React.cloneElement(children, { orders, period }) : children}
 
       {incompleteMonths.length > 0 && (
         <div className="flex gap-3 p-4 rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 text-left">

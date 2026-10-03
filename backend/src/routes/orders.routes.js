@@ -193,6 +193,8 @@ router.post('/', requireAuth, uploadOrderReceipt.single('receipt'), validate(ord
 // Completed agad ito, binabawas sa stock, at nakatala kung sinong admin ang nag-record.
 const WALK_IN_PAYMENT_METHODS = ['Cash', 'GCash'];
 const WALK_IN_EMAIL = 'walk-in@bocofac.local';
+// Hanggang dito ay sakop na ng sales history (HIST-*), kaya bawal na ang walk-in na mas maaga para walang doble
+const SALES_HISTORY_END = '2026-08-31';
 const MEMBER_DISCOUNT = 0.10;
 const phDate = (d) => new Date(d.getTime() + 8 * 3600000).toISOString().slice(0, 10);
 
@@ -228,6 +230,9 @@ router.post('/walk-in', requireRole('admin'), asyncHandler(async (req, res) => {
   }
   if (saleDate > today) {
     return res.status(400).json({ error: 'The sale date cannot be in the future.' });
+  }
+  if (saleDate <= SALES_HISTORY_END) {
+    return res.status(400).json({ error: 'Sales up to Aug 31, 2026 are already in the sales history.' });
   }
   // Ngayong araw = oras ngayon; lumang petsa = tanghali (PH) para hindi lumipat ng araw sa ibang timezone
   const orderedAt = saleDate === today ? new Date() : new Date(`${saleDate}T12:00:00+08:00`);

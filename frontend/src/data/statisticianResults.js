@@ -89,3 +89,13 @@ export const STATISTICIAN_RESULTS = [
 ];
 
 export const SIGNIFICANCE_LEVEL = 0.05;
+
+// [PREDICTIVE ANALYTICS] Ang data na ginamit ng statistician (BOCOFAC_SALES_DATA_2026_FINAL.xlsx, sheet "Sales Data"):
+// 2,484 benta, ₱2,111,386, Nov 1 2021 hanggang Aug 31 2026. Sa panahong ito, ang sales history lang ang binibilang
+// sa analytics para tumugma sa resulta ng statistician; ang mga benta pagkatapos nito ay kasama na rin.
+export const STATISTICIAN_DATASET = {
+  from: '2021-11-01',
+  to: '2026-08-31',
+  orders: 2484,
+  totalSales: 2111386,
+};

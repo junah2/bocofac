@@ -2,12 +2,15 @@ import React, { useMemo, useState } from 'react';
 import { Store, Plus, Trash2 } from 'lucide-react';
 import AdminModal from './AdminModal';
 import { productCode } from '../utils/productCode';
+import { STATISTICIAN_DATASET } from '../data/statisticianResults';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 const MEMBER_DISCOUNT = 0.10;
 const peso = (n) => `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 // Petsa ngayon sa Pilipinas (YYYY-MM-DD) - hindi pwedeng lumampas dito
 const todayPH = () => new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+// Hanggang Aug 31, 2026 ay sakop na ng sales history, kaya simula Sep 1, 2026 lang ang pwedeng itala
+const FIRST_RECORDABLE_DAY = new Date(new Date(`${STATISTICIAN_DATASET.to}T00:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10);
 const newLine = () => ({ key: Math.random().toString(36).slice(2), productId: '', quantity: '1', price: '' });
 
 // [WALK-IN SALE] Form para itala ang benta sa opisina/tindahan: bawas sa stock, kasama sa sales at analytics
@@ -53,6 +56,7 @@ export default function WalkInSaleModal({ products, onClose, onRecorded }) {
       if (l.price === '' || Number(l.price) < 0) return setError(`Enter the price for ${p.name}.`);
     }
     if (!soldAt || soldAt > todayPH()) return setError('The sale date cannot be in the future.');
+    if (soldAt < FIRST_RECORDABLE_DAY) return setError('Sales up to Aug 31, 2026 are already in the sales history.');
 
     setSaving(true);
     try {
@@ -112,7 +116,7 @@ export default function WalkInSaleModal({ products, onClose, onRecorded }) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label htmlFor="walkin-date" className="block text-xs font-bold text-slate-500 mb-1.5">Date of sale</label>
-            <input id="walkin-date" type="date" max={todayPH()} value={soldAt} onChange={(e) => setSoldAt(e.target.value)} className={inputClass} />
+            <input id="walkin-date" type="date" min={FIRST_RECORDABLE_DAY} max={todayPH()} value={soldAt} onChange={(e) => setSoldAt(e.target.value)} className={inputClass} />
           </div>
           <div className="sm:col-span-2">
             <label htmlFor="walkin-buyer" className="block text-xs font-bold text-slate-500 mb-1.5">Buyer name (optional)</label>
