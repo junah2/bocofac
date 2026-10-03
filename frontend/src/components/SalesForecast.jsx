@@ -11,14 +11,15 @@ import {
   ReferenceLine,
   ReferenceArea,
 } from 'recharts';
-import { Lightbulb, LineChart as LineChartIcon, Boxes, Layers, AlertTriangle, TrendingUp, TrendingDown, History, ShoppingBag, PhilippinePeso, X, BarChart3 } from 'lucide-react';
+import { Lightbulb, LineChart as LineChartIcon, Layers, AlertTriangle, TrendingUp, TrendingDown, History, ShoppingBag, PhilippinePeso, X, BarChart3 } from 'lucide-react';
 import { MONTH_LABELS } from '../utils/dateBuckets';
 import { buildSalesForecast, buildWeeklySales, buildYearlySales, weekStart, monthIndex, REALIZED_ORDER_STATUSES, monthFromIndex, backtestLinearMape, linearModelForecast, weeklyModelForecast, yearlyModelForecast } from '../utils/forecast';
 import { STATISTICIAN_MONTHLY_SALES_MODEL, STATISTICIAN_WEEKLY_SALES_MODEL, STATISTICIAN_YEARLY_SALES_MODEL, STATISTICIAN_RESULTS } from '../data/statisticianResults';
 import { Card } from './CoopInsights';
-import MobileScrollHint from './MobileScrollHint';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
-import { analyticsOrders } from '../utils/productPerformance';
+import { analyticsOrders, buildProductPerformance, predictProductPerformance, performanceName } from '../utils/productPerformance';
+import ProductForecast from './ProductForecast';
+import BusiestOrderingDays from './BusiestOrderingDays';
 
 const PALETTE = {
   light: { grid: '#e2e8f0', axis: '#94a3b8', tooltipBg: '#ffffff', tooltipBorder: '#e2e8f0', tooltipText: '#0f172a', actual: '#2f6f4b', forecast: '#d97706', band: '#f59e0b', up: '#2f6f4b', down: '#d97706', muted: '#cbd5e1' },
@@ -32,24 +33,8 @@ const PERIODS = {
   monthly: { label: 'Monthly', unit: 'month', adjective: 'monthly', next: 'Next month', shown: 24, horizon: 6 },
   yearly: { label: 'Yearly', unit: 'year', adjective: 'yearly', next: 'This year', shown: 10, horizon: 2 },
 };
-const PRODUCT_ROWS = 10;
-
-const TREND_STYLES = {
-  Rising: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
-  Steady: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-  Declining: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
-  New: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
-  'Low volume': 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
-  'No recent sales': 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
-};
-const STOCK_STYLES = {
-  'Restock now': 'text-rose-600 dark:text-rose-400',
-  'Restock soon': 'text-amber-600 dark:text-amber-400',
-  Enough: 'text-slate-500 dark:text-slate-400',
-};
 
 const peso = (n) => `₱${Math.round(n).toLocaleString()}`;
-const signedPct = (ratio) => `${ratio >= 0 ? '+' : '−'}${Math.abs(Math.round(ratio * 100))}%`;
 const shortLabel = (i) => {
   const { year, month } = monthFromIndex(i);
   return `${MONTH_LABELS[month]} ${String(year).slice(2)}`;
@@ -66,7 +51,6 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
   // [ANALYTICS] Sales history ng statistician hanggang Aug 31, 2026 + mga bagong benta pagkatapos nito
   const orders = useMemo(() => analyticsOrders(allOrders), [allOrders]);
   const palette = PALETTE[isDarkMode ? 'dark' : 'light'];
-  const [showAllProducts, setShowAllProducts] = useState(false);
   const [period, setPeriod] = useState('monthly');
 
   const result = useMemo(() => buildSalesForecast(orders, products, { seasonality: false }), [orders, products]);
@@ -85,7 +69,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
     );
   }
 
-  const { firstMonth, forecastStart, history, incompleteMonths, productForecasts } = result;
+  const { firstMonth, forecastStart, history, incompleteMonths } = result;
   // [PREDICTIVE ANALYTICS] Hula ng benta = Monthly Linear Regression ng statistician;
   // ang accuracy ay sinusubok ng system sa parehong paraan gamit ang kasalukuyang data
   const forecast = linearModelForecast(STATISTICIAN_MONTHLY_SALES_MODEL, forecastStart, 6);
@@ -172,24 +156,39 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
   const chartData = buildChartData(view.history, view.forecast, view.label, config.shown, mape, { orders: periodOrders, units: periodUnits });
   const forecastLabels = view.forecast.map((_, h) => view.label(view.history.length + h));
 
+  // [PREDICTIVE ANALYTICS] Hula sa bawat produkto para sa period na hinulaan (Projected Sales)
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const stockByName = new Map();
+  products.forEach((p) => {
+    const name = performanceName(p.name);
+    stockByName.set(name, (stockByName.get(name) || 0) + p.stock);
+  });
+  const prediction = predictProductPerformance(buildProductPerformance(orders, activePeriod), projected, stockByName);
+  const projectedLabel = view.longName(view.history.length + projectedIndex);
+  const imageOf = (row) => row.productIds.map((id) => productById.get(id)?.image).find(Boolean);
+  const categoryOf = (row) => row.productIds.map((id) => productById.get(id)?.category).find(Boolean) || 'Other';
+
   const categoryForecast = Object.values(
-    productForecasts.reduce((acc, p) => {
-      const key = p.category || 'Other';
+    (prediction?.rows || []).reduce((acc, r) => {
+      const key = categoryOf(r);
       acc[key] = acc[key] || { category: key, revenue: 0 };
-      acc[key].revenue += p.next3Revenue;
+      acc[key].revenue += r.expectedSales;
       return acc;
     }, {})
   ).sort((a, b) => b.revenue - a.revenue);
   const categoryTotal = categoryForecast.reduce((s, c) => s + c.revenue, 0);
 
-  const ranked = [...productForecasts].sort((a, b) => b.next3Revenue - a.next3Revenue);
-  const visibleProducts = showAllProducts ? ranked : ranked.slice(0, PRODUCT_ROWS);
-  const rising = ranked.filter((p) => p.trend === 'Rising');
-  const declining = ranked.filter((p) => p.trend === 'Declining');
-  const restockNow = ranked.filter((p) => p.stockStatus === 'Restock now');
+  const predicted = prediction?.rows || [];
+  const rising = predicted.filter((r) => r.trend === 'Rising').sort((a, b) => b.change - a.change);
+  const declining = predicted.filter((r) => r.trend === 'Declining').sort((a, b) => a.change - b.change);
+  const restockNow = predicted.filter((r) => r.stock !== null && r.expectedUnits > 0 && r.weeksOfStock < 2);
 
   // [ANALYTICS] Mga rekomendasyon mula sa forecast
   const takeaways = [];
+  if (prediction) {
+    const top = prediction.rows[0];
+    takeaways.push(`${top.name} is the most likely best seller for ${projectedLabel} (${Math.round(top.chanceTop * 100)}% chance), with about ${top.expectedUnits.toLocaleString()} units expected.`);
+  }
   takeaways.push(
     `Expected sales for ${MONTH_NAMES[forecastStart % 12]} to ${longLabel(forecastStart + 2)}: about ${peso(next3)}` +
     (vsLastYear === null ? '.'
@@ -198,7 +197,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
   );
   takeaways.push(`The statistician's monthly regression shows sales are basically flat (${monthlyResult.slope}, not significant), so plan for about ${peso(monthlyForecast[0])} a month.`);
   if (restockNow.length > 0) {
-    takeaways.push(`${listNames(restockNow.slice(0, 4).map((p) => p.name))} may run out next month - current stock is below the expected demand.`);
+    takeaways.push(`${listNames(restockNow.slice(0, 4).map((p) => p.name))} may run out within 2 weeks at the expected demand. Restock first.`);
   }
   if (rising.length > 0) {
     takeaways.push(`Demand is rising for ${listNames(rising.slice(0, 4).map((p) => p.name))}. Make sure supply keeps up.`);
@@ -360,18 +359,41 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
         </div>
       </Card>
 
-      {React.isValidElement(children) ? React.cloneElement(children, { orders, period }) : children}
-
       {incompleteMonths.length > 0 && (
-        <div className="flex gap-3 p-4 rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 text-left">
-          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-sm text-amber-900 dark:text-amber-200 leading-relaxed">
+        <div className="flex gap-3 px-4 py-3 rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 text-left">
+          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
             {listNames(incompleteMonths.map((m) => `${MONTH_NAMES[m.month]} ${m.year} (${peso(m.amount)} recorded)`))}{' '}
             {incompleteMonths.length === 1 ? 'looks' : 'look'} incomplete compared with a typical month, so {incompleteMonths.length === 1 ? 'it was' : 'they were'} left out of the forecast.
-            Walk-in sales may not be recorded in the system yet - the forecast stays accurate only if every sale is recorded.
+            Record every walk-in sale to keep the forecast accurate.
           </p>
         </div>
       )}
+
+      <ProductForecast prediction={prediction} periodLabel={projectedLabel} unit={config.unit} imageOf={imageOf} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <Card icon={Layers} title="Expected Demand by Category" description={`Share of the projected sales for ${projectedLabel}, by product category.`}>
+          {categoryTotal === 0 ? (
+            <p className="text-xs text-slate-400 text-center py-10">No product sales to forecast yet.</p>
+          ) : (
+            <div className="space-y-4 pt-1">
+              {categoryForecast.map((c) => (
+                <div key={c.category} className="space-y-1.5">
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="font-semibold text-slate-700 dark:text-slate-200">{c.category}</span>
+                    <span className="text-slate-500 dark:text-slate-400 shrink-0 tabular-nums">{peso(c.revenue)} · {Math.round((c.revenue / categoryTotal) * 100)}%</span>
+                  </div>
+                  <div className="h-2.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${(c.revenue / categoryTotal) * 100}%`, background: palette.actual }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+        <BusiestOrderingDays orders={orders} isDarkMode={isDarkMode} />
+      </div>
 
       <div className="bg-[#FDFCF7] dark:bg-emerald-950/25 border border-emerald-100 dark:border-slate-800 rounded-2xl p-6 text-left space-y-3">
         <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -387,77 +409,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
         </ul>
       </div>
 
-      <Card icon={Layers} title="Expected Demand by Category" description={`Share of the expected sales for ${shortLabel(forecastStart)} – ${shortLabel(forecastStart + 2)}, by product category.`}>
-          {categoryTotal === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-10">No product sales to forecast yet.</p>
-          ) : (
-            <div className="space-y-3 pt-1">
-              {categoryForecast.map((c) => (
-                <div key={c.category} className="space-y-1">
-                  <div className="flex justify-between gap-3 text-xs">
-                    <span className="font-semibold text-slate-700 dark:text-slate-200">{c.category}</span>
-                    <span className="text-slate-500 dark:text-slate-400 shrink-0">{peso(c.revenue)} · {Math.round((c.revenue / categoryTotal) * 100)}%</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${(c.revenue / categoryTotal) * 100}%`, background: palette.actual }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-
-      <Card icon={Boxes} title="Product Demand Forecast" description={`System estimate: expected units sold per product and whether current stock covers it. Trend compares the last 6 months with the same 6 months a year earlier.`}>
-        <MobileScrollHint />
-        <div className="overflow-x-auto -mx-2">
-          <table className="w-full min-w-[640px] text-xs">
-            <thead>
-              <tr className="text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
-                <th className="px-2 py-2">Product</th>
-                <th className="px-2 py-2">Trend</th>
-                <th className="px-2 py-2 text-right">Sold, last 12 mo</th>
-                <th className="px-2 py-2 text-right">Next month</th>
-                <th className="px-2 py-2 text-right">Next 3 months</th>
-                <th className="px-2 py-2 text-right">Stock</th>
-                <th className="px-2 py-2">Stock status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {visibleProducts.map((p) => (
-                <tr key={p.id}>
-                  <td className="px-2 py-2">
-                    <p className="font-semibold text-slate-800 dark:text-slate-200">{p.name}</p>
-                    <p className="text-[10px] text-slate-400">{p.category}</p>
-                  </td>
-                  <td className="px-2 py-2">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${TREND_STYLES[p.trend]}`}>
-                      {p.trend}{(p.trend === 'Rising' || p.trend === 'Declining') && ` ${signedPct(p.growth)}`}
-                    </span>
-                  </td>
-                  <td className="px-2 py-2 text-right text-slate-600 dark:text-slate-300">{p.recentUnits.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right text-slate-600 dark:text-slate-300">{p.nextMonthUnits.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right">
-                    <p className="font-semibold text-slate-800 dark:text-slate-200">{p.next3Units.toLocaleString()}</p>
-                    <p className="text-[10px] text-slate-400">{peso(p.next3Revenue)}</p>
-                  </td>
-                  <td className="px-2 py-2 text-right text-slate-600 dark:text-slate-300">{p.stock.toLocaleString()}</td>
-                  <td className={`px-2 py-2 font-semibold whitespace-nowrap ${STOCK_STYLES[p.stockStatus]}`}>{p.stockStatus}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {ranked.length > PRODUCT_ROWS && (
-          <button
-            type="button"
-            onClick={() => setShowAllProducts((v) => !v)}
-            className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
-          >
-            {showAllProducts ? 'Show top 10 only' : `Show all ${ranked.length} products`}
-          </button>
-        )}
-      </Card>
-
+      {children}
     </div>
   );
 }

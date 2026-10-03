@@ -98,3 +98,67 @@ export function buildProductPerformance(orders, level, { now = new Date() } = {}
     totalUnits: periods.reduce((s, p) => s + p.units, 0),
   };
 }
+
+// Ilang linggo ang laman ng isang period (para maikumpara ang stock sa lingguhang demand)
+const WEEKS_PER_PERIOD = { weekly: 1, monthly: 52.18 / 12, yearly: 52.18 };
+// Huling mga period na ikinukumpara sa kabuuang average para sa trend
+const RECENT_PERIODS = { weekly: 26, monthly: 12, yearly: 2 };
+
+// [PREDICTIVE ANALYTICS] Hula sa product performance ng susunod na period.
+// - Inaasahang benta ng produkto = bahagi nito sa benta (sales history) x projected sales ng statistician
+// - Inaasahang dami = karaniwang nabebenta nito bawat period, inayon sa projected sales
+// - Tsansang maging #1 = ilang beses itong naging most in-demand / bilang ng period
+// - Trend = karaniwang nabenta sa mga huling period kumpara sa buong history
+// - Stock cover = ilang linggo pa tatagal ang kasalukuyang stock sa inaasahang demand
+export function predictProductPerformance(perf, projected, stockByName = new Map()) {
+  if (!perf) return null;
+  const withSales = perf.periods.filter((p) => !p.inProgress && p.totalSales > 0);
+  const sorted = withSales.map((p) => p.totalSales).sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] || 0;
+  // Hindi isinasama ang period na kulang ang naitalang benta (gaya ng sa sales forecast)
+  const basis = withSales.filter((p) => p.totalSales >= median * 0.5);
+  if (basis.length === 0) return null;
+
+  const basisSales = basis.reduce((s, p) => s + p.totalSales, 0);
+  const avgPeriodSales = basisSales / basis.length;
+  const scale = avgPeriodSales > 0 ? projected / avgPeriodSales : 1;
+  const recent = basis.slice(-RECENT_PERIODS[perf.level]);
+  const weeksPerPeriod = WEEKS_PER_PERIOD[perf.level];
+
+  const stats = new Map();
+  basis.forEach((p) => {
+    p.qty.forEach((qty, name) => {
+      const s = stats.get(name) || { units: 0, top: 0 };
+      s.units += qty;
+      stats.set(name, s);
+    });
+    if (p.topProduct) stats.get(p.topProduct).top += 1;
+  });
+  const salesByName = new Map(perf.products.map((r) => [r.name, r]));
+  const totalProductSales = [...stats.keys()].reduce((s, name) => s + (salesByName.get(name)?.sales || 0), 0);
+
+  const rows = [...stats.entries()].map(([name, s]) => {
+    const info = salesByName.get(name);
+    const avgUnits = s.units / basis.length;
+    const recentUnits = recent.reduce((sum, p) => sum + (p.qty.get(name) || 0), 0) / recent.length;
+    const ratio = avgUnits > 0 ? recentUnits / avgUnits : 1;
+    const expectedUnits = Math.max(0, Math.round(avgUnits * scale));
+    const share = totalProductSales > 0 ? (info?.sales || 0) / totalProductSales : 0;
+    const stock = stockByName.has(name) ? stockByName.get(name) : null;
+    const weeklyDemand = expectedUnits / weeksPerPeriod;
+    return {
+      name,
+      productIds: info ? [...info.productIds] : [],
+      expectedUnits,
+      expectedSales: share * projected,
+      share,
+      chanceTop: s.top / basis.length,
+      trend: avgUnits < 2 ? 'Low volume' : ratio >= 1.1 ? 'Rising' : ratio <= 0.9 ? 'Declining' : 'Steady',
+      change: ratio - 1,
+      stock,
+      weeksOfStock: stock === null ? null : weeklyDemand > 0 ? stock / weeklyDemand : Infinity,
+    };
+  }).sort((a, b) => b.chanceTop - a.chanceTop || b.expectedSales - a.expectedSales);
+
+  return { rows, basisPeriods: basis.length, projected, from: basis[0].from, to: basis[basis.length - 1].to };
+}

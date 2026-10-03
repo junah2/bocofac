@@ -38,7 +38,6 @@ import { isLowStock, reorderLevelOf, DEFAULT_REORDER_LEVEL } from '../utils/stoc
 import ApplicantDetailModal from '../components/ApplicantDetailModal';
 import MemberDetailModal from '../components/MemberDetailModal';
 import MobileScrollHint from '../components/MobileScrollHint';
-import ExecDashboard from '../components/ExecDashboard';
 import ImageLightbox from '../components/ImageLightbox';
 import SearchBar, { matchesSearch } from '../components/SearchBar';
 import SalesForecast from '../components/SalesForecast';
@@ -1731,9 +1730,7 @@ export default function AdminDashboardPage({
           )}
 
           {adminTab === 'analytics' && (
-            <SalesForecast orders={orders} products={products} isDarkMode={isDarkMode}>
-              <ExecDashboard products={products} orders={orders} isDarkMode={isDarkMode} />
-            </SalesForecast>
+            <SalesForecast orders={orders} products={products} isDarkMode={isDarkMode} />
           )}
 
           {adminTab === 'reports' && (
