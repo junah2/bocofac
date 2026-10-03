@@ -17,7 +17,7 @@ import { buildSalesForecast, buildWeeklySales, buildYearlySales, weekStart, mont
 import { STATISTICIAN_MONTHLY_SALES_MODEL, STATISTICIAN_WEEKLY_SALES_MODEL, STATISTICIAN_YEARLY_SALES_MODEL, STATISTICIAN_RESULTS } from '../data/statisticianResults';
 import { Card } from './CoopInsights';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
-import { analyticsOrders, buildProductPerformance, predictProductPerformance, performanceName } from '../utils/productPerformance';
+import { analyticsOrders, buildProductPerformance, predictProductPerformance, performanceName, toProductPredictions } from '../utils/productPerformance';
 import ProductForecast from './ProductForecast';
 import BusiestOrderingDays from './BusiestOrderingDays';
 
@@ -163,9 +163,33 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
     const name = performanceName(p.name);
     stockByName.set(name, (stockByName.get(name) || 0) + p.stock);
   });
-  const prediction = predictProductPerformance(buildProductPerformance(orders, activePeriod), projected, stockByName);
-  const projectedLabel = view.longName(view.history.length + projectedIndex);
+  // Ang Projected Sales (regression ng statistician mula sa Google Colab) ang hinahati bawat produkto
+  const performance = buildProductPerformance(orders, activePeriod);
+  const prediction = predictProductPerformance(performance, projected, stockByName);
+  const projectedLabel = view.longName(view.history.length + projectedIndex).replace(/^week of /, 'Week of ');
+  const periodName = { weekly: 'Next Week', monthly: 'Next Month', yearly: 'Next Year' }[activePeriod];
+  const predictions = toProductPredictions(prediction, periodName);
   const imageOf = (row) => row.productIds.map((id) => productById.get(id)?.image).find(Boolean);
+
+  // [PREDICTIVE ANALYTICS] Actual vs Predicted: kapag tapos na ang forecast period at kumpleto ang naitalang benta
+  const targetPeriod = performance?.periods[view.history.length + projectedIndex];
+  const comparison = (() => {
+    if (!prediction) return null;
+    if (!targetPeriod || targetPeriod.inProgress) {
+      return { available: false, message: `Actual vs Predicted sales will appear here after ${projectedLabel} ends and its sales are recorded.` };
+    }
+    if (targetPeriod.totalSales < prediction.typicalSales * 0.5) {
+      return { available: false, message: `${projectedLabel} has ended, but only ${peso(targetPeriod.totalSales)} in sales was recorded, so it is too incomplete to compare. The comparison will appear once its sales are recorded.` };
+    }
+    const rows = predictions.map((r) => {
+      const actual = targetPeriod.qty.get(r.productName) || 0;
+      return { productName: r.productName, predicted: r.predictedDemand, actual, error: Math.abs(actual - r.predictedDemand) };
+    });
+    return { available: true, rows, meanError: rows.reduce((t, r) => t + r.error, 0) / (rows.length || 1) };
+  })();
+  const method = prediction
+    ? `Source: the statistician's ${config.adjective} linear regression (Google Colab) projects ${peso(projected)} in sales for ${projectedLabel}. Predicted demand = each product's usual units per ${config.unit} from ${prediction.basisPeriods} past ${config.unit}s, scaled to that projection. Demand level compares a product with the average predicted demand (High ≥ 1.5×, Low < 0.5×). Restock Recommended = current stock is below the predicted demand. These are forecasts, not guaranteed sales. All Coconut Husk Pole sizes count as one product.`
+    : '';
   const categoryOf = (row) => row.productIds.map((id) => productById.get(id)?.category).find(Boolean) || 'Other';
 
   const categoryForecast = Object.values(
@@ -181,13 +205,13 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
   const predicted = prediction?.rows || [];
   const rising = predicted.filter((r) => r.trend === 'Rising').sort((a, b) => b.change - a.change);
   const declining = predicted.filter((r) => r.trend === 'Declining').sort((a, b) => a.change - b.change);
-  const restockNow = predicted.filter((r) => r.stock !== null && r.expectedUnits > 0 && r.weeksOfStock < 2);
+  const restockNow = predictions.filter((r) => r.restockStatus === 'Restock').map((r) => ({ name: r.productName }));
 
   // [ANALYTICS] Mga rekomendasyon mula sa forecast
   const takeaways = [];
-  if (prediction) {
-    const top = prediction.rows[0];
-    takeaways.push(`${top.name} is the most likely best seller for ${projectedLabel} (${Math.round(top.chanceTop * 100)}% chance), with about ${top.expectedUnits.toLocaleString()} units expected.`);
+  if (predictions.length > 0) {
+    const top = predictions[0];
+    takeaways.push(`${top.productName} has the highest predicted demand for ${projectedLabel}: about ${top.predictedDemand.toLocaleString()} units.`);
   }
   takeaways.push(
     `Expected sales for ${MONTH_NAMES[forecastStart % 12]} to ${longLabel(forecastStart + 2)}: about ${peso(next3)}` +
@@ -197,7 +221,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
   );
   takeaways.push(`The statistician's monthly regression shows sales are basically flat (${monthlyResult.slope}, not significant), so plan for about ${peso(monthlyForecast[0])} a month.`);
   if (restockNow.length > 0) {
-    takeaways.push(`${listNames(restockNow.slice(0, 4).map((p) => p.name))} may run out within 2 weeks at the expected demand. Restock first.`);
+    takeaways.push(`${listNames(restockNow.slice(0, 4).map((p) => p.name))}: current stock is below the predicted demand for ${projectedLabel}. Restock recommended.`);
   }
   if (rising.length > 0) {
     takeaways.push(`Demand is rising for ${listNames(rising.slice(0, 4).map((p) => p.name))}. Make sure supply keeps up.`);
@@ -370,7 +394,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
         </div>
       )}
 
-      <ProductForecast prediction={prediction} periodLabel={projectedLabel} unit={config.unit} imageOf={imageOf} />
+      <ProductForecast predictions={predictions} periodName={periodName} periodLabel={projectedLabel} projectedSales={projected} imageOf={imageOf} isDarkMode={isDarkMode} comparison={comparison} method={method} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <Card icon={Layers} title="Expected Demand by Category" description={`Share of the projected sales for ${projectedLabel}, by product category.`}>

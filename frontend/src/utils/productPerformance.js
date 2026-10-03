@@ -160,5 +160,48 @@ export function predictProductPerformance(perf, projected, stockByName = new Map
     };
   }).sort((a, b) => b.chanceTop - a.chanceTop || b.expectedSales - a.expectedSales);
 
-  return { rows, basisPeriods: basis.length, projected, from: basis[0].from, to: basis[basis.length - 1].to };
+  return { rows, basisPeriods: basis.length, projected, typicalSales: median, from: basis[0].from, to: basis[basis.length - 1].to };
+}
+
+// ---------------------------------------------------------------------------------------------
+// [PREDICTIVE ANALYTICS] Pinanggagalingan ng hula: ang resulta ng statistician mula sa Google Colab
+// (BOCOFAC_Product_Performance_Regression.ipynb) na nasa ../data/statisticianResults.js. Ang Projected Sales
+// ng regression na iyon ang hinahati bawat produkto sa predictProductPerformance() sa itaas.
+// Kapag may API na ang model, palitan lang ang pinanggagalingan ng `prediction`; ang UI ay gumagamit
+// lang ng anyong ibinabalik ng toProductPredictions() sa ibaba.
+// ---------------------------------------------------------------------------------------------
+
+// Demand Level: ikinukumpara ang predicted demand sa karaniwang predicted demand ng lahat ng produkto
+export const DEMAND_LEVEL_RULE = { high: 1.5, moderate: 0.5 }; // >= 1.5x = High, >= 0.5x = Moderate, kulang = Low
+
+export function demandLevelOf(predictedDemand, averageDemand) {
+  if (averageDemand <= 0 || predictedDemand <= 0) return 'Low';
+  const ratio = predictedDemand / averageDemand;
+  return ratio >= DEMAND_LEVEL_RULE.high ? 'High' : ratio >= DEMAND_LEVEL_RULE.moderate ? 'Moderate' : 'Low';
+}
+
+// Restock Status: kulang ang kasalukuyang stock sa predicted demand ng forecast period = Restock
+export const restockStatusOf = (currentStock, predictedDemand) => (
+  currentStock === null ? 'Not in catalog' : currentStock < predictedDemand ? 'Restock' : 'Sufficient'
+);
+
+// Anyo ng bawat hula na ginagamit ng UI:
+// { productId, productIds, productName, currentStock, predictedDemand, predictedSales, forecastPeriod, demandLevel, restockStatus }
+export function toProductPredictions(prediction, forecastPeriod) {
+  if (!prediction) return [];
+  const rows = prediction.rows.filter((r) => r.expectedUnits > 0 || r.stock !== null);
+  const average = rows.reduce((s, r) => s + r.expectedUnits, 0) / (rows.length || 1);
+  return rows
+    .map((r) => ({
+      productId: r.productIds[0] || r.name,
+      productIds: r.productIds,
+      productName: r.name,
+      currentStock: r.stock,
+      predictedDemand: r.expectedUnits,
+      predictedSales: r.expectedSales,
+      forecastPeriod,
+      demandLevel: demandLevelOf(r.expectedUnits, average),
+      restockStatus: restockStatusOf(r.stock, r.expectedUnits),
+    }))
+    .sort((a, b) => b.predictedDemand - a.predictedDemand || b.predictedSales - a.predictedSales);
 }
