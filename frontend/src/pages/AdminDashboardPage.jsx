@@ -230,7 +230,7 @@ function ApplicationProgress({ ready, pmesDate }) {
   );
 }
 
-function ProductRow({ variants, onOpenStock, openEditProduct, handleDeleteProduct }) {
+function ProductRow({ variants, openEditProduct, handleDeleteProduct }) {
   const [selectedId, setSelectedId] = useState(variants[0].id);
   const p = variants.find(v => v.id === selectedId) || variants[0];
   const hasSizes = variants.length > 1;
@@ -279,24 +279,6 @@ function ProductRow({ variants, onOpenStock, openEditProduct, handleDeleteProduc
           {p.stock} {p.unit}
         </span>
         <span className="block text-[10px] text-slate-400">Reorder at {reorderLevelOf(p)}</span>
-      </td>
-      <td className="p-4">
-        <div className="flex items-center justify-end gap-2">
-          <button
-            onClick={() => onOpenStock(p.id, 'update')}
-            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 cursor-pointer whitespace-nowrap"
-          >
-            Update Stock
-          </button>
-          <button
-            onClick={() => onOpenStock(p.id, 'history')}
-            title="Stock history"
-            aria-label={`Stock history of ${p.name}`}
-            className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
-          >
-            <History className="w-4 h-4" />
-          </button>
-        </div>
       </td>
       <td className="p-4">
         <div className="flex items-center justify-end gap-2">
@@ -950,14 +932,13 @@ export default function AdminDashboardPage({
                       <th className="p-4 font-bold">Category</th>
                       <th className="p-4 font-bold">Price</th>
                       <th className="p-4 font-bold">Stock</th>
-                      <th className="p-4 font-bold text-right">Stock</th>
                       <th className="p-4 font-bold text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {productGroups.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="p-6 text-center text-sm text-slate-400">
+                        <td colSpan={6} className="p-6 text-center text-sm text-slate-400">
                           {productSearch ? `No products match "${productSearch}".` : 'No products in this group.'}
                         </td>
                       </tr>
@@ -966,7 +947,6 @@ export default function AdminDashboardPage({
                       <ProductRow
                         key={key}
                         variants={variants}
-                        onOpenStock={openStockModal}
                         openEditProduct={openEditProduct}
                         handleDeleteProduct={handleDeleteProduct}
                       />
