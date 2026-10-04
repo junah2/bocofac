@@ -362,10 +362,10 @@ export default function BoardDashboardPage({
                             <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 line-clamp-1">{a.fullName}</p>
                             <p className="text-xs text-slate-400">{a.agriculturalType}</p>
                           </div>
-                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${
-                            a.status === 'Approved' ? 'bg-emerald-600 text-white' :
-                            a.status === 'Rejected' ? 'bg-rose-100 text-rose-800' :
-                            'bg-amber-100 text-amber-800'
+                          <span className={`text-sm font-bold whitespace-nowrap shrink-0 ${
+                            a.status === 'Approved' ? 'text-emerald-700 dark:text-emerald-400' :
+                            a.status === 'Rejected' ? 'text-rose-600 dark:text-rose-400' :
+                            'text-amber-600 dark:text-amber-400'
                           }`}>{a.status}</span>
                         </div>
                       ))}
@@ -388,8 +388,8 @@ export default function BoardDashboardPage({
                             <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 line-clamp-1">{m.name}</p>
                             <p className="text-xs text-slate-400">Joined {formatDate(m.joinedDate)}</p>
                           </div>
-                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${
-                            m.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                          <span className={`text-sm font-bold whitespace-nowrap shrink-0 ${
+                            m.status === 'Active' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                           }`}>{m.status}</span>
                         </div>
                       ))}
@@ -530,10 +530,10 @@ export default function BoardDashboardPage({
                             : <span className="text-xs text-slate-400">Not yet</span>}
                         </td>
                         <td className="p-4">
-                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                            a.status === 'Approved' ? 'bg-emerald-600 text-white' :
-                            a.status === 'Rejected' ? 'bg-rose-100 text-rose-800' :
-                            'bg-amber-100 text-amber-800'
+                          <span className={`text-sm font-bold whitespace-nowrap ${
+                            a.status === 'Approved' ? 'text-emerald-700 dark:text-emerald-400' :
+                            a.status === 'Rejected' ? 'text-rose-600 dark:text-rose-400' :
+                            'text-amber-600 dark:text-amber-400'
                           }`}>{displayApplicantStatus(a.status)}</span>
                         </td>
                         <td className="p-4">
@@ -585,8 +585,8 @@ export default function BoardDashboardPage({
                         </td>
                         <td className="p-4 text-slate-600 dark:text-slate-300">{formatDate(m.joinedDate)}</td>
                         <td className="p-4">
-                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                            m.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                          <span className={`text-sm font-bold whitespace-nowrap ${
+                            m.status === 'Active' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                           }`}>{m.status}</span>
                         </td>
                       </tr>
