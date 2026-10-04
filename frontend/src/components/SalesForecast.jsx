@@ -188,7 +188,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
     return { available: true, rows, meanError: rows.reduce((t, r) => t + r.error, 0) / (rows.length || 1) };
   })();
   const method = prediction
-    ? `Source: the statistician's ${config.adjective} linear regression (Google Colab) projects ${peso(projected)} in sales for ${projectedLabel}. Predicted demand = each product's usual units per ${config.unit} from ${prediction.basisPeriods} past ${config.unit}s, scaled to that projection. Demand level compares a product with the average predicted demand (High ≥ 1.5×, Low < 0.5×). Restock Recommended = current stock is below the predicted demand. These are forecasts, not guaranteed sales. All Coconut Husk Pole sizes count as one product.`
+    ? `Source: the statistician's ${config.adjective} linear regression projects ${peso(projected)} in sales for ${projectedLabel}. Predicted demand = each product's usual units per ${config.unit} from ${prediction.basisPeriods} past ${config.unit}s, scaled to that projection. Demand level compares a product with the average predicted demand (High ≥ 1.5×, Low < 0.5×). Restock Recommended = current stock is below the predicted demand. These are forecasts, not guaranteed sales. All Coconut Husk Pole sizes count as one product.`
     : '';
   const categoryOf = (row) => row.productIds.map((id) => productById.get(id)?.category).find(Boolean) || 'Other';
 
