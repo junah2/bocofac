@@ -17,13 +17,13 @@ export const STOCK_ACTIONS = [
 
 export const MOVEMENT_LABELS = {
   'initial stock': 'Starting stock',
-  restock: 'Restock',
-  returned: 'Returned',
+  restock: 'Stock added',
+  returned: 'Returned by buyer',
   damaged: 'Damaged',
   expired: 'Expired',
-  adjustment: 'Count adjustment',
-  'online order': 'Online order',
+  adjustment: 'Stock adjusted',
+  'online order': 'Customer order',
   'walk-in sale': 'Walk-in sale',
-  'order cancelled': 'Order cancelled',
-  'order rejected': 'Order rejected',
+  'order cancelled': 'Order cancelled (stock returned)',
+  'order rejected': 'Order rejected (stock returned)',
 };
