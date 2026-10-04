@@ -13,6 +13,7 @@ const { applicantCreateSchema } = require('../validation/applicants.schema');
 const { applicantLookupLimiter, applicantDocsLimiter } = require('../middleware/rateLimit');
 const { validateRequiredShareCapital, MIN_REQUIRED_SHARE_CAPITAL, MAX_REQUIRED_SHARE_CAPITAL } = require('../utils/shareCapital');
 const { persistUpload, sendStoredFile } = require('../utils/storage');
+const { generateApplicationSummaryPdf } = require('../utils/applicationSummaryPdf');
 
 const router = express.Router();
 
@@ -132,6 +133,26 @@ router.get('/by-email/:email', applicantLookupLimiter, asyncHandler(async (req, 
   if (!rows[0]) return res.status(404).json({ error: 'No application found for that email.' });
   const { pmesCertificate } = await loadDocumentFlags(rows[0].id);
   res.json(toPublicStatusClient(rows[0], pmesCertificate));
+}));
+
+// [MEMBERSHIP] Filing Summary bilang PDF - parehong impormasyon na ipinapakita ng Check Application Status
+router.get('/by-email/:email/filing-summary.pdf', applicantLookupLimiter, asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT * FROM applicants WHERE lower(email) = lower($1) ORDER BY submitted_at DESC LIMIT 1',
+    [req.params.email]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'No application found for that email.' });
+  const docs = await loadDocumentFlags(rows[0].id);
+  const summary = toPublicStatusClient(rows[0], docs.pmesCertificate);
+  const pdf = await generateApplicationSummaryPdf({
+    ...summary,
+    submittedAt: rows[0].submitted_at,
+    registrationFeePaid: rows[0].registration_fee_paid,
+    validIdUploaded: docs.validId,
+  });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="bocofac-filing-summary-${rows[0].id}.pdf"`);
+  res.send(pdf);
 }));
 
 router.post('/', validate(applicantCreateSchema), asyncHandler(async (req, res) => {

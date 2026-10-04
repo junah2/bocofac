@@ -2226,8 +2226,25 @@ export default function MembershipPortal({
                       <p className="text-sm font-bold">Application Pending Board Approval</p>
                     </div>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         const a = activeSearchedApplicant;
+                        // [MEMBERSHIP] PDF na gawa ng server; kapag pumalya, text file pa rin ang fallback
+                        try {
+                          const res = await fetch(`${API_BASE}/applicants/by-email/${encodeURIComponent(a.email)}/filing-summary.pdf`, { credentials: 'include' });
+                          if (!res.ok) throw new Error('pdf');
+                          const url = URL.createObjectURL(await res.blob());
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `bocofac-filing-summary-${a.id}.pdf`;
+                          document.body.appendChild(link);
+                          link.click();
+                          link.remove();
+                          setTimeout(() => URL.revokeObjectURL(url), 1000);
+                          onToast('Filing summary downloaded.', 'success');
+                          return;
+                        } catch {
+                          // tuloy sa text na bersyon sa ibaba
+                        }
                         const lines = [
                           'BOCOFAC - Membership Application Filing Summary',
                           '='.repeat(48),
