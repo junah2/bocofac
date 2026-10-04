@@ -19,13 +19,23 @@ const PERIODS = [
   { key: 'month', label: 'This month' },
   { key: 'year', label: 'This year' },
   { key: 'all', label: 'All time' },
-  { key: 'custom', label: 'Custom' },
+  { key: 'custom', label: 'Custom dates…' },
 ];
 const SOURCES = [
-  { key: 'all', label: 'All sales' },
-  { key: 'walk-in', label: 'Walk-in' },
-  { key: 'online', label: 'Online' },
+  { key: 'all', label: 'Walk-in and online' },
+  { key: 'walk-in', label: 'Walk-in only' },
+  { key: 'online', label: 'Online only' },
 ];
+
+// [UI] Isang filter na may label sa itaas
+function Field({ label, htmlFor, children, className = '' }) {
+  return (
+    <div className={`min-w-0 ${className}`}>
+      <label htmlFor={htmlFor} className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{label}</label>
+      {children}
+    </div>
+  );
+}
 
 // Simula at dulo (YYYY-MM-DD, kasama ang dulo) ng napiling panahon
 function periodRange(key, now = new Date()) {
@@ -96,7 +106,7 @@ function SummaryTile({ icon: Icon, label, value, sub }) {
 }
 
 export default function SalesRecords({ orders, products, onWalkInRecorded }) {
-  const [period, setPeriod] = useState('month');
+  const [period, setPeriod] = useState('all');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [source, setSource] = useState('all');
@@ -159,7 +169,7 @@ export default function SalesRecords({ orders, products, onWalkInRecorded }) {
     ? `${range.from ? displayDate(new Date(`${range.from}T00:00`)) : 'Start'} – ${range.to ? displayDate(new Date(`${range.to}T00:00`)) : 'Today'}`
     : 'All time';
   const filterLabel = [
-    source !== 'all' && SOURCES.find((s) => s.key === source).label,
+    source !== 'all' && (source === 'walk-in' ? 'Walk-in' : 'Online'),
     category !== 'all' && category,
     productId !== 'all' && productOptions.find((p) => p.productId === productId)?.productName,
     search && `"${search}"`,
@@ -167,65 +177,87 @@ export default function SalesRecords({ orders, products, onWalkInRecorded }) {
 
   const pageCount = Math.max(1, Math.ceil(lines.length / PAGE_SIZE));
   const pageLines = lines.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const selectClass = 'px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 cursor-pointer';
-  const chipClass = (active) => `px-3 py-1.5 rounded-full text-xs font-bold border cursor-pointer transition ${
-    active ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-  }`;
+  const selectClass = 'w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500';
+  const hasFilters = period !== 'all' || source !== 'all' || category !== 'all' || productId !== 'all' || search !== '';
+  const clearFilters = () => {
+    setPeriod('all');
+    setCustomFrom('');
+    setCustomTo('');
+    setSource('all');
+    setCategory('all');
+    setProductId('all');
+    setSearch('');
+  };
+  const exportButtonClass = 'px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed';
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
-        <p className="text-xs text-slate-500 max-w-xl">
-          Every item sold, online and walk-in. Pick a date range and filters, then print or download the report.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => setShowWalkIn(true)} className="px-3.5 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 cursor-pointer flex items-center gap-1.5">
-            <Store className="w-3.5 h-3.5" /> Record Walk-in Sale
-          </button>
-          <button
-            onClick={() => printSalesRecords(lines, { rangeLabel, filterLabel, summary })}
-            disabled={lines.length === 0}
-            className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Printer className="w-3.5 h-3.5" /> Print Report
-          </button>
-          <button
-            onClick={() => downloadCsv(lines, `bocofac-sales-${range.from || 'start'}-to-${range.to || 'today'}.csv`)}
-            disabled={lines.length === 0}
-            className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Download className="w-3.5 h-3.5" /> Excel / CSV
-          </button>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+        <div>
+          <h3 className="font-bold text-slate-900 dark:text-white">All sales, walk-in and online</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Choose the dates and filters below. The totals, list, print and download follow your choices.</p>
         </div>
+        <button onClick={() => setShowWalkIn(true)} className="self-start sm:self-auto shrink-0 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 cursor-pointer flex items-center gap-2">
+          <Store className="w-4 h-4" /> Record Walk-in Sale
+        </button>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Date range">
-          {PERIODS.map((p) => (
-            <button key={p.key} type="button" onClick={() => setPeriod(p.key)} className={chipClass(period === p.key)}>{p.label}</button>
-          ))}
-          {period === 'custom' && (
-            <span className="flex items-center gap-2 text-xs text-slate-500">
-              <input type="date" aria-label="From" value={customFrom} max={customTo || undefined} onChange={(e) => setCustomFrom(e.target.value)} className={selectClass} />
-              to
-              <input type="date" aria-label="To" value={customTo} min={customFrom || undefined} onChange={(e) => setCustomTo(e.target.value)} className={selectClass} />
-            </span>
-          )}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+        <div className="p-4 sm:p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <Field label="Date" htmlFor="sr-period">
+              <select id="sr-period" value={period} onChange={(e) => setPeriod(e.target.value)} className={selectClass}>
+                {PERIODS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+              </select>
+            </Field>
+            {period === 'custom' && (
+              <>
+                <Field label="From" htmlFor="sr-from">
+                  <input id="sr-from" type="date" value={customFrom} max={customTo || undefined} onChange={(e) => setCustomFrom(e.target.value)} className={selectClass} />
+                </Field>
+                <Field label="To" htmlFor="sr-to">
+                  <input id="sr-to" type="date" value={customTo} min={customFrom || undefined} onChange={(e) => setCustomTo(e.target.value)} className={selectClass} />
+                </Field>
+              </>
+            )}
+            <Field label="Sale type" htmlFor="sr-source">
+              <select id="sr-source" value={source} onChange={(e) => setSource(e.target.value)} className={selectClass}>
+                {SOURCES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Category" htmlFor="sr-category">
+              <select id="sr-category" value={category} onChange={(e) => { setCategory(e.target.value); setProductId('all'); }} className={selectClass}>
+                <option value="all">All categories</option>
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Product" htmlFor="sr-product">
+              <select id="sr-product" value={productId} onChange={(e) => setProductId(e.target.value)} className={selectClass}>
+                <option value="all">All products</option>
+                {productOptions.map((p) => <option key={p.productId} value={p.productId}>{p.productName}</option>)}
+              </select>
+            </Field>
+            <Field label="Search" className="sm:col-span-2">
+              <SearchBar value={search} onChange={setSearch} placeholder="Order number, product or buyer name" />
+            </Field>
+          </div>
         </div>
-        <div className="flex flex-col md:flex-row gap-2">
-          <select aria-label="Source" value={source} onChange={(e) => setSource(e.target.value)} className={selectClass}>
-            {SOURCES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-          </select>
-          <select aria-label="Category" value={category} onChange={(e) => { setCategory(e.target.value); setProductId('all'); }} className={selectClass}>
-            <option value="all">All categories</option>
-            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select aria-label="Product" value={productId} onChange={(e) => setProductId(e.target.value)} className={`${selectClass} md:max-w-xs`}>
-            <option value="all">All products</option>
-            {productOptions.map((p) => <option key={p.productId} value={p.productId}>{p.productName}</option>)}
-          </select>
-          <div className="flex-1 min-w-0">
-            <SearchBar value={search} onChange={setSearch} placeholder="Search order, product or buyer" />
+        <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between border-t border-slate-100 dark:border-slate-800 px-4 sm:px-5 py-3 bg-slate-50/70 dark:bg-slate-800/30 rounded-b-2xl">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Showing <span className="font-bold text-slate-900 dark:text-white">{lines.length.toLocaleString()}</span> item{lines.length === 1 ? '' : 's'} sold
+            {' · '}<span className="font-semibold">{rangeLabel}</span>
+            {filterLabel && <> · <span className="font-semibold">{filterLabel}</span></>}
+            {hasFilters && (
+              <button type="button" onClick={clearFilters} className="ml-2 text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer">Clear filters</button>
+            )}
+          </p>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={() => printSalesRecords(lines, { rangeLabel, filterLabel, summary })} disabled={lines.length === 0} className={exportButtonClass}>
+              <Printer className="w-3.5 h-3.5" /> Print
+            </button>
+            <button onClick={() => downloadCsv(lines, `bocofac-sales-${range.from || 'start'}-to-${range.to || 'today'}.csv`)} disabled={lines.length === 0} className={exportButtonClass}>
+              <Download className="w-3.5 h-3.5" /> Download Excel
+            </button>
           </div>
         </div>
       </div>
@@ -234,7 +266,7 @@ export default function SalesRecords({ orders, products, onWalkInRecorded }) {
         <SummaryTile icon={Receipt} label="Transactions" value={summary.transactions.toLocaleString()} sub={rangeLabel} />
         <SummaryTile icon={Package} label="Units Sold" value={summary.units.toLocaleString()} sub={`${summary.products.length} product${summary.products.length === 1 ? '' : 's'}`} />
         <SummaryTile icon={PhilippinePeso} label="Sales Amount" value={peso(summary.amount)} sub="Item prices, before member discount & shipping" />
-        <SummaryTile icon={ShoppingBag} label="Walk-in Share" value={`${summary.walkInShare}%`} sub={`${Math.round((100 - summary.walkInShare) * 10) / 10}% online`} />
+        <SummaryTile icon={ShoppingBag} label="Walk-in Share" value={summary.amount > 0 ? `${summary.walkInShare}%` : '—'} sub={summary.amount > 0 ? `${Math.round((100 - summary.walkInShare) * 10) / 10}% online` : 'No sales in this range'} />
       </div>
 
       <MobileScrollHint />
