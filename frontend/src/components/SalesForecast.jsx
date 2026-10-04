@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { Lightbulb, LineChart as LineChartIcon, Layers, AlertTriangle, TrendingUp, TrendingDown, History, ShoppingBag, PhilippinePeso, X, BarChart3 } from 'lucide-react';
 import { MONTH_LABELS } from '../utils/dateBuckets';
-import { buildSalesForecast, buildWeeklySales, buildYearlySales, weekStart, monthIndex, REALIZED_ORDER_STATUSES, monthFromIndex, backtestLinearMape, linearModelForecast, weeklyModelForecast, yearlyModelForecast } from '../utils/forecast';
+import { buildSalesForecast, buildWeeklySales, buildYearlySales, weekStart, monthIndex, ANALYTICS_ORDER_STATUSES, monthFromIndex, backtestLinearMape, linearModelForecast, weeklyModelForecast, yearlyModelForecast } from '../utils/forecast';
 import { STATISTICIAN_MONTHLY_SALES_MODEL, STATISTICIAN_WEEKLY_SALES_MODEL, STATISTICIAN_YEARLY_SALES_MODEL, STATISTICIAN_RESULTS } from '../data/statisticianResults';
 import { Card } from './CoopInsights';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
@@ -29,8 +29,8 @@ const PALETTE = {
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 // Ilang nakaraang bahagi at ilang hula ang ipinapakita sa chart, bawat period
 const PERIODS = {
-  weekly: { label: 'Weekly', unit: 'week', adjective: 'weekly', next: 'Next week', shown: 26, horizon: 8 },
-  monthly: { label: 'Monthly', unit: 'month', adjective: 'monthly', next: 'Next month', shown: 24, horizon: 6 },
+  weekly: { label: 'Weekly', unit: 'week', adjective: 'weekly', next: 'This week', shown: 26, horizon: 8 },
+  monthly: { label: 'Monthly', unit: 'month', adjective: 'monthly', next: 'This month', shown: 24, horizon: 6 },
   yearly: { label: 'Yearly', unit: 'year', adjective: 'yearly', next: 'This year', shown: 10, horizon: 2 },
 };
 
@@ -69,7 +69,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
     );
   }
 
-  const { firstMonth, forecastStart, history, incompleteMonths } = result;
+  const { firstMonth, forecastStart, history } = result;
   // [PREDICTIVE ANALYTICS] Hula ng benta = Monthly Linear Regression ng statistician;
   // ang accuracy ay sinusubok ng system sa parehong paraan gamit ang kasalukuyang data
   const forecast = linearModelForecast(STATISTICIAN_MONTHLY_SALES_MODEL, forecastStart, 6);
@@ -137,7 +137,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
   // [ANALYTICS] Bilang ng order at products sold bawat period (kapareho ng mga order na binibilang sa revenue)
   const periodOrders = Array(view.history.length).fill(0);
   const periodUnits = Array(view.history.length).fill(0);
-  orders.filter((o) => REALIZED_ORDER_STATUSES.includes(o.status)).forEach((o) => {
+  orders.filter((o) => ANALYTICS_ORDER_STATUSES.includes(o.status)).forEach((o) => {
     const i = view.indexOf(new Date(o.orderedAt));
     if (i < 0 || i >= view.history.length) return;
     periodOrders[i]++;
@@ -167,7 +167,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
   const performance = buildProductPerformance(orders, activePeriod);
   const prediction = predictProductPerformance(performance, projected, stockByName);
   const projectedLabel = view.longName(view.history.length + projectedIndex).replace(/^week of /, 'Week of ');
-  const periodName = { weekly: 'Next Week', monthly: 'Next Month', yearly: 'Next Year' }[activePeriod];
+  const periodName = { weekly: 'This Week', monthly: 'This Month', yearly: 'Next Year' }[activePeriod];
   const predictions = toProductPredictions(prediction, periodName);
   const imageOf = (row) => row.productIds.map((id) => productById.get(id)?.image).find(Boolean);
 
@@ -176,10 +176,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
   const comparison = (() => {
     if (!prediction) return null;
     if (!targetPeriod || targetPeriod.inProgress) {
-      return { available: false, message: `Actual vs Predicted sales will appear here after ${projectedLabel} ends and its sales are recorded.` };
-    }
-    if (targetPeriod.totalSales < prediction.typicalSales * 0.5) {
-      return { available: false, message: `${projectedLabel} has ended, but only ${peso(targetPeriod.totalSales)} in sales was recorded, so it is too incomplete to compare. The comparison will appear once its sales are recorded.` };
+      return { available: false, message: `Actual vs Predicted sales will appear here after ${projectedLabel} ends. New orders and walk-in sales are counted as soon as they are recorded.` };
     }
     const rows = predictions.map((r) => {
       const actual = targetPeriod.qty.get(r.productName) || 0;
@@ -383,17 +380,6 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
         </div>
       </Card>
 
-      {incompleteMonths.length > 0 && (
-        <div className="flex gap-3 px-4 py-3 rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 text-left">
-          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
-            {listNames(incompleteMonths.map((m) => `${MONTH_NAMES[m.month]} ${m.year} (${peso(m.amount)} recorded)`))}{' '}
-            {incompleteMonths.length === 1 ? 'looks' : 'look'} incomplete compared with a typical month, so {incompleteMonths.length === 1 ? 'it was' : 'they were'} left out of the forecast.
-            Record every walk-in sale to keep the forecast accurate.
-          </p>
-        </div>
-      )}
-
       <ProductForecast predictions={predictions} periodName={periodName} periodLabel={projectedLabel} projectedSales={projected} imageOf={imageOf} isDarkMode={isDarkMode} comparison={comparison} method={method} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
@@ -467,7 +453,7 @@ function ForecastTile({ icon: Icon, tone, label, value, sub, onClick }) {
 }
 
 // [ANALYTICS] Total Sales na hinati bawat category, at sa loob nito bawat product (pinakamalaki muna)
-const REALIZED = (o) => o.status !== 'Pending Verification' && o.status !== 'Rejected' && o.status !== 'Cancelled';
+const REALIZED = (o) => o.status !== 'Rejected' && o.status !== 'Cancelled';
 
 // [ANALYTICS] Benta ng mga product na nasa catalog lang, hinati bawat category at product (pinakamalaki muna).
 // Hindi kasama ang mga product na wala na sa catalog (lumang demo/test orders) at ang shipping fee,

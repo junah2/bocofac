@@ -5,11 +5,13 @@
 // Accuracy: i-forecast ang huling 6 na buwan na parang hindi pa alam, ikumpara sa aktwal (MAPE)
 
 export const REALIZED_ORDER_STATUSES = ['Completed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered'];
+// [ANALYTICS] Binibilang agad sa analytics ang bawat order, pati ang hinihintay pang ma-verify;
+// ang Rejected at Cancelled lang ang hindi kasama
+export const ANALYTICS_ORDER_STATUSES = ['Pending Verification', ...REALIZED_ORDER_STATUSES];
 
 const MIN_MONTHS_FOR_SEASONALITY = 24;
 const BACKTEST_MONTHS = 6;
 // Buwan na mas mababa sa 25% ng karaniwan = malamang hindi pa naitatala ang benta (hal. walk-in)
-const INCOMPLETE_MONTH_RATIO = 0.25;
 const TREND_THRESHOLD = 0.1;
 const MAX_GROWTH = 0.5;
 const MIN_UNITS_FOR_TREND = 20;
@@ -90,17 +92,6 @@ export function linearModelForecast(model, fromMonthIndex, horizon) {
   return Array.from({ length: horizon }, (_, h) => Math.max(0, model.constant + model.slope * (fromMonthIndex + h - base + 1)));
 }
 
-// Ilang huling bahagi (buwan/linggo) ang buo pa ang data: tinatanggal ang mga dulong
-// mas mababa sa 25% ng karaniwan (hal. walk-in sales na hindi pa naitatala)
-function usableLength(values, window) {
-  let usable = values.length;
-  while (usable > window) {
-    const typical = mean(values.slice(usable - window - 1, usable - 1));
-    if (typical > 0 && values[usable - 1] < typical * INCOMPLETE_MONTH_RATIO) usable--;
-    else break;
-  }
-  return usable;
-}
 
 const DAY_MS = 86400000;
 // Lunes ng linggong kinabibilangan ng petsa (00:00, local time)
@@ -113,7 +104,7 @@ const weeksBetween = (from, to) => Math.round((to - from) / (7 * DAY_MS));
 
 // [PREDICTIVE ANALYTICS] Lingguhang benta (Lunes hanggang Linggo), buong linggo lang
 export function buildWeeklySales(orders, { now = new Date() } = {}) {
-  const sales = orders.filter((o) => REALIZED_ORDER_STATUSES.includes(o.status));
+  const sales = orders.filter((o) => ANALYTICS_ORDER_STATUSES.includes(o.status));
   if (sales.length === 0) return null;
   const firstWeek = weekStart(new Date(Math.min(...sales.map((o) => new Date(o.orderedAt).getTime()))));
   const length = weeksBetween(firstWeek, weekStart(now));
@@ -123,13 +114,12 @@ export function buildWeeklySales(orders, { now = new Date() } = {}) {
     const w = weeksBetween(firstWeek, weekStart(new Date(o.orderedAt)));
     if (w >= 0 && w < length) totals[w] += o.totalAmount;
   });
-  const usable = usableLength(totals, 12);
-  return { firstWeek, history: totals.slice(0, usable), incompleteWeeks: length - usable };
+  return { firstWeek, history: totals };
 }
 
 // [PREDICTIVE ANALYTICS] Taunang benta, hanggang noong nakaraang taon lang (buong taon)
 export function buildYearlySales(orders, { now = new Date() } = {}) {
-  const sales = orders.filter((o) => REALIZED_ORDER_STATUSES.includes(o.status));
+  const sales = orders.filter((o) => ANALYTICS_ORDER_STATUSES.includes(o.status));
   if (sales.length === 0) return null;
   const firstYear = Math.min(...sales.map((o) => new Date(o.orderedAt).getFullYear()));
   const length = now.getFullYear() - firstYear;
@@ -155,7 +145,7 @@ export function weeklyModelForecast(model, firstWeek, fromWeek, horizon) {
 
 function realizedSales(orders) {
   return orders
-    .filter((o) => REALIZED_ORDER_STATUSES.includes(o.status))
+    .filter((o) => ANALYTICS_ORDER_STATUSES.includes(o.status))
     .map((o) => ({ ...o, month: monthIndex(new Date(o.orderedAt)) }));
 }
 
@@ -181,12 +171,8 @@ export function buildSalesForecast(orders, products, { horizon = 6, now = new Da
     });
   });
 
-  // Huwag isama ang mga huling buwan na halatang kulang ang naitalang benta
-  const usable = usableLength(revenue, 12);
-  const incompleteMonths = Array.from({ length: length - usable }, (_, i) => ({
-    ...monthFromIndex(firstMonth + usable + i),
-    amount: revenue[usable + i],
-  }));
+  // Lahat ng buong buwan ay kasama, kahit maliit ang naitalang benta
+  const usable = length;
 
   const history = revenue.slice(0, usable);
   const startMonth = firstMonth % 12;
@@ -208,7 +194,6 @@ export function buildSalesForecast(orders, products, { horizon = 6, now = new Da
     seasonal,
     monthlyTrend: slope,
     mape,
-    incompleteMonths,
     hasSeasonality: history.length >= MIN_MONTHS_FOR_SEASONALITY,
     productForecasts,
   };

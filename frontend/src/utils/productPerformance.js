@@ -1,4 +1,4 @@
-import { REALIZED_ORDER_STATUSES, weekStart } from './forecast';
+import { ANALYTICS_ORDER_STATUSES, weekStart } from './forecast';
 import { STATISTICIAN_DATASET } from '../data/statisticianResults';
 
 const DAY_MS = 86400000;
@@ -52,7 +52,7 @@ function periodKeyer(level, firstOrder) {
 // ang Most In-Demand Product (pinakamaraming nabentang piraso), ilan ang nabenta nito, at ang Total Sales.
 // Kasama rin kung ilang beses naging #1 ang bawat produkto at ang kabuuang nabenta bawat produkto.
 export function buildProductPerformance(orders, level, { now = new Date() } = {}) {
-  const sales = orders.filter((o) => REALIZED_ORDER_STATUSES.includes(o.status));
+  const sales = orders.filter((o) => ANALYTICS_ORDER_STATUSES.includes(o.status));
   if (sales.length === 0) return null;
   const firstOrder = new Date(Math.min(...sales.map((o) => new Date(o.orderedAt).getTime())));
   const keyer = periodKeyer(level, firstOrder);
@@ -115,8 +115,7 @@ export function predictProductPerformance(perf, projected, stockByName = new Map
   const withSales = perf.periods.filter((p) => !p.inProgress && p.totalSales > 0);
   const sorted = withSales.map((p) => p.totalSales).sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)] || 0;
-  // Hindi isinasama ang period na kulang ang naitalang benta (gaya ng sa sales forecast)
-  const basis = withSales.filter((p) => p.totalSales >= median * 0.5);
+  const basis = withSales;
   if (basis.length === 0) return null;
 
   const basisSales = basis.reduce((s, p) => s + p.totalSales, 0);

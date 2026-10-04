@@ -4,7 +4,7 @@ import { CalendarDays } from 'lucide-react';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const REALIZED_ORDER_STATUSES = ['Completed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered'];
+const REALIZED_ORDER_STATUSES = ['Pending Verification', 'Completed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered'];
 
 const PALETTE = {
   light: { grid: '#e2e8f0', axis: '#94a3b8', tooltipBg: '#ffffff', tooltipBorder: '#e2e8f0', tooltipText: '#0f172a', busiest: '#2f6f4b', other: '#96c6a6' },
