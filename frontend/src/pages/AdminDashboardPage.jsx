@@ -275,7 +275,7 @@ function ProductRow({ variants, onOpenStock, openEditProduct, handleDeleteProduc
         )}
       </td>
       <td className="p-4 whitespace-nowrap">
-        <span className={isLowStock(p) ? 'text-rose-600 font-bold' : 'text-slate-700 dark:text-slate-300'}>
+        <span className={p.stock === 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : isLowStock(p) ? 'text-amber-500 dark:text-amber-400 font-bold' : 'text-slate-700 dark:text-slate-300'}>
           {p.stock} {p.unit}
         </span>
         <span className="block text-[10px] text-slate-400">Reorder at {reorderLevelOf(p)}</span>
