@@ -149,7 +149,8 @@ function toRegistrationClient(r) {
     memberId: r.member_id,
     name: r.applicant_name || r.member_name || r.walk_in_name,
     email: r.applicant_email || r.member_email || r.walk_in_email,
-    walkIn: !r.applicant_id && !r.member_id,
+    // [PMES] Walk-in = inilagay ng admin sa mismong seminar; online = nag-reserve ang applicant gamit ang account niya
+    walkIn: r.source ? r.source === 'walk-in' : (!r.applicant_id && !r.member_id),
     registeredAt: r.registered_at,
     attended: r.attended,
     attendedAt: r.attended_at,
@@ -209,8 +210,8 @@ router.post('/:sessionId/registrations/walk-in', requireRole('admin'), asyncHand
 
   try {
     const { rows } = await pool.query(
-      `INSERT INTO pmes_registrations (session_id, walk_in_name, walk_in_email, attended, attended_at)
-       VALUES ($1, $2, $3, true, now())
+      `INSERT INTO pmes_registrations (session_id, walk_in_name, walk_in_email, attended, attended_at, source)
+       VALUES ($1, $2, $3, true, now(), 'walk-in')
        RETURNING *`,
       [req.params.sessionId, fullName, email]
     );

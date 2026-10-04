@@ -437,3 +437,15 @@ CREATE TABLE IF NOT EXISTS stock_movements (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements(product_id, created_at DESC);
+
+-- [PMES] Saan galing ang reservation: online (nag-reserve gamit ang account) o walk-in (inilagay ng admin sa seminar).
+-- Sa mga lumang record, walk-in ang mga inilagay ng admin ayon sa audit log; online ang iba.
+ALTER TABLE pmes_registrations ADD COLUMN IF NOT EXISTS source TEXT;
+UPDATE pmes_registrations SET source = 'walk-in'
+WHERE source IS NULL
+  AND id::text IN (SELECT entity_id FROM audit_log WHERE action = 'pmes_session.walk_in_enrolled');
+UPDATE pmes_registrations SET source = 'online' WHERE source IS NULL;
+ALTER TABLE pmes_registrations ALTER COLUMN source SET DEFAULT 'online';
+ALTER TABLE pmes_registrations ALTER COLUMN source SET NOT NULL;
+ALTER TABLE pmes_registrations DROP CONSTRAINT IF EXISTS pmes_registrations_source_check;
+ALTER TABLE pmes_registrations ADD CONSTRAINT pmes_registrations_source_check CHECK (source IN ('online', 'walk-in'));
