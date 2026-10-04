@@ -14,7 +14,7 @@ import {
 import { Lightbulb, LineChart as LineChartIcon, Layers, AlertTriangle, TrendingUp, TrendingDown, History, ShoppingBag, PhilippinePeso, X, BarChart3 } from 'lucide-react';
 import { MONTH_LABELS } from '../utils/dateBuckets';
 import { buildSalesForecast, buildWeeklySales, buildYearlySales, weekStart, monthIndex, ANALYTICS_ORDER_STATUSES, monthFromIndex, backtestLinearMape, linearModelForecast, weeklyModelForecast, yearlyModelForecast } from '../utils/forecast';
-import { STATISTICIAN_MONTHLY_SALES_MODEL, STATISTICIAN_WEEKLY_SALES_MODEL, STATISTICIAN_YEARLY_SALES_MODEL, STATISTICIAN_RESULTS } from '../data/statisticianResults';
+import { STATISTICIAN_MONTHLY_SALES_MODEL, STATISTICIAN_WEEKLY_SALES_MODEL, STATISTICIAN_YEARLY_SALES_MODEL, STATISTICIAN_RESULTS, STATISTICIAN_DATASET } from '../data/statisticianResults';
 import { Card } from './CoopInsights';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import { analyticsOrders, buildProductPerformance, predictProductPerformance, performanceName, toProductPredictions } from '../utils/productPerformance';
@@ -45,6 +45,8 @@ const longLabel = (i) => {
 };
 const weekDate = (d, opts = { month: 'short', day: 'numeric' }) => d.toLocaleDateString('en-PH', opts);
 const addWeeks = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n * 7);
+// Huling araw ng sales history na sinuri ng statistician
+const DATASET_END = new Date(`${STATISTICIAN_DATASET.to}T00:00`);
 const listNames = (items) => (items.length <= 2 ? items.join(' and ') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
 
 export default function SalesForecast({ orders: allOrders = [], products = [], isDarkMode, children }) {
@@ -86,7 +88,8 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
     weekly: () => ({
       history: weekly.history,
       forecast: weeklyModelForecast(STATISTICIAN_WEEKLY_SALES_MODEL, weekly.firstWeek, weekly.history.length, config.horizon),
-      mape: backtestLinearMape(weekly.history),
+      // Sinusubok ang accuracy sa sales history ng statistician (kumpleto ang datos hanggang Aug 2026)
+      mape: backtestLinearMape(weekly.history.slice(0, Math.round((weekStart(DATASET_END) - weekly.firstWeek) / (7 * 86400000)))),
       label: (i) => weekDate(addWeeks(weekly.firstWeek, i)),
       longName: (i) => `week of ${weekDate(addWeeks(weekly.firstWeek, i), { month: 'long', day: 'numeric', year: 'numeric' })}`,
       equation: equationText(STATISTICIAN_WEEKLY_SALES_MODEL, 'week no.'),
@@ -96,7 +99,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
     monthly: () => ({
       history,
       forecast: linearModelForecast(STATISTICIAN_MONTHLY_SALES_MODEL, forecastStart, config.horizon),
-      mape: backtestLinearMape(history),
+      mape: backtestLinearMape(history.slice(0, monthIndex(DATASET_END) - firstMonth + 1)),
       label: (i) => shortLabel(firstMonth + i),
       longName: (i) => longLabel(firstMonth + i),
       equation: equationText(STATISTICIAN_MONTHLY_SALES_MODEL, 'month no.'),
@@ -317,7 +320,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
       <Card
         icon={LineChartIcon}
         title="Projected Sales Trend"
-        description={`Actual ${config.adjective} sales and the statistician's ${config.adjective} linear regression forecast (${view.equation}).${accuracy === null ? '' : ` Tested accuracy: ${Math.round(accuracy * 100)}% on the last 6 known ${config.unit}s.`}${view.caution ? ` ${view.caution}` : ''}`}
+        description={`Actual ${config.adjective} sales and the statistician's ${config.adjective} linear regression forecast (${view.equation}).${accuracy === null ? '' : ` Tested accuracy: ${Math.round(accuracy * 100)}% on the last 6 ${config.unit}s of the sales history.`}${view.caution ? ` ${view.caution}` : ''}`}
       >
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[

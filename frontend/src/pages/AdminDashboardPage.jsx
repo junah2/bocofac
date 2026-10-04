@@ -619,11 +619,14 @@ export default function AdminDashboardPage({
   // [UI] Sidebar: nakagrupo bawat section; kapag collapsed, icons lang (may tooltip)
   const SidebarNav = ({ onNavigate, collapsed = false, onToggle }) => (
     <>
-      <div className={`h-20 flex items-center gap-2.5 border-b border-slate-200/80 dark:border-slate-800 shrink-0 ${collapsed ? 'justify-center px-2' : 'px-4'}`}>
+      <div className={`h-20 flex items-center gap-2.5 border-b border-white/10 shrink-0 ${collapsed ? 'justify-center px-2' : 'px-4'}`}>
         {!collapsed && (
           <>
-            <img src={bocofacLogo} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" />
-            <span className="font-serif font-extrabold tracking-tight text-lg text-slate-900 dark:text-white truncate">BOCOFAC</span>
+            <img src={bocofacLogo} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0 ring-2 ring-white/80 shadow" />
+            <span className="min-w-0">
+              <span className="block font-serif font-extrabold tracking-tight text-lg leading-tight text-white truncate">BOCOFAC</span>
+              <span className="block text-[10px] font-semibold uppercase tracking-wider text-emerald-100/80 truncate">Administrator</span>
+            </span>
           </>
         )}
         {onToggle && (
@@ -631,7 +634,7 @@ export default function AdminDashboardPage({
             onClick={onToggle}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className={`p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white cursor-pointer transition-colors ${collapsed ? '' : 'ml-auto'}`}
+            className={`p-1.5 rounded-lg text-emerald-50/80 hover:bg-white/10 hover:text-white cursor-pointer transition-colors ${collapsed ? '' : 'ml-auto'}`}
           >
             {collapsed ? <PanelLeftOpen className="w-[18px] h-[18px]" /> : <PanelLeftClose className="w-[18px] h-[18px]" />}
           </button>
@@ -641,9 +644,9 @@ export default function AdminDashboardPage({
         {NAV_SECTIONS.map(section => (
           <div key={section.label} className="space-y-0.5">
             {collapsed ? (
-              <div className="mx-auto mb-2 w-6 border-t border-slate-200 dark:border-slate-800" />
+              <div className="mx-auto mb-2 w-6 border-t border-white/20" />
             ) : (
-              <p className="px-2.5 pb-1.5 text-[10.5px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{section.label}</p>
+              <p className="px-2.5 pb-1.5 text-[10.5px] font-bold uppercase tracking-widest text-emerald-100/60">{section.label}</p>
             )}
             {section.items.map(item => {
               const Icon = item.icon;
@@ -656,21 +659,20 @@ export default function AdminDashboardPage({
                   title={collapsed ? `${item.label}${badgeCount > 0 ? ` (${badgeCount})` : ''}` : undefined}
                   aria-label={item.label}
                   aria-current={isActive ? 'page' : undefined}
-                  className={`relative w-full flex items-center gap-2.5 h-9 rounded-lg text-[13.5px] cursor-pointer transition-colors text-left ${
+                  className={`relative w-full flex items-center gap-2.5 h-10 rounded-xl text-[13.5px] cursor-pointer transition text-left ${
                     collapsed ? 'justify-center px-0' : 'px-2.5'
                   } ${
                     isActive
-                      ? 'bg-emerald-50 text-emerald-800 font-semibold dark:bg-emerald-900/40 dark:text-emerald-200'
-                      : 'font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-white'
+                      ? 'bg-white text-emerald-700 font-semibold shadow-md'
+                      : 'font-semibold text-emerald-50/90 hover:bg-white/10 hover:text-white'
                   }`}
                 >
-                  {isActive && !collapsed && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-emerald-600 dark:bg-emerald-400" />}
                   <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.9} />
                   {!collapsed && <span className="truncate">{item.label}</span>}
                   {badgeCount > 0 && (collapsed ? (
-                    <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
+                    <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-emerald-600" />
                   ) : (
-                    <span className="ml-auto rounded-md bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 px-1.5 py-0.5 text-[10.5px] font-bold leading-none tabular-nums">
+                    <span className="ml-auto rounded-md bg-rose-500 text-white px-1.5 py-0.5 text-[10.5px] font-bold leading-none tabular-nums">
                       {badgeCount}
                     </span>
                   ))}
@@ -680,31 +682,31 @@ export default function AdminDashboardPage({
           </div>
         ))}
       </nav>
-      <div className={`border-t border-slate-200/80 dark:border-slate-800 p-3 flex items-center gap-2.5 shrink-0 ${collapsed ? 'flex-col' : ''}`}>
+      <div className={`border-t border-white/10 p-3 flex items-center gap-2.5 shrink-0 ${collapsed ? 'flex-col' : ''}`}>
         {admin?.avatarUrl ? (
           <img
             src={resolveImageUrl(admin.avatarUrl)}
             alt=""
             onClick={() => setViewedAvatarUrl(resolveImageUrl(admin.avatarUrl))}
             title="View full photo"
-            className="w-8 h-8 rounded-full object-cover shrink-0 cursor-pointer hover:opacity-80 transition"
+            className="w-8 h-8 rounded-full object-cover shrink-0 cursor-pointer hover:opacity-80 transition ring-2 ring-white/70"
           />
         ) : (
-          <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold text-sm">
+          <div className="w-8 h-8 rounded-full bg-white text-emerald-700 flex items-center justify-center shrink-0 font-bold text-sm">
             {(admin?.name || 'A').slice(0, 1)}
           </div>
         )}
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[12.5px] font-semibold leading-tight text-slate-800 dark:text-slate-100">{admin?.name || 'Admin User'}</p>
-            <p className="truncate text-[11px] leading-tight text-slate-400">{admin?.email || 'Administrator'}</p>
+            <p className="truncate text-[12.5px] font-semibold leading-tight text-white">{admin?.name || 'Admin User'}</p>
+            <p className="truncate text-[11px] leading-tight text-emerald-100/70">{admin?.email || 'Administrator'}</p>
           </div>
         )}
         <button
           onClick={handleLogout}
           title="Logout"
           aria-label="Logout"
-          className="p-1.5 rounded-lg text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 cursor-pointer transition-colors shrink-0"
+          className="p-1.5 rounded-lg text-emerald-50/80 hover:bg-white/10 hover:text-white cursor-pointer transition-colors shrink-0"
         >
           <LogOut className="w-[18px] h-[18px]" />
         </button>
@@ -715,13 +717,13 @@ export default function AdminDashboardPage({
   return (
     <div className="h-screen flex bg-[#faf8f4] dark:bg-slate-950 text-slate-900 dark:text-slate-100">
 
-      <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-[68px]' : 'w-60'} transition-[width] duration-200 bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 flex-col shrink-0 select-none sticky top-0 h-[calc(100vh-var(--footer-h,0px))]`}>
+      <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-[68px]' : 'w-60'} transition-[width] duration-200 bg-gradient-to-b from-emerald-600 to-emerald-700 dark:from-emerald-800 dark:to-emerald-950 flex-col shrink-0 select-none sticky top-0 h-[calc(100vh-var(--footer-h,0px))]`}>
         <SidebarNav collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       </aside>
 
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="w-64 bg-white dark:bg-slate-900 flex flex-col h-full shadow-xl">
+          <div className="w-64 bg-gradient-to-b from-emerald-600 to-emerald-700 dark:from-emerald-800 dark:to-emerald-950 flex flex-col h-full shadow-xl">
             <SidebarNav onNavigate={() => setMobileMenuOpen(false)} />
           </div>
           <div className="flex-1 bg-slate-950/50" onClick={() => setMobileMenuOpen(false)} />
