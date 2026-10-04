@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ResponsiveContainer, BarChart, Bar, Cell, CartesianGrid, XAxis, YAxis, Tooltip, LabelList } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, Cell, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 import { CalendarDays } from 'lucide-react';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -79,7 +79,6 @@ export default function BusiestOrderingDays({ orders = [], isDarkMode }) {
                   {days.map((d) => (
                     <Cell key={d.day} fill={d.day === busiest.day ? palette.busiest : palette.other} />
                   ))}
-                  <LabelList dataKey="count" position="top" style={{ fontSize: 11, fontWeight: 700, fill: palette.axis }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
