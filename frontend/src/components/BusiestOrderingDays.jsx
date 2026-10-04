@@ -28,6 +28,11 @@ export function weekdayStats(orders) {
 export default function BusiestOrderingDays({ orders = [], isDarkMode }) {
   const palette = PALETTE[isDarkMode ? 'dark' : 'light'];
   const { days, total, busiest, quietest } = useMemo(() => weekdayStats(orders), [orders]);
+  // [UI] Hindi nagsisimula sa 0 ang axis para makita ang maliliit na pagitan ng mga araw
+  const spread = busiest.count - quietest.count;
+  const padding = Math.max(2, Math.ceil(spread * 0.6));
+  const yDomain = [Math.max(0, quietest.count - padding), busiest.count + padding];
+  const nearlyEven = total > 0 && spread <= busiest.count * 0.05;
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm p-6 space-y-4 text-left min-w-0">
@@ -61,7 +66,7 @@ export default function BusiestOrderingDays({ orders = [], isDarkMode }) {
               <BarChart data={days} margin={{ top: 22, right: 8, left: -12, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={palette.grid} vertical={false} />
                 <XAxis dataKey="day" tick={{ fontSize: 11, fill: palette.axis }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: palette.axis }} axisLine={false} tickLine={false} width={40} />
+                <YAxis allowDecimals={false} domain={yDomain} allowDataOverflow tick={{ fontSize: 11, fill: palette.axis }} axisLine={false} tickLine={false} width={40} />
                 <Tooltip
                   cursor={{ fill: 'rgba(148,163,184,0.12)' }}
                   content={({ active, payload }) => (active && payload?.length ? (
@@ -74,17 +79,17 @@ export default function BusiestOrderingDays({ orders = [], isDarkMode }) {
                   {days.map((d) => (
                     <Cell key={d.day} fill={d.day === busiest.day ? palette.busiest : palette.other} />
                   ))}
-                  <LabelList dataKey="count" content={(p) => (p.value === busiest.count && p.value > 0 ? <text x={p.x + p.width / 2} y={p.y - 8} textAnchor="middle" fontSize={11} fontWeight={700} fill={palette.axis}>Busiest</text> : null)} />
+                  <LabelList dataKey="count" position="top" style={{ fontSize: 11, fontWeight: 700, fill: palette.axis }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
 
-          {busiest.count > quietest.count && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Restock before <span className="font-semibold text-slate-700 dark:text-slate-200">{busiest.name}</span> and try running promos on <span className="font-semibold text-slate-700 dark:text-slate-200">{quietest.name}</span>.
-            </p>
-          )}
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {nearlyEven
+              ? <>Orders are spread almost evenly across the week: only <span className="font-semibold text-slate-700 dark:text-slate-200">{spread.toLocaleString()}</span> orders separate the busiest and quietest day.</>
+              : <>Most orders come in on <span className="font-semibold text-slate-700 dark:text-slate-200">{busiest.name}</span>, the fewest on <span className="font-semibold text-slate-700 dark:text-slate-200">{quietest.name}</span>.</>}
+          </p>
         </>
       )}
     </div>
