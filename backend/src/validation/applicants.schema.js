@@ -100,6 +100,19 @@ const applicantCreateSchema = z.object({
   orNumber: z.string().regex(/^\d{13}$/, 'Reference number must be 13 digits.').optional().nullable().or(z.literal('')),
 
   farmProfile: farmProfileSchema.optional().nullable(),
+}).superRefine((val, ctx) => {
+  // [VALIDATION] Mga impormasyong hindi pwedeng laktawan sa membership application
+  const required = [
+    ['firstName', 'first name'], ['lastName', 'family name'], ['birthdate', 'birthday'], ['birthplace', 'birthplace'],
+    ['gender', 'gender'], ['civilStatus', 'civil status'], ['phone', 'mobile number'], ['barangay', 'barangay'],
+    ['munCity', 'municipality / city'], ['occupation', 'occupation'], ['spouseContactPerson', 'contact person'],
+    ['spouseCpNumber', "contact person's number"], ['eduAttainment', 'educational attainment'], ['idType', 'ID type'],
+    ['idNumber', 'ID number'],
+  ];
+  const missing = required.filter(([key]) => !val[key] || (typeof val[key] === 'string' && !val[key].trim()));
+  if (missing.length > 0) {
+    ctx.addIssue({ code: 'custom', path: [missing[0][0]], message: `Please fill in: ${missing.map(([, label]) => label).join(', ')}.` });
+  }
 });
 
 module.exports = { applicantCreateSchema, dependentSchema, farmProfileSchema };

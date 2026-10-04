@@ -77,6 +77,9 @@ function computeAge(birthdateStr) {
 
 const inputClass = "w-full px-4 text-sm py-2.5 rounded-xl border bg-white dark:bg-slate-950 text-slate-900 dark:text-white";
 const labelClass = "block text-xs font-semibold text-slate-500 mb-1";
+// [VALIDATION] Pulang asterisk sa mga field na kailangang punan; pulang border kapag nilaktawan
+const Req = () => <span className="text-rose-600" aria-hidden="true">*</span>;
+const missingClass = 'border-rose-500 ring-1 ring-rose-500/40';
 
 const digitsOnly = (value, maxLen) => value.replace(/\D/g, '').slice(0, maxLen);
 const lettersOnly = (value) => value.replace(/[^A-Za-zÀ-ÿ\s.'-]/g, '');
@@ -133,7 +136,7 @@ const VALID_ID_TYPES = [
   "Senior Citizen's ID", 'Single Parent', 'SSS', 'TIN', "Voter's ID",
 ];
 
-function SelectField({ label, value, onChange, options, placeholder = 'Select...' }) {
+function SelectField({ label, value, onChange, options, placeholder = 'Select...', required = false, invalid = false }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
 
@@ -153,11 +156,11 @@ function SelectField({ label, value, onChange, options, placeholder = 'Select...
 
   return (
     <div ref={wrapRef} className="relative">
-      <label className={labelClass}>{label}</label>
+      <label className={labelClass}>{label}{required && <> <Req /></>}</label>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`${inputClass} flex items-center justify-between gap-2 text-left cursor-pointer focus:outline-none`}
+        className={`${inputClass} ${invalid ? missingClass : ''} flex items-center justify-between gap-2 text-left cursor-pointer focus:outline-none`}
       >
         <span className={`truncate ${value ? '' : 'text-slate-400'}`}>{value || placeholder}</span>
         <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -552,8 +555,68 @@ export default function MembershipPortal({
     setRegFeePaid(false); setRefNum(''); setFeeReceiptPreview(''); setFeeReceiptFile(null); setReceiptDigitRuns(null);
   };
 
+  // [VALIDATION] Mga kailangang punan bawat hakbang ng form (key = pangalan ng field, label = nakikita ng applicant)
+  const [checkedSteps, setCheckedSteps] = useState({});
+  const requiredByStep = {
+    1: [
+      ['firstName', 'First Name', firstName.trim()],
+      ['lastName', 'Family Name', lastName.trim()],
+      ['birthdate', 'Birthday', birthdate],
+      ['birthplace', 'Birthplace', birthplace.trim()],
+      ['gender', 'Gender', gender],
+      ['civilStatus', 'Civil Status', civilStatus],
+      ['phone', 'CP # / Mobile Number (11 digits, starts with 09)', isValidPhone(phone)],
+      ['email', 'Email Address', isValidEmail(email)],
+    ],
+    2: [
+      ['barangay', 'Barangay', barangay.trim()],
+      ['munCity', 'Mun. / City', munCity.trim()],
+      ['occupation', 'Occupation', occupation.trim()],
+    ],
+    3: [
+      ['spouseContactPerson', 'Spouse / Contact Person', spouseContactPerson.trim()],
+      ['spouseCpNumber', 'Contact Person CP # (11 digits, starts with 09)', isValidPhone(spouseCpNumber)],
+    ],
+    4: [
+      ['eduAttainment', 'Educational Attainment', eduAttainment],
+    ],
+    5: [
+      ['idType', 'ID Type', idType],
+      ['idNumber', idFormat ? `ID # (${idFormat.example})` : 'ID #', idNumber && isValidIdNumber(idType, idNumber)],
+      ['validId', 'Valid ID Photo', validIdAttached],
+    ],
+  };
+  const missingIn = (step) => (requiredByStep[step] || []).filter(([, , ok]) => !ok);
+  // Pula lang ang field kapag sinubukan nang lumampas sa hakbang na iyon
+  const isMissing = (step, key) => !!checkedSteps[step] && missingIn(step).some(([k]) => k === key);
+  const req = (step, key) => (isMissing(step, key) ? missingClass : '');
+  // Tinitingnan ang hakbang; kapag may kulang, sinasabi kung alin at hindi pinapalampas
+  const passStep = (step) => {
+    const missing = missingIn(step);
+    if (missing.length === 0) return true;
+    setCheckedSteps((prev) => ({ ...prev, [step]: true }));
+    onToast(`Please fill in: ${missing.map(([, label]) => label).join(', ')}.`, 'error');
+    return false;
+  };
+  // Makakapunta lang sa isang hakbang kapag kumpleto ang lahat ng nauna
+  const goToStep = (target) => {
+    for (let step = 1; step < target; step++) {
+      if (!passStep(step)) {
+        setWizardStep(step);
+        return;
+      }
+    }
+    setWizardStep(target);
+  };
+
   const submitApplication = async (e) => {
     e.preventDefault();
+    for (let step = 1; step <= 5; step++) {
+      if (!passStep(step)) {
+        setWizardStep(step);
+        return;
+      }
+    }
     if (!firstName || !lastName || !email || !barangay || !munCity) {
       onToast('Please fill in essential profile and address fields.', 'error');
       return;
@@ -1069,12 +1132,12 @@ export default function MembershipPortal({
 
             <div className="grid grid-cols-2 sm:grid-cols-7 gap-2 text-center text-[10px] font-bold">
               <div onClick={() => setWizardStep(1)} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 1 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Personal</div>
-              <div onClick={() => { if (firstName) setWizardStep(2); }} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 2 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Address</div>
-              <div onClick={() => { if (firstName) setWizardStep(3); }} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 3 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Family</div>
-              <div onClick={() => { if (firstName) setWizardStep(4); }} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 4 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Farm/Edu</div>
-              <div onClick={() => { if (firstName) setWizardStep(5); }} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 5 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Requirements</div>
-              <div onClick={() => { if (firstName) setWizardStep(6); }} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 6 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Payment</div>
-              <div onClick={() => { if (firstName) setWizardStep(7); }} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 7 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Review</div>
+              <div onClick={() => goToStep(2)} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 2 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Address</div>
+              <div onClick={() => goToStep(3)} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 3 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Family</div>
+              <div onClick={() => goToStep(4)} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 4 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Farm/Edu</div>
+              <div onClick={() => goToStep(5)} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 5 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Requirements</div>
+              <div onClick={() => goToStep(6)} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 6 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Payment</div>
+              <div onClick={() => goToStep(7)} className={`py-2 rounded-lg cursor-pointer transition ${wizardStep >= 7 ? 'bg-emerald-800 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-400'}`}>Review</div>
             </div>
 
             {wizardStep === 1 && (
@@ -1085,16 +1148,16 @@ export default function MembershipPortal({
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
-                    <label className={labelClass}>First Name</label>
-                    <input type="text" value={firstName} onChange={onLetters(setFirstName)} placeholder="Estela" className={inputClass}  autoComplete="off"/>
+                    <label className={labelClass}>First Name <Req /></label>
+                    <input type="text" value={firstName} onChange={onLetters(setFirstName)} placeholder="Estela" className={`${inputClass} ${req(1, 'firstName')}`}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Middle Name</label>
                     <input type="text" value={middleName} onChange={onLetters(setMiddleName)} placeholder="Reyes" className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
-                    <label className={labelClass}>Family Name</label>
-                    <input type="text" value={lastName} onChange={onLetters(setLastName)} placeholder="Custodio" className={inputClass}  autoComplete="off"/>
+                    <label className={labelClass}>Family Name <Req /></label>
+                    <input type="text" value={lastName} onChange={onLetters(setLastName)} placeholder="Custodio" className={`${inputClass} ${req(1, 'lastName')}`}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Suffix</label>
@@ -1103,28 +1166,30 @@ export default function MembershipPortal({
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
-                    <label className={labelClass}>Birthday</label>
-                    <input type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)} className={inputClass} autoComplete="off" />
+                    <label className={labelClass}>Birthday <Req /></label>
+                    <input type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)} className={`${inputClass} ${req(1, 'birthdate')}`} autoComplete="off" />
                   </div>
                   <div>
                     <label className={labelClass}>Age</label>
                     <input type="text" readOnly value={computeAge(birthdate) ?? ''} placeholder="Auto-computed" className={`${inputClass} opacity-70`}  autoComplete="off"/>
                   </div>
                   <div>
-                    <label className={labelClass}>Birthplace</label>
-                    <input type="text" value={birthplace} onChange={onLetters(setBirthplace)} placeholder="Naga City" className={inputClass}  autoComplete="off"/>
+                    <label className={labelClass}>Birthplace <Req /></label>
+                    <input type="text" value={birthplace} onChange={onLetters(setBirthplace)} placeholder="Naga City" className={`${inputClass} ${req(1, 'birthplace')}`}  autoComplete="off"/>
                   </div>
-                  <SelectField label="Gender" value={gender} onChange={(e) => setGender(e.target.value)} options={['Female', 'Male']} />
+                  <SelectField label="Gender" required invalid={isMissing(1, 'gender')} value={gender} onChange={(e) => setGender(e.target.value)} options={['Female', 'Male']} />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <SelectField
                     label="Civil Status"
+                    required
+                    invalid={isMissing(1, 'civilStatus')}
                     value={civilStatus}
                     onChange={(e) => setCivilStatus(e.target.value)}
                     options={['Single', 'Married', 'Widowed', 'Separated']}
                   />
                   <div>
-                    <label className={labelClass}>CP # / Mobile Number</label>
+                    <label className={labelClass}>CP # / Mobile Number <Req /></label>
                     <input
                       type="tel"
                       inputMode="numeric"
@@ -1132,7 +1197,7 @@ export default function MembershipPortal({
                       value={phone}
                       onChange={onDigits(setPhone, 11)}
                       placeholder="09171234567"
-                      className={`${inputClass} ${validationBorderClass(phone, isValidPhone(phone))}`}
+                      className={`${inputClass} ${validationBorderClass(phone, isValidPhone(phone))} ${req(1, 'phone')}`}
                      autoComplete="off"/>
                     {phone && !isValidPhone(phone) && (
                       <p className="text-[11px] text-red-600 dark:text-red-400 mt-1">Must be 11 digits starting with 09 (e.g., 09171234567).</p>
@@ -1140,7 +1205,7 @@ export default function MembershipPortal({
                   </div>
                 </div>
                 <div>
-                  <label className={labelClass}>Active Email Address</label>
+                  <label className={labelClass}>Active Email Address <Req /></label>
                   <input
                     type="email"
                     value={email}
@@ -1148,7 +1213,7 @@ export default function MembershipPortal({
                     onBlur={(e) => { if (!user) { checkPmesAttendance(e.target.value); checkMyPmesRegistration(e.target.value); } }}
                     placeholder="estela@outlook.com"
                     readOnly={!!user}
-                    className={`${inputClass} ${user ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    className={`${inputClass} ${user ? 'opacity-70 cursor-not-allowed' : ''} ${req(1, 'email')}`}
                     autoComplete="off"
                   />
                   {!user && email && !isValidEmail(email) && (
@@ -1162,21 +1227,7 @@ export default function MembershipPortal({
                 </div>
                 <div className="flex justify-end pt-4">
                   <button
-                    onClick={() => {
-                      if (!firstName || !lastName || !email) {
-                        onToast('Please complete name and email before moving on.', 'error');
-                        return;
-                      }
-                      if (!isValidEmail(email)) {
-                        onToast('Please enter a valid email address (e.g., name@gmail.com).', 'error');
-                        return;
-                      }
-                      if (phone && !isValidPhone(phone)) {
-                        onToast('Contact number must be 11 digits starting with 09 (e.g., 09171234567).', 'error');
-                        return;
-                      }
-                      setWizardStep(2);
-                    }}
+                    onClick={() => { if (passStep(1)) setWizardStep(2); }}
                     className="px-5 py-2 rounded-xl bg-emerald-800 text-white font-semibold text-xs flex items-center gap-1 cursor-pointer"
                   >
                     Address & Background <ChevronRight className="w-4 h-4" />
@@ -1201,12 +1252,12 @@ export default function MembershipPortal({
                     <input type="text" value={zone} onChange={onAlnum(setZone)} className={inputClass}  autoComplete="off"/>
                   </div>
                   <div>
-                    <label className={labelClass}>Barangay</label>
-                    <input type="text" value={barangay} onChange={onLetters(setBarangay)} placeholder="North Villazar" className={inputClass}  autoComplete="off"/>
+                    <label className={labelClass}>Barangay <Req /></label>
+                    <input type="text" value={barangay} onChange={onLetters(setBarangay)} placeholder="North Villazar" className={`${inputClass} ${req(2, 'barangay')}`}  autoComplete="off"/>
                   </div>
                   <div>
-                    <label className={labelClass}>Mun. / City</label>
-                    <input type="text" value={munCity} onChange={onLetters(setMunCity)} placeholder="Sipocot" className={inputClass}  autoComplete="off"/>
+                    <label className={labelClass}>Mun. / City <Req /></label>
+                    <input type="text" value={munCity} onChange={onLetters(setMunCity)} placeholder="Sipocot" className={`${inputClass} ${req(2, 'munCity')}`}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Facebook</label>
@@ -1216,8 +1267,8 @@ export default function MembershipPortal({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className={labelClass}>Occupation</label>
-                    <input type="text" value={occupation} onChange={onLetters(setOccupation)} className={inputClass}  autoComplete="off"/>
+                    <label className={labelClass}>Occupation <Req /></label>
+                    <input type="text" value={occupation} onChange={onLetters(setOccupation)} className={`${inputClass} ${req(2, 'occupation')}`}  autoComplete="off"/>
                   </div>
                   <div>
                     <label className={labelClass}>Employer</label>
@@ -1246,13 +1297,7 @@ export default function MembershipPortal({
                     Back to Personal
                   </button>
                   <button
-                    onClick={() => {
-                      if (!barangay || !munCity) {
-                        onToast('Please complete Barangay and Mun./City before moving on.', 'error');
-                        return;
-                      }
-                      setWizardStep(3);
-                    }}
+                    onClick={() => { if (passStep(2)) setWizardStep(3); }}
                     className="px-5 py-2 rounded-xl bg-emerald-800 text-white font-semibold text-xs flex items-center gap-1 cursor-pointer"
                   >
                     Family & Dependents <ChevronRight className="w-4 h-4" />
@@ -1265,12 +1310,12 @@ export default function MembershipPortal({
               <div className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className={labelClass}>Spouse / Contact Person</label>
-                    <input type="text" value={spouseContactPerson} onChange={onLetters(setSpouseContactPerson)} className={inputClass}  autoComplete="off"/>
+                    <label className={labelClass}>Spouse / Contact Person <Req /></label>
+                    <input type="text" value={spouseContactPerson} onChange={onLetters(setSpouseContactPerson)} className={`${inputClass} ${req(3, 'spouseContactPerson')}`}  autoComplete="off"/>
                   </div>
                   <div>
-                    <label className={labelClass}>CP #s</label>
-                    <input type="tel" inputMode="numeric" maxLength={11} value={spouseCpNumber} onChange={onDigits(setSpouseCpNumber, 11)} placeholder="09171234567" className={`${inputClass} ${validationBorderClass(spouseCpNumber, isValidPhone(spouseCpNumber))}`}  autoComplete="off"/>
+                    <label className={labelClass}>CP #s <Req /></label>
+                    <input type="tel" inputMode="numeric" maxLength={11} value={spouseCpNumber} onChange={onDigits(setSpouseCpNumber, 11)} placeholder="09171234567" className={`${inputClass} ${validationBorderClass(spouseCpNumber, isValidPhone(spouseCpNumber))} ${req(3, 'spouseCpNumber')}`}  autoComplete="off"/>
                     {spouseCpNumber && !isValidPhone(spouseCpNumber) && (
                       <p className="text-[11px] text-red-600 dark:text-red-400 mt-1">Must be 11 digits starting with 09.</p>
                     )}
@@ -1323,7 +1368,7 @@ export default function MembershipPortal({
                     Back to Address
                   </button>
                   <button
-                    onClick={() => setWizardStep(4)}
+                    onClick={() => { if (passStep(3)) setWizardStep(4); }}
                     className="px-5 py-2 rounded-xl bg-emerald-800 text-white font-semibold text-xs flex items-center gap-1 cursor-pointer"
                   >
                     Farm & Education <ChevronRight className="w-4 h-4" />
@@ -1343,7 +1388,7 @@ export default function MembershipPortal({
                   </p>
                 </div>
                 <div>
-                  <SelectField label="Educational Attainment" value={eduAttainment} onChange={(e) => setEduAttainment(e.target.value)} options={EDU_ATTAINMENT_OPTIONS} />
+                  <SelectField label="Educational Attainment" required invalid={isMissing(4, 'eduAttainment')} value={eduAttainment} onChange={(e) => setEduAttainment(e.target.value)} options={EDU_ATTAINMENT_OPTIONS} />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1450,7 +1495,7 @@ export default function MembershipPortal({
                     Back to Family
                   </button>
                   <button
-                    onClick={() => setWizardStep(5)}
+                    onClick={() => { if (passStep(4)) setWizardStep(5); }}
                     className="px-5 py-2 rounded-xl bg-emerald-800 text-white font-semibold text-xs flex items-center gap-1 cursor-pointer"
                   >
                     Requirements <ChevronRight className="w-4 h-4" />
@@ -1468,15 +1513,15 @@ export default function MembershipPortal({
                       <label className={labelClass}>EDUCOM Chairperson</label>
                       <input type="text" value={educomChairperson} onChange={onLetters(setEducomChairperson)} className={inputClass}  autoComplete="off"/>
                     </div>
-                    <SelectField label="ID Type" value={idType} onChange={(e) => { setIdType(e.target.value); setIdNumber(''); }} options={VALID_ID_TYPES} />
+                    <SelectField label="ID Type" required invalid={isMissing(5, 'idType')} value={idType} onChange={(e) => { setIdType(e.target.value); setIdNumber(''); }} options={VALID_ID_TYPES} />
                     <div>
-                      <label className={labelClass}>ID #</label>
+                      <label className={labelClass}>ID # <Req /></label>
                       <input
                         type="text"
                         value={idNumber}
                         onChange={onAlnum(setIdNumber)}
                         placeholder={idFormat?.example || ''}
-                        className={inputClass}
+                        className={`${inputClass} ${req(5, 'idNumber')}`}
                        autoComplete="off"/>
                       {idFormat && (
                         <p className="text-[11px] text-slate-400 mt-1">Format: {idFormat.example} — {idFormat.hint}</p>
@@ -1512,7 +1557,7 @@ export default function MembershipPortal({
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
-                    <div className="border border-dashed rounded-xl p-4 text-center space-y-2 hover:border-emerald-500 transition relative bg-slate-50/50 dark:bg-slate-950/20">
+                    <div className={`border border-dashed rounded-xl p-4 text-center space-y-2 hover:border-emerald-500 transition relative bg-slate-50/50 dark:bg-slate-950/20 ${isMissing(5, 'validId') ? 'border-rose-500 bg-rose-50/40' : ''}`}>
                       <input
                         type="file"
                         accept="image/*,application/pdf"
@@ -1526,7 +1571,7 @@ export default function MembershipPortal({
                           {validIdAttached ? <Check className="w-4 h-4 text-emerald-600" /> : <Upload className="w-4 h-4 text-slate-400" />}
                         </div>
                       )}
-                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{idType || 'Valid Govt ID'} Photo</p>
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{idType || 'Valid Govt ID'} Photo <Req /></p>
                       <p className="text-[10px] text-slate-400 line-clamp-1">{validIdAttached ? validIdName : 'Click to attach (PNG/PDF)'}</p>
                       {validIdAttached && <p className="text-[10px] text-slate-400">Click or drag again to replace</p>}
                       {validIdPreview && (
@@ -1554,17 +1599,7 @@ export default function MembershipPortal({
                     Back to Farm/Edu
                   </button>
                   <button
-                    onClick={() => {
-                      if (!validIdAttached) {
-                        onToast('Please submit at least one valid identity document to proceed.', 'error');
-                        return;
-                      }
-                      if (idType && idNumber && !isValidIdNumber(idType, idNumber)) {
-                        onToast(`ID Number does not match the ${idType} format${idFormat ? ` (${idFormat.example})` : ''}.`, 'error');
-                        return;
-                      }
-                      setWizardStep(6);
-                    }}
+                    onClick={() => { if (passStep(5)) setWizardStep(6); }}
                     className="px-5 py-2 rounded-xl bg-emerald-800 text-white font-semibold text-xs flex items-center gap-1 cursor-pointer"
                   >
                     Membership Fees <ChevronRight className="w-4 h-4" />

@@ -222,6 +222,26 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
   const shippingAddress = [streetAddress, barangay && `Barangay ${barangay}`, cityMunicipality, province]
     .filter(Boolean).join(', ');
 
+  // [VALIDATION] Mga kailangang punan sa checkout; pula ang nilaktawan pagkatapos pindutin ang Proceed
+  const [triedCheckout, setTriedCheckout] = useState(false);
+  const checkoutRequired = [
+    ['name', 'Full Name', recipientName.trim()],
+    ['email', 'Email Address', /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())],
+    ['phone', 'Mobile number (11 digits, starts with 09)', isValidPhone11(recipientPhone)],
+    ['street', 'Street / House No.', streetAddress.trim()],
+    ['province', 'Province', province],
+    ['city', 'City / Municipality', cityMunicipality.trim()],
+    ['barangay', 'Barangay', barangay.trim()],
+  ];
+  const checkoutMissing = checkoutRequired.filter(([, , ok]) => !ok);
+  const missingBorder = (key) => (triedCheckout && checkoutMissing.some(([k]) => k === key) ? ' !border-rose-500 ring-1 ring-rose-500/40' : '');
+  const checkShipping = () => {
+    if (checkoutMissing.length === 0 && shippingZone) return true;
+    setTriedCheckout(true);
+    onToast(checkoutMissing.length > 0 ? `Please fill in: ${checkoutMissing.map(([, label]) => label).join(', ')}.` : 'Please choose your province and city so we can find your delivery zone.', 'error');
+    return false;
+  };
+
   useEffect(() => {
     if (!user?.email) return;
     try {
@@ -346,8 +366,8 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
 
   const submitManualPayment = async (e) => {
     e.preventDefault();
-    if (!recipientName || !recipientEmail || !streetAddress || !shippingZone) {
-      onToast('Please fill out all required shipping fields.', 'error');
+    if (!checkShipping()) {
+      setCheckoutStep(1);
       return;
     }
 
@@ -633,30 +653,30 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white">Shipping & Contact Details</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Full Name</label>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Full Name <span className="text-rose-600">*</span></label>
                       <input
                         type="text"
                         required
                         value={recipientName}
                         onChange={(e) => setRecipientName(e.target.value)}
                         placeholder="Juan Dela Cruz"
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white"
+                        className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white${missingBorder('name')}`}
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Email Address</label>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Email Address <span className="text-rose-600">*</span></label>
                       <input
                         type="email"
                         required
                         value={recipientEmail}
                         onChange={(e) => setRecipientEmail(e.target.value)}
                         placeholder="juan.delacruz@gmail.com"
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white"
+                        className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white${missingBorder('email')}`}
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Mobile number</label>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Mobile number <span className="text-rose-600">*</span></label>
                     <input
                       type="tel"
                       inputMode="numeric"
@@ -664,28 +684,28 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                       value={recipientPhone}
                       onChange={(e) => setRecipientPhone(digitsOnly(e.target.value, 11))}
                       placeholder="09171234567"
-                      className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 text-slate-900 dark:text-white ${validationBorderClass(recipientPhone, isValidPhone11(recipientPhone))}`}
+                      className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 text-slate-900 dark:text-white ${validationBorderClass(recipientPhone, isValidPhone11(recipientPhone))}${missingBorder('phone')}`}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Street / House No. / Landmark</label>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Street / House No. / Landmark <span className="text-rose-600">*</span></label>
                     <textarea
                       required
                       value={streetAddress}
                       onChange={(e) => setStreetAddress(e.target.value)}
                       placeholder="123 Rizal St., near the barangay hall"
                       rows={2}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white resize-none"
+                      className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white resize-none${missingBorder('street')}`}
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Province</label>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Province <span className="text-rose-600">*</span></label>
                       <select
                         required
                         value={province}
                         onChange={onProvinceChange}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white"
+                        className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white${missingBorder('province')}`}
                       >
                         <option value="">Select province</option>
                         {FOCUS_PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
@@ -693,13 +713,13 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">City / Municipality</label>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">City / Municipality <span className="text-rose-600">*</span></label>
                       {isFocusProvince ? (
                         <select
                           required
                           value={cityMunicipality}
                           onChange={onCityChange}
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white"
+                          className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white${missingBorder('city')}`}
                         >
                           <option value="">Select city/municipality</option>
                           {citiesForProvince.map(c => <option key={c} value={c}>{c}</option>)}
@@ -712,17 +732,17 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                           value={cityMunicipality}
                           onChange={onCityChange}
                           placeholder={province ? 'e.g. Legazpi City' : 'Select a province first'}
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white disabled:opacity-50"
+                          className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white disabled:opacity-50${missingBorder('city')}`}
                         />
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Barangay</label>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Barangay <span className="text-rose-600">*</span></label>
                       {isFocusProvince && barangaysForCity.length > 0 ? (
                         <select
                           value={barangay}
                           onChange={(e) => setBarangay(e.target.value)}
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white"
+                          className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white${missingBorder('barangay')}`}
                         >
                           <option value="">Select barangay</option>
                           {barangaysForCity.map(b => <option key={b} value={b}>{b}</option>)}
@@ -734,7 +754,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
                           value={barangay}
                           onChange={(e) => setBarangay(e.target.value)}
                           placeholder={cityMunicipality ? 'e.g. Poblacion' : 'Select a city/municipality first'}
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white disabled:opacity-50"
+                          className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white disabled:opacity-50${missingBorder('barangay')}`}
                         />
                       )}
                     </div>
@@ -756,13 +776,7 @@ export default function Storefront({ user, products, cart, setCart, onAddOrder, 
 
                   <div className="flex justify-end pt-4">
                     <button
-                      onClick={() => {
-                        if (!recipientName || !recipientEmail || !streetAddress || !shippingZone) {
-                          onToast('Please fill out all required fields before continuing.', 'error');
-                          return;
-                        }
-                        setCheckoutStep(2);
-                      }}
+                      onClick={() => { if (checkShipping()) setCheckoutStep(2); }}
                       className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm flex items-center gap-2 transition"
                     >
                       Proceed to Verification <ChevronRight className="w-4 h-4" />

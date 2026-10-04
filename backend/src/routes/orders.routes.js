@@ -93,6 +93,13 @@ router.post('/', requireAuth, uploadOrderReceipt.single('receipt'), validate(ord
   if (!paymentMethod) {
     return res.status(400).json({ error: 'paymentMethod is required.' });
   }
+  // [VALIDATION] Kailangan ang mobile number at address para maihatid ang order
+  if (!phone || !/^09\d{9}$/.test(phone)) {
+    return res.status(400).json({ error: 'A mobile number (11 digits starting with 09) is required.' });
+  }
+  if (!shippingAddress || !shippingAddress.trim()) {
+    return res.status(400).json({ error: 'A delivery address is required.' });
+  }
   if (!Object.prototype.hasOwnProperty.call(SHIPPING_ZONES, shippingZone)) {
     return res.status(400).json({ error: `shippingZone must be one of: ${Object.keys(SHIPPING_ZONES).join(', ')}` });
   }
