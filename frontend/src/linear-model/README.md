@@ -26,8 +26,9 @@ Sep 2026 forecast is ₱35,709.50 and 42.85 orders).
 
 ## 2. Trained model (`model.js`)
 
-The product performance (sales) coefficients from `training/trained_model.json` that the dashboard uses,
-plus the results table of all six regressions (R, R², p-value) and the date range of the training data.
+The coefficients from `training/trained_model.json` that the dashboard uses: product performance (sales) and
+customer purchase pattern (orders), each weekly, monthly, and yearly. It also holds the results table of all
+six regressions (R, R², p-value) and the date range of the training data.
 After retraining, copy the new constants and slopes from `trained_model.json` into this file.
 
 ## 3. Prediction code
@@ -43,3 +44,4 @@ After retraining, copy the new constants and slopes from `trained_model.json` in
 |---|---|
 | `SalesForecast.jsx` | The Analytics page: projected sales, previous period, expected change, the sales trend chart, and the suggestions. |
 | `ProductForecast.jsx` | The Product Performance Forecast: summary cards, the prediction table, the demand chart, top products, and Actual vs Predicted. |
+| `OrdersForecast.jsx` | The Customer Purchase Pattern Forecast: projected orders, previous period, expected change, average sale per order, the orders chart, and the model's accuracy, R², and p-value. |

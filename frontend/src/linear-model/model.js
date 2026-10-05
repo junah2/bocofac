@@ -29,6 +29,23 @@ export const STATISTICIAN_YEARLY_SALES_MODEL = {
   predicts: 2027, // 2027 ang hinulaan ng statistician
 };
 
+// [PREDICTIVE ANALYTICS] Customer Purchase Pattern: bilang ng orders = constant + B x t (galing sa
+// training/trained_model.json). Pareho ang t ng sales models: taon, buwan (Nov 2021 = 1), linggo (Nov 1, 2021 = 1).
+export const STATISTICIAN_MONTHLY_ORDERS_MODEL = {
+  firstMonth: { year: 2021, month: 10 },
+  constant: 42.80036,
+  slope: 0.00092282, // Sep 2026 (t = 59) = 42.85 orders
+};
+export const STATISTICIAN_WEEKLY_ORDERS_MODEL = {
+  firstWeekStart: '2021-11-01T00:00:00',
+  constant: 9.93008,
+  slope: -0.00088107, // linggo ng Sep 7, 2026 (t = 254) = 9.71 orders
+};
+export const STATISTICIAN_YEARLY_ORDERS_MODEL = {
+  constant: -73357.0286,
+  slope: 36.457143, // 2027 = 541.60 orders
+};
+
 export const STATISTICIAN_RESULTS = [
   {
     level: 'Yearly',

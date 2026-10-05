@@ -14,11 +14,13 @@ import {
 import { Lightbulb, LineChart as LineChartIcon, Layers, AlertTriangle, TrendingUp, TrendingDown, History, ShoppingBag, PhilippinePeso, X, BarChart3 } from 'lucide-react';
 import { MONTH_LABELS } from '../utils/dateBuckets';
 import { buildSalesForecast, buildWeeklySales, buildYearlySales, weekStart, monthIndex, ANALYTICS_ORDER_STATUSES, monthFromIndex, backtestLinearMape, linearModelForecast, weeklyModelForecast, yearlyModelForecast } from './forecast';
-import { STATISTICIAN_MONTHLY_SALES_MODEL, STATISTICIAN_WEEKLY_SALES_MODEL, STATISTICIAN_YEARLY_SALES_MODEL, STATISTICIAN_RESULTS, STATISTICIAN_DATASET } from './model';
+import { STATISTICIAN_MONTHLY_SALES_MODEL, STATISTICIAN_WEEKLY_SALES_MODEL, STATISTICIAN_YEARLY_SALES_MODEL, STATISTICIAN_RESULTS, STATISTICIAN_DATASET,
+  STATISTICIAN_MONTHLY_ORDERS_MODEL, STATISTICIAN_WEEKLY_ORDERS_MODEL, STATISTICIAN_YEARLY_ORDERS_MODEL } from './model';
 import { Card } from '../components/CoopInsights';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import { analyticsOrders, buildProductPerformance, predictProductPerformance, performanceName, toProductPredictions } from './productPerformance';
 import ProductForecast from './ProductForecast';
+import OrdersForecast from './OrdersForecast';
 import BusiestOrderingDays from '../components/BusiestOrderingDays';
 
 const PALETTE = {
@@ -84,12 +86,16 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
     : 'monthly';
   const config = PERIODS[activePeriod];
   const equationText = (model, unit) => `Sales = ${model.constant.toLocaleString()} ${model.slope < 0 ? '−' : '+'} ${Math.abs(model.slope).toLocaleString(undefined, { maximumFractionDigits: 2 })} × ${unit}`;
+  const ordersEquationText = (model, unit) => `Orders = ${model.constant.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${model.slope < 0 ? '−' : '+'} ${Math.abs(model.slope).toLocaleString(undefined, { maximumFractionDigits: 4 })} × ${unit}`;
   const view = {
     weekly: () => ({
       history: weekly.history,
       forecast: weeklyModelForecast(STATISTICIAN_WEEKLY_SALES_MODEL, weekly.firstWeek, weekly.history.length, config.horizon),
       // Sinusubok ang accuracy sa sales history ng statistician (kumpleto ang datos hanggang Aug 2026)
+      testLength: Math.round((weekStart(DATASET_END) - weekly.firstWeek) / (7 * 86400000)),
       mape: backtestLinearMape(weekly.history.slice(0, Math.round((weekStart(DATASET_END) - weekly.firstWeek) / (7 * 86400000)))),
+      ordersForecast: weeklyModelForecast(STATISTICIAN_WEEKLY_ORDERS_MODEL, weekly.firstWeek, weekly.history.length, config.horizon),
+      ordersEquation: ordersEquationText(STATISTICIAN_WEEKLY_ORDERS_MODEL, 'week no.'),
       label: (i) => weekDate(addWeeks(weekly.firstWeek, i)),
       longName: (i) => `week of ${weekDate(addWeeks(weekly.firstWeek, i), { month: 'long', day: 'numeric', year: 'numeric' })}`,
       equation: equationText(STATISTICIAN_WEEKLY_SALES_MODEL, 'week no.'),
@@ -99,7 +105,10 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
     monthly: () => ({
       history,
       forecast: linearModelForecast(STATISTICIAN_MONTHLY_SALES_MODEL, forecastStart, config.horizon),
+      testLength: monthIndex(DATASET_END) - firstMonth + 1,
       mape: backtestLinearMape(history.slice(0, monthIndex(DATASET_END) - firstMonth + 1)),
+      ordersForecast: linearModelForecast(STATISTICIAN_MONTHLY_ORDERS_MODEL, forecastStart, config.horizon),
+      ordersEquation: ordersEquationText(STATISTICIAN_MONTHLY_ORDERS_MODEL, 'month no.'),
       label: (i) => shortLabel(firstMonth + i),
       longName: (i) => longLabel(firstMonth + i),
       equation: equationText(STATISTICIAN_MONTHLY_SALES_MODEL, 'month no.'),
@@ -111,6 +120,9 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
       history: yearly.history,
       forecast: yearlyModelForecast(STATISTICIAN_YEARLY_SALES_MODEL, yearly.firstYear + yearly.history.length, config.horizon),
       mape: null,
+      testLength: null,
+      ordersForecast: yearlyModelForecast(STATISTICIAN_YEARLY_ORDERS_MODEL, yearly.firstYear + yearly.history.length, config.horizon),
+      ordersEquation: ordersEquationText(STATISTICIAN_YEARLY_ORDERS_MODEL, 'year'),
       label: (i) => String(yearly.firstYear + i),
       longName: (i) => (yearly.firstYear + i === new Date().getFullYear() ? `${yearly.firstYear + i} (in progress)` : String(yearly.firstYear + i)),
       equation: equationText(STATISTICIAN_YEARLY_SALES_MODEL, 'year'),
@@ -158,6 +170,20 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
   };
   const chartData = buildChartData(view.history, view.forecast, view.label, config.shown, mape, { orders: periodOrders, units: periodUnits });
   const forecastLabels = view.forecast.map((_, h) => view.label(view.history.length + h));
+
+  // [PREDICTIVE ANALYTICS] Customer Purchase Pattern: hula sa bilang ng orders (orders regression ng statistician),
+  // para sa parehong period ng Projected Sales; accuracy = parehong backtest sa sales history
+  const projectedOrders = view.ordersForecast[projectedIndex];
+  const previousOrders = periodOrders[lastIndex];
+  const ordersMape = view.testLength ? backtestLinearMape(periodOrders.slice(0, view.testLength)) : null;
+  const ordersAccuracy = ordersMape === null ? null : Math.max(0, 1 - ordersMape);
+  const ordersResult = STATISTICIAN_RESULTS.find((r) => r.level === config.label && r.measure.startsWith('Customer'));
+  const ordersChart = [
+    ...periodOrders.slice(windowStart).map((value, i) => ({ label: view.label(windowStart + i), actual: value })),
+    ...view.ordersForecast.map((value, h) => ({ label: view.label(view.history.length + h), forecast: value, isForecast: true })),
+  ];
+  // Ikinokonekta ang forecast line sa huling aktwal na punto
+  if (periodOrders.length > 0) ordersChart[periodOrders.length - 1 - windowStart].forecast = previousOrders;
 
   // [PREDICTIVE ANALYTICS] Hula sa bawat produkto para sa period na hinulaan (Projected Sales)
   const productById = new Map(products.map((p) => [p.id, p]));
@@ -220,6 +246,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
       : `, ${vsLastYear >= 0 ? 'up' : 'down'} ${Math.abs(Math.round(vsLastYear * 100))}% from the same months last year.`)
   );
   takeaways.push(`The statistician's monthly regression shows sales are basically flat (${monthlyResult.slope}, not significant), so plan for about ${peso(monthlyForecast[0])} a month.`);
+  takeaways.push(`Expect about ${Math.round(projectedOrders).toLocaleString()} orders for ${projectedLabel}, about ${peso(projectedOrders > 0 ? projected / projectedOrders : 0)} per order.`);
   if (restockNow.length > 0) {
     takeaways.push(`${listNames(restockNow.slice(0, 4).map((p) => p.name))}: current stock is below the predicted demand for ${projectedLabel}. Restock recommended.`);
   }
@@ -384,6 +411,22 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
       </Card>
 
       <ProductForecast predictions={predictions} periodName={periodName} periodLabel={projectedLabel} projectedSales={projected} imageOf={imageOf} isDarkMode={isDarkMode} comparison={comparison} method={method} />
+
+      <OrdersForecast
+        periodName={periodName}
+        periodLabel={projectedLabel}
+        unit={config.unit}
+        projectedOrders={projectedOrders}
+        previousOrders={previousOrders}
+        previousLabel={view.longName(lastIndex)}
+        projectedSales={projected}
+        previousSales={previous}
+        accuracy={ordersAccuracy}
+        result={ordersResult}
+        equation={view.ordersEquation}
+        chartData={ordersChart}
+        isDarkMode={isDarkMode}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <Card icon={Layers} title="Expected Demand by Category" description={`Share of the projected sales for ${projectedLabel}, by product category.`}>
