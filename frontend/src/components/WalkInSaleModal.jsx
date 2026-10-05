@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Store, Plus, Trash2 } from 'lucide-react';
 import AdminModal from './AdminModal';
 import { productCode } from '../utils/productCode';
-import { STATISTICIAN_DATASET } from '../data/statisticianResults';
+import { STATISTICIAN_DATASET } from '../linear-model/model';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
 const MEMBER_DISCOUNT = 0.10;

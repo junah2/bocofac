@@ -40,7 +40,7 @@ import MemberDetailModal from '../components/MemberDetailModal';
 import MobileScrollHint from '../components/MobileScrollHint';
 import ImageLightbox from '../components/ImageLightbox';
 import SearchBar, { matchesSearch } from '../components/SearchBar';
-import SalesForecast from '../components/SalesForecast';
+import SalesForecast from '../linear-model/SalesForecast';
 import SalesRecords from '../components/SalesRecords';
 import StockModal from '../components/StockModal';
 import ShareCapitalLedger from '../components/ShareCapitalLedger';

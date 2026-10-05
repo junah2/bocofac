@@ -1,5 +1,5 @@
 import { ANALYTICS_ORDER_STATUSES, weekStart } from './forecast';
-import { STATISTICIAN_DATASET } from '../data/statisticianResults';
+import { STATISTICIAN_DATASET } from './model';
 
 const DAY_MS = 86400000;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

@@ -13,13 +13,13 @@ import {
 } from 'recharts';
 import { Lightbulb, LineChart as LineChartIcon, Layers, AlertTriangle, TrendingUp, TrendingDown, History, ShoppingBag, PhilippinePeso, X, BarChart3 } from 'lucide-react';
 import { MONTH_LABELS } from '../utils/dateBuckets';
-import { buildSalesForecast, buildWeeklySales, buildYearlySales, weekStart, monthIndex, ANALYTICS_ORDER_STATUSES, monthFromIndex, backtestLinearMape, linearModelForecast, weeklyModelForecast, yearlyModelForecast } from '../utils/forecast';
-import { STATISTICIAN_MONTHLY_SALES_MODEL, STATISTICIAN_WEEKLY_SALES_MODEL, STATISTICIAN_YEARLY_SALES_MODEL, STATISTICIAN_RESULTS, STATISTICIAN_DATASET } from '../data/statisticianResults';
-import { Card } from './CoopInsights';
+import { buildSalesForecast, buildWeeklySales, buildYearlySales, weekStart, monthIndex, ANALYTICS_ORDER_STATUSES, monthFromIndex, backtestLinearMape, linearModelForecast, weeklyModelForecast, yearlyModelForecast } from './forecast';
+import { STATISTICIAN_MONTHLY_SALES_MODEL, STATISTICIAN_WEEKLY_SALES_MODEL, STATISTICIAN_YEARLY_SALES_MODEL, STATISTICIAN_RESULTS, STATISTICIAN_DATASET } from './model';
+import { Card } from '../components/CoopInsights';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
-import { analyticsOrders, buildProductPerformance, predictProductPerformance, performanceName, toProductPredictions } from '../utils/productPerformance';
+import { analyticsOrders, buildProductPerformance, predictProductPerformance, performanceName, toProductPredictions } from './productPerformance';
 import ProductForecast from './ProductForecast';
-import BusiestOrderingDays from './BusiestOrderingDays';
+import BusiestOrderingDays from '../components/BusiestOrderingDays';
 
 const PALETTE = {
   light: { grid: '#e2e8f0', axis: '#94a3b8', tooltipBg: '#ffffff', tooltipBorder: '#e2e8f0', tooltipText: '#0f172a', actual: '#2f6f4b', forecast: '#d97706', band: '#f59e0b', up: '#2f6f4b', down: '#d97706', muted: '#cbd5e1' },

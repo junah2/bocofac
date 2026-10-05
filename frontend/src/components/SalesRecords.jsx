@@ -4,7 +4,7 @@ import SearchBar, { matchesSearch } from './SearchBar';
 import MobileScrollHint from './MobileScrollHint';
 import WalkInSaleModal from './WalkInSaleModal';
 import { productCode } from '../utils/productCode';
-import { REALIZED_ORDER_STATUSES } from '../utils/forecast';
+import { REALIZED_ORDER_STATUSES } from '../linear-model/forecast';
 import { printSalesRecords } from '../utils/printDocument';
 
 const PAGE_SIZE = 50;

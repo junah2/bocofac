@@ -40,7 +40,7 @@ import ApplicantDetailModal from '../components/ApplicantDetailModal';
 import MobileScrollHint from '../components/MobileScrollHint';
 import Footer from '../components/Footer';
 import CoopInsights from '../components/CoopInsights';
-import SalesForecast from '../components/SalesForecast';
+import SalesForecast from '../linear-model/SalesForecast';
 import SearchBar, { matchesSearch } from '../components/SearchBar';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import { isLowStock } from '../utils/stock';

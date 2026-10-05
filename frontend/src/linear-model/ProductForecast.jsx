@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, Cell, CartesianGrid, XAxis, YAxis, Tooltip, LabelList } from 'recharts';
 import { Sparkles, Crown, Flame, PackageX, CalendarRange, Trophy, Target, Info } from 'lucide-react';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
-import MobileScrollHint from './MobileScrollHint';
+import MobileScrollHint from '../components/MobileScrollHint';
 
 const TABLE_PREVIEW = 10;
 const TOP_COUNT = 5;
