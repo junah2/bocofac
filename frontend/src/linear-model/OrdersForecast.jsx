@@ -33,7 +33,7 @@ function SummaryCard({ icon: Icon, label, value, sub, tone = 'emerald' }) {
 // orders regression ng statistician (model.js), kasama ang average na benta bawat order
 export default function OrdersForecast({
   periodName, periodLabel, unit, projectedOrders, previousOrders, previousLabel,
-  projectedSales, previousSales, accuracy, result, equation, chartData, isDarkMode,
+  projectedSales, previousSales, accuracy, accuracyNote, result, equation, chartData, isDarkMode,
 }) {
   const chart = CHART[isDarkMode ? 'dark' : 'light'];
   const change = previousOrders > 0 ? (projectedOrders - previousOrders) / previousOrders : null;
@@ -110,7 +110,7 @@ export default function OrdersForecast({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
         {[
           { label: 'Model', value: equation },
-          { label: 'Tested accuracy', value: accuracy === null ? 'Not enough data' : `${Math.round(accuracy * 100)}% on the last 6 ${unit}s` },
+          { label: 'Tested accuracy', value: accuracy === null ? '—' : `${Math.round(accuracy * 100)}% ${accuracyNote}` },
           { label: 'R²', value: result ? result.r2.toFixed(3) : '—' },
           { label: 'p-value', value: result ? `${result.p.toFixed(3)} (${result.p < 0.05 ? 'significant' : 'not significant'})` : '—' },
         ].map((item) => (

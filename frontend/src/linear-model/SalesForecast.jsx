@@ -49,6 +49,16 @@ const weekDate = (d, opts = { month: 'short', day: 'numeric' }) => d.toLocaleDat
 const addWeeks = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n * 7);
 // Huling araw ng sales history na sinuri ng statistician
 const DATASET_END = new Date(`${STATISTICIAN_DATASET.to}T00:00`);
+// [PREDICTIVE ANALYTICS] Accuracy ng yearly model: hula vs aktwal sa mga buong taon ng sales history
+// (hindi kasama ang unang taon at ang taon ng huling datos, dahil kulang ang buwan nila)
+function yearlyFitMape(model, values, firstYear) {
+  const lastYear = DATASET_END.getFullYear();
+  const errors = values
+    .map((value, i) => ({ value, year: firstYear + i }))
+    .filter(({ value, year }) => year > firstYear && year < lastYear && value > 0)
+    .map(({ value, year }) => Math.abs(value - (model.constant + model.slope * year)) / value);
+  return errors.length ? errors.reduce((s, e) => s + e, 0) / errors.length : null;
+}
 const listNames = (items) => (items.length <= 2 ? items.join(' and ') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
 
 export default function SalesForecast({ orders: allOrders = [], products = [], isDarkMode, children }) {
@@ -119,7 +129,8 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
     yearly: () => ({
       history: yearly.history,
       forecast: yearlyModelForecast(STATISTICIAN_YEARLY_SALES_MODEL, yearly.firstYear + yearly.history.length, config.horizon),
-      mape: null,
+      mape: yearlyFitMape(STATISTICIAN_YEARLY_SALES_MODEL, yearly.history, yearly.firstYear),
+      accuracyNote: `on the complete years ${yearly.firstYear + 1}–${DATASET_END.getFullYear() - 1}`,
       testLength: null,
       ordersForecast: yearlyModelForecast(STATISTICIAN_YEARLY_ORDERS_MODEL, yearly.firstYear + yearly.history.length, config.horizon),
       ordersEquation: ordersEquationText(STATISTICIAN_YEARLY_ORDERS_MODEL, 'year'),
@@ -175,7 +186,10 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
   // para sa parehong period ng Projected Sales; accuracy = parehong backtest sa sales history
   const projectedOrders = view.ordersForecast[projectedIndex];
   const previousOrders = periodOrders[lastIndex];
-  const ordersMape = view.testLength ? backtestLinearMape(periodOrders.slice(0, view.testLength)) : null;
+  const ordersMape = activePeriod === 'yearly'
+    ? yearlyFitMape(STATISTICIAN_YEARLY_ORDERS_MODEL, periodOrders, yearly.firstYear)
+    : backtestLinearMape(periodOrders.slice(0, view.testLength));
+  const accuracyNote = view.accuracyNote || `on the last 6 ${config.unit}s of the sales history`;
   const ordersAccuracy = ordersMape === null ? null : Math.max(0, 1 - ordersMape);
   const ordersResult = STATISTICIAN_RESULTS.find((r) => r.level === config.label && r.measure.startsWith('Customer'));
   const ordersChart = [
@@ -347,7 +361,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
       <Card
         icon={LineChartIcon}
         title="Projected Sales Trend"
-        description={`Actual ${config.adjective} sales and the statistician's ${config.adjective} linear regression forecast (${view.equation}).${accuracy === null ? '' : ` Tested accuracy: ${Math.round(accuracy * 100)}% on the last 6 ${config.unit}s of the sales history.`}${view.caution ? ` ${view.caution}` : ''}`}
+        description={`Actual ${config.adjective} sales and the statistician's ${config.adjective} linear regression forecast (${view.equation}).${accuracy === null ? '' : ` Tested accuracy: ${Math.round(accuracy * 100)}% ${view.accuracyNote || `on the last 6 ${config.unit}s of the sales history`}.`}${view.caution ? ` ${view.caution}` : ''}`}
       >
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
@@ -422,6 +436,7 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
         projectedSales={projected}
         previousSales={previous}
         accuracy={ordersAccuracy}
+        accuracyNote={accuracyNote}
         result={ordersResult}
         equation={view.ordersEquation}
         chartData={ordersChart}
