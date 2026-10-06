@@ -1,6 +1,6 @@
 import React from 'react';
 import { ResponsiveContainer, ComposedChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
-import { Users, ShoppingCart, History, TrendingUp, TrendingDown, Receipt, Info } from 'lucide-react';
+import { Users, ShoppingCart, History, TrendingUp, TrendingDown, Receipt } from 'lucide-react';
 
 const CHART = {
   light: { grid: '#e2e8f0', axis: '#94a3b8', tooltipBg: '#ffffff', tooltipBorder: '#e2e8f0', tooltipText: '#0f172a', actual: '#2f6f4b', forecast: '#d97706' },
@@ -107,25 +107,26 @@ export default function OrdersForecast({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-        {[
-          { label: 'Model', value: equation },
-          { label: 'Tested accuracy', value: accuracy === null ? '—' : `${Math.round(accuracy * 100)}% ${accuracyNote}` },
-          { label: 'R²', value: result ? result.r2.toFixed(3) : '—' },
-          { label: 'p-value', value: result ? `${result.p.toFixed(3)} (${result.p < 0.05 ? 'significant' : 'not significant'})` : '—' },
-        ].map((item) => (
-          <div key={item.label} className="rounded-xl bg-slate-50 dark:bg-slate-800/60 px-3 py-2.5 min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
-            <p className="font-semibold text-slate-800 dark:text-slate-100 break-words">{item.value}</p>
-          </div>
-        ))}
+      <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800">
+        <table className="w-full min-w-[560px] text-sm">
+          <thead className="bg-slate-50 dark:bg-slate-800/60">
+            <tr className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <th className="px-3 py-2.5">Model</th>
+              <th className="px-3 py-2.5">Tested Accuracy</th>
+              <th className="px-3 py-2.5 text-right">R²</th>
+              <th className="px-3 py-2.5 text-right">p-value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="text-slate-800 dark:text-slate-100">
+              <td className="px-3 py-2.5 font-semibold whitespace-nowrap">{equation}</td>
+              <td className="px-3 py-2.5">{accuracy === null ? '—' : `${Math.round(accuracy * 100)}% ${accuracyNote}`}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{result ? result.r2.toFixed(3) : '—'}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">{result ? `${result.p.toFixed(3)} (${result.p < 0.05 ? 'significant' : 'not significant'})` : '—'}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-
-      <p className="flex items-start gap-2 text-[11px] text-slate-400 leading-relaxed">
-        <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-        Source: the statistician&apos;s linear regression of the number of orders per {unit} (Customer Purchase Pattern), trained on the sales history.
-        The number of orders in that history is nearly the same every {unit}, so the forecast is nearly flat. These are forecasts, not guaranteed orders.
-      </p>
     </div>
   );
 }
