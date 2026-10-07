@@ -189,7 +189,6 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
   const ordersMape = activePeriod === 'yearly'
     ? yearlyFitMape(STATISTICIAN_YEARLY_ORDERS_MODEL, periodOrders, yearly.firstYear)
     : backtestLinearMape(periodOrders.slice(0, view.testLength));
-  const accuracyNote = view.accuracyNote || `on the last 6 ${config.unit}s of the sales history`;
   const ordersAccuracy = ordersMape === null ? null : Math.max(0, 1 - ordersMape);
   const ordersResult = STATISTICIAN_RESULTS.find((r) => r.level === config.label && r.measure.startsWith('Customer'));
   const ordersChart = [
@@ -436,7 +435,6 @@ export default function SalesForecast({ orders: allOrders = [], products = [], i
         projectedSales={projected}
         previousSales={previous}
         accuracy={ordersAccuracy}
-        accuracyNote={accuracyNote}
         result={ordersResult}
         equation={view.ordersEquation}
         chartData={ordersChart}

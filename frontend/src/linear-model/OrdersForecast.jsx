@@ -33,7 +33,7 @@ function SummaryCard({ icon: Icon, label, value, sub, tone = 'emerald' }) {
 // orders regression ng statistician (model.js), kasama ang average na benta bawat order
 export default function OrdersForecast({
   periodName, periodLabel, unit, projectedOrders, previousOrders, previousLabel,
-  projectedSales, previousSales, accuracy, accuracyNote, result, equation, chartData, isDarkMode,
+  projectedSales, previousSales, accuracy, result, equation, chartData, isDarkMode,
 }) {
   const chart = CHART[isDarkMode ? 'dark' : 'light'];
   const change = previousOrders > 0 ? (projectedOrders - previousOrders) / previousOrders : null;
@@ -120,9 +120,9 @@ export default function OrdersForecast({
           <tbody>
             <tr className="text-slate-800 dark:text-slate-100">
               <td className="px-3 py-2.5 font-semibold whitespace-nowrap">{equation}</td>
-              <td className="px-3 py-2.5">{accuracy === null ? '—' : `${Math.round(accuracy * 100)}% ${accuracyNote}`}</td>
+              <td className="px-3 py-2.5 tabular-nums">{accuracy === null ? '—' : `${Math.round(accuracy * 100)}%`}</td>
               <td className="px-3 py-2.5 text-right tabular-nums">{result ? result.r2.toFixed(3) : '—'}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">{result ? `${result.p.toFixed(3)} (${result.p < 0.05 ? 'significant' : 'not significant'})` : '—'}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{result ? result.p.toFixed(3) : '—'}</td>
             </tr>
           </tbody>
         </table>
